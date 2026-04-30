@@ -1,6 +1,6 @@
 // packages/adapter/src/serialize.test.ts
 import { describe, it, expect } from 'vitest'
-import { createMachine, setup } from 'xstate'
+import { createMachine, setup, fromPromise } from 'xstate'
 import { serializeMachine } from './serialize.js'
 
 describe('serializeMachine', () => {
@@ -61,6 +61,46 @@ describe('serializeMachine', () => {
     const transition = result.root.states.idle.on[0]
     expect(transition.guard).toBe('isReady')
     expect(transition.actions).toEqual(['doSomething'])
+  })
+
+  it('serializes always transitions', () => {
+    const machine = createMachine({
+      id: 'always-test',
+      initial: 'checking',
+      states: {
+        checking: {
+          always: [{ target: 'done' }],
+        },
+        done: {},
+      },
+    })
+    const result = serializeMachine(machine)
+    expect(result.root.states.checking.always).toHaveLength(1)
+    expect(result.root.states.checking.always[0].targets).toContain('always-test.done')
+  })
+
+  it('serializes invoked services', () => {
+    const fetchActor = fromPromise(async () => ({ data: 'ok' }))
+    const machine = setup({
+      actors: { fetchData: fetchActor },
+    }).createMachine({
+      id: 'invoke-test',
+      initial: 'loading',
+      states: {
+        loading: {
+          invoke: {
+            id: 'fetch',
+            src: 'fetchData',
+            onDone: 'done',
+          },
+        },
+        done: {},
+      },
+    })
+    const result = serializeMachine(machine)
+    expect(result.root.states.loading.invoke).toHaveLength(1)
+    expect(result.root.states.loading.invoke[0].id).toBe('fetch')
+    expect(result.root.states.loading.invoke[0].src).toBeTruthy()
   })
 
   it('includes sourceLocation when provided', () => {

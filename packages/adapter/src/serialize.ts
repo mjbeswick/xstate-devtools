@@ -33,16 +33,11 @@ function serializeTransitionList(transitions: any[]): SerializedTransition[] {
 }
 
 function serializeInvokes(node: any): SerializedInvoke[] {
-  const invokes: any[] = Array.isArray(node.config?.invoke)
-    ? node.config.invoke
-    : node.config?.invoke
-    ? [node.config.invoke]
-    : []
-  return invokes.map((inv: any) => ({
+  return (node.invoke as any[]).map((inv: any) => ({
     id: inv.id ?? '(unknown)',
     src: typeof inv.src === 'string'
       ? inv.src
-      : inv.src?.type ?? inv.src?.name ?? String(inv.src ?? '(inline)'),
+      : inv.src?.id ?? inv.src?.name ?? '(inline)',
   }))
 }
 
@@ -59,8 +54,8 @@ function serializeNode(node: any): SerializedStateNode {
   return {
     id: node.id,
     key: node.key,
-    type: node.type ?? 'atomic',
-    initial: node.config?.initial,
+    type: node.type,
+    initial: node.initial?.target?.[0]?.key,
     states: Object.fromEntries(
       Object.entries(node.states ?? {}).map(([k, v]) => [k, serializeNode(v)])
     ),

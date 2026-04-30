@@ -34,7 +34,14 @@ describe('sanitize', () => {
     expect(result.entries).toEqual([['key', 'value']])
   })
 
-  it('handles circular-like depth limit', () => {
+  it('handles actual circular references', () => {
+    const a: any = {}
+    a.self = a
+    expect(() => sanitize(a)).not.toThrow()
+    expect(JSON.stringify(sanitize(a))).toContain('[MaxDepth]')
+  })
+
+  it('handles deep linear nesting', () => {
     let deep: any = {}
     let curr = deep
     for (let i = 0; i < 15; i++) { curr.child = {}; curr = curr.child }
