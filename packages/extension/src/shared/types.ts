@@ -14,6 +14,8 @@ export interface SerializedInvoke {
   src: string
 }
 
+export type SerializedEvent = { type: string; [key: string]: unknown }
+
 export interface SerializedStateNode {
   id: string
   key: string
@@ -51,7 +53,7 @@ export interface ActorRecord {
 
 export interface EventRecord {
   sessionId: string
-  event: { type: string; [key: string]: unknown }
+  event: SerializedEvent
   snapshotAfter: SerializedSnapshot
   timestamp: number
   globalSeq: number
@@ -67,6 +69,8 @@ export type PageToExtensionMessage =
       parentSessionId?: string
       machine: SerializedMachine | null
       snapshot: SerializedSnapshot
+      globalSeq: number
+      timestamp: number
     }
   | {
       type: 'XSTATE_SNAPSHOT'
@@ -78,7 +82,7 @@ export type PageToExtensionMessage =
   | {
       type: 'XSTATE_EVENT'
       sessionId: string
-      event: { type: string; [key: string]: unknown }
+      event: SerializedEvent
       snapshotAfter: SerializedSnapshot
       timestamp: number
       globalSeq: number
@@ -89,11 +93,12 @@ export type PageToExtensionMessage =
     }
 
 // panel → service worker → content script → injected world → adapter
-export type ExtensionToPageMessage = {
-  type: 'XSTATE_DISPATCH'
-  sessionId: string
-  event: { type: string; [key: string]: unknown }
-}
+export type ExtensionToPageMessage =
+  | {
+      type: 'XSTATE_DISPATCH'
+      sessionId: string
+      event: SerializedEvent
+    }
 
 // Marker added to all postMessages so content script can filter
 export type MarkedPageMessage = PageToExtensionMessage & { __xstateDevtools: true }
