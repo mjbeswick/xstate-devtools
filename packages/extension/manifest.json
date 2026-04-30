@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "XState DevTools",
+  "version": "0.1.0",
+  "description": "Inspect XState v5 machines at runtime",
+  "devtools_page": "src/devtools/devtools.html",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/injected/index.ts"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_start"
+    }
+  ],
+  "background": {
+    "service_worker": "src/background/index.ts",
+    "type": "module"
+  },
+  "permissions": [],
+  "icons": {}
+}
