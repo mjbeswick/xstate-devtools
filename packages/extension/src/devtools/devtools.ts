@@ -2,7 +2,7 @@
 chrome.devtools.panels.create(
   'XState',
   '',
-  '../panel/index.html',
+  'src/panel/index.html',
   (panel) => {
     void panel
   }
