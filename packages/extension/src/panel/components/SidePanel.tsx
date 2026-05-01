@@ -4,6 +4,8 @@ import { useStore, getDisplaySnapshot } from '../store.js'
 import { usePort } from '../port-context.js'
 import type { SerializedStateNode, SerializedTransition } from '../../shared/types.js'
 
+type Tab = 'transitions' | 'context'
+
 function findNode(root: SerializedStateNode, id: string): SerializedStateNode | null {
   if (root.id === id) return root
   for (const child of Object.values(root.states)) {
@@ -51,6 +53,24 @@ function TransitionRow({
   )
 }
 
+function TabButton({
+  active, onClick, children,
+}: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1, padding: '6px 0', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+        background: 'transparent', border: 'none',
+        borderBottom: active ? '2px solid #1890ff' : '2px solid transparent',
+        color: active ? '#1890ff' : '#666',
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
 export function SidePanel() {
   const selectedActorId = useStore((s) => s.selectedActorId)
   const selectedStateNodeId = useStore((s) => s.selectedStateNodeId)
@@ -61,6 +81,7 @@ export function SidePanel() {
 
   const port = usePort()
 
+  const [tab, setTab] = useState<Tab>('transitions')
   const [payloadJson, setPayloadJson] = useState('{}')
   const [payloadError, setPayloadError] = useState<string | null>(null)
   const [customEventType, setCustomEventType] = useState('')
@@ -97,84 +118,117 @@ export function SidePanel() {
   }
 
   return (
-    <div style={{ padding: 12, borderLeft: '1px solid #eee', height: '100%', overflow: 'auto' }}>
-      <div style={{ fontWeight: 600, fontSize: 11, color: '#666', marginBottom: 8 }}>
-        {node ? `TRANSITIONS FROM: ${node.key}` : 'SELECTED STATE'}
+    <div style={{ borderLeft: '1px solid #eee', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid #eee', flexShrink: 0 }}>
+        <TabButton active={tab === 'transitions'} onClick={() => setTab('transitions')}>
+          Transitions
+        </TabButton>
+        <TabButton active={tab === 'context'} onClick={() => setTab('context')}>
+          Context
+        </TabButton>
       </div>
 
-      {node && node.on.length > 0 ? (
-        <div style={{ marginBottom: 12 }}>
-          {node.on.map((t, i) => (
-            <TransitionRow key={i} transition={t} onSend={dispatch} />
-          ))}
-          {node.always.length > 0 && (
-            <>
-              <div style={{ fontSize: 10, color: '#aaa', margin: '8px 0 4px' }}>ALWAYS</div>
-              {node.always.map((t, i) => (
-                <TransitionRow key={i} transition={t} onSend={() => {}} />
-              ))}
-            </>
-          )}
-        </div>
-      ) : node ? (
-        <div style={{ color: '#aaa', fontSize: 11, marginBottom: 12 }}>
-          No transitions from this state.
-        </div>
-      ) : (
-        <div style={{ color: '#aaa', fontSize: 11, marginBottom: 12 }}>
-          Select a state node in the tree.
-        </div>
-      )}
+      <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+        {tab === 'transitions' && (
+          <>
+            <div style={{ fontWeight: 600, fontSize: 11, color: '#666', marginBottom: 8 }}>
+              {node ? `TRANSITIONS FROM: ${node.key}` : 'SELECTED STATE'}
+            </div>
 
-      <div style={{ fontWeight: 600, fontSize: 11, color: '#666', marginBottom: 4 }}>PAYLOAD</div>
-      <textarea
-        value={payloadJson}
-        onChange={(e) => setPayloadJson(e.target.value)}
-        style={{
-          width: '100%', height: 80, fontFamily: 'monospace', fontSize: 11,
-          border: payloadError ? '1px solid red' : '1px solid #d9d9d9',
-          borderRadius: 4, padding: 4, resize: 'vertical',
-        }}
-      />
-      {payloadError && <div style={{ color: 'red', fontSize: 10 }}>{payloadError}</div>}
+            {node && node.on.length > 0 ? (
+              <div style={{ marginBottom: 12 }}>
+                {node.on.map((t, i) => (
+                  <TransitionRow key={i} transition={t} onSend={dispatch} />
+                ))}
+                {node.always.length > 0 && (
+                  <>
+                    <div style={{ fontSize: 10, color: '#aaa', margin: '8px 0 4px' }}>ALWAYS</div>
+                    {node.always.map((t, i) => (
+                      <TransitionRow key={i} transition={t} onSend={() => {}} />
+                    ))}
+                  </>
+                )}
+              </div>
+            ) : node ? (
+              <div style={{ color: '#aaa', fontSize: 11, marginBottom: 12 }}>
+                No transitions from this state.
+              </div>
+            ) : (
+              <div style={{ color: '#aaa', fontSize: 11, marginBottom: 12 }}>
+                Select a state node in the tree.
+              </div>
+            )}
 
-      <div style={{ fontWeight: 600, fontSize: 11, color: '#666', margin: '8px 0 4px' }}>
-        SEND CUSTOM EVENT
+            <div style={{ fontWeight: 600, fontSize: 11, color: '#666', marginBottom: 4 }}>PAYLOAD</div>
+            <textarea
+              value={payloadJson}
+              onChange={(e) => setPayloadJson(e.target.value)}
+              style={{
+                width: '100%', height: 80, fontFamily: 'monospace', fontSize: 11,
+                border: payloadError ? '1px solid red' : '1px solid #d9d9d9',
+                borderRadius: 4, padding: 4, resize: 'vertical',
+              }}
+            />
+            {payloadError && <div style={{ color: 'red', fontSize: 10 }}>{payloadError}</div>}
+
+            <div style={{ fontWeight: 600, fontSize: 11, color: '#666', margin: '8px 0 4px' }}>
+              SEND CUSTOM EVENT
+            </div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <input
+                value={customEventType}
+                onChange={(e) => setCustomEventType(e.target.value)}
+                placeholder="EVENT_TYPE"
+                style={{
+                  flex: 1, fontFamily: 'monospace', fontSize: 11,
+                  padding: '2px 6px', border: '1px solid #d9d9d9', borderRadius: 4,
+                }}
+              />
+              <button
+                onClick={() => customEventType && dispatch(customEventType)}
+                style={{
+                  padding: '2px 10px', fontSize: 11, cursor: 'pointer',
+                  background: '#52c41a', color: '#fff', border: 'none', borderRadius: 4,
+                }}
+              >
+                Send
+              </button>
+            </div>
+          </>
+        )}
+
+        {tab === 'context' && (
+          <>
+            <div style={{ fontWeight: 600, fontSize: 11, color: '#666', marginBottom: 8 }}>
+              CONTEXT — {actor.machine?.id ?? 'actor'}
+            </div>
+            {snapshot ? (
+              <pre style={{
+                fontSize: 11, background: '#f5f5f5', padding: 8,
+                borderRadius: 4, overflow: 'auto', margin: 0,
+                fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              }}>
+                {snapshot.context === undefined
+                  ? '(no context)'
+                  : JSON.stringify(snapshot.context, null, 2)}
+              </pre>
+            ) : (
+              <div style={{ color: '#aaa', fontSize: 11 }}>No snapshot available.</div>
+            )}
+
+            {snapshot?.status && snapshot.status !== 'active' && (
+              <div style={{ marginTop: 12, fontSize: 11, color: '#d4380d' }}>
+                Status: <strong>{snapshot.status}</strong>
+                {snapshot.error && (
+                  <pre style={{ fontSize: 10, marginTop: 4 }}>
+                    {JSON.stringify(snapshot.error, null, 2)}
+                  </pre>
+                )}
+              </div>
+            )}
+          </>
+        )}
       </div>
-      <div style={{ display: 'flex', gap: 4 }}>
-        <input
-          value={customEventType}
-          onChange={(e) => setCustomEventType(e.target.value)}
-          placeholder="EVENT_TYPE"
-          style={{
-            flex: 1, fontFamily: 'monospace', fontSize: 11,
-            padding: '2px 6px', border: '1px solid #d9d9d9', borderRadius: 4,
-          }}
-        />
-        <button
-          onClick={() => customEventType && dispatch(customEventType)}
-          style={{
-            padding: '2px 10px', fontSize: 11, cursor: 'pointer',
-            background: '#52c41a', color: '#fff', border: 'none', borderRadius: 4,
-          }}
-        >
-          Send
-        </button>
-      </div>
-
-      {actor.machine?.root && snapshot && (
-        <div style={{ marginTop: 16 }}>
-          <div style={{ fontWeight: 600, fontSize: 11, color: '#666', marginBottom: 4 }}>
-            CONTEXT
-          </div>
-          <pre style={{
-            fontSize: 10, background: '#f5f5f5', padding: 8,
-            borderRadius: 4, overflow: 'auto', maxHeight: 200,
-          }}>
-            {JSON.stringify(snapshot.context, null, 2)}
-          </pre>
-        </div>
-      )}
     </div>
   )
 }
