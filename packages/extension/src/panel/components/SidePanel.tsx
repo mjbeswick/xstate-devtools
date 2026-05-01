@@ -1,6 +1,7 @@
 // packages/extension/src/panel/components/SidePanel.tsx
-import React, { useState, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useCallback } from 'react'
 import { useStore, getDisplaySnapshot } from '../store.js'
+import { usePort } from '../port-context.js'
 import type { SerializedStateNode, SerializedTransition } from '../../shared/types.js'
 
 function findNode(root: SerializedStateNode, id: string): SerializedStateNode | null {
@@ -58,20 +59,11 @@ export function SidePanel() {
     selectedActorId ? getDisplaySnapshot(s, selectedActorId) : null
   )
 
+  const port = usePort()
+
   const [payloadJson, setPayloadJson] = useState('{}')
   const [payloadError, setPayloadError] = useState<string | null>(null)
   const [customEventType, setCustomEventType] = useState('')
-
-  // Reuse a single port per panel session rather than creating per dispatch
-  const portRef = useRef<chrome.runtime.Port | null>(null)
-  useEffect(() => {
-    const tabId = chrome.devtools.inspectedWindow.tabId
-    portRef.current = chrome.runtime.connect({ name: `xstate-panel-${tabId}` })
-    return () => {
-      portRef.current?.disconnect()
-      portRef.current = null
-    }
-  }, [])
 
   const actor = selectedActorId ? actors.get(selectedActorId) : null
   const node = actor?.machine && selectedStateNodeId
@@ -79,7 +71,7 @@ export function SidePanel() {
     : null
 
   const dispatch = useCallback((eventType: string) => {
-    if (!selectedActorId || !portRef.current) return
+    if (!selectedActorId || !port) return
     let payload: Record<string, unknown> = {}
     try {
       payload = JSON.parse(payloadJson)
@@ -88,13 +80,13 @@ export function SidePanel() {
       setPayloadError('Invalid JSON')
       return
     }
-    portRef.current.postMessage({
+    port.postMessage({
       __xstateDevtools: true,
       type: 'XSTATE_DISPATCH',
       sessionId: selectedActorId,
       event: { type: eventType, ...payload },
     })
-  }, [selectedActorId, payloadJson])
+  }, [selectedActorId, payloadJson, port])
 
   if (!actor) {
     return (

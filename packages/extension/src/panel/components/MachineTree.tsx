@@ -39,10 +39,15 @@ function StateNodeRow({
           borderLeft: isActive ? '3px solid #52c41a' : '3px solid transparent',
           fontFamily: 'monospace', fontSize: 12,
         }}
-        onClick={() => { onSelect(node.id); if (hasChildren) setExpanded((e) => !e) }}
+        onClick={() => onSelect(node.id)}
       >
         {hasChildren && (
-          <span style={{ color: '#aaa', fontSize: 10, width: 10 }}>{expanded ? '▼' : '▶'}</span>
+          <span
+            onClick={(e) => { e.stopPropagation(); setExpanded((ex) => !ex) }}
+            style={{ color: '#aaa', fontSize: 10, width: 10, cursor: 'pointer' }}
+          >
+            {expanded ? '▼' : '▶'}
+          </span>
         )}
         {!hasChildren && <span style={{ width: 10 }} />}
         <span style={{ color: typeColor[node.type] ?? '#595959', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>

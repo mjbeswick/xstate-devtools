@@ -66,12 +66,12 @@ export function EventLog() {
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', fontFamily: 'monospace', fontSize: 11 }}>
-        {filtered.map((evt, i) => {
+        {filtered.map((evt) => {
           const actorLabel = actors.get(evt.sessionId)?.machine?.id ?? evt.sessionId.slice(0, 12)
           const isCurrent = evt.globalSeq === timeTravelSeq
           return (
             <div
-              key={i}
+              key={evt.globalSeq}
               onClick={() => {
                 timeTravel(evt.globalSeq)
                 selectActor(evt.sessionId)

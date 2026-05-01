@@ -1,5 +1,5 @@
 // packages/extension/src/panel/components/ActorList.tsx
-import React from 'react'
+import React, { useMemo } from 'react'
 import { useStore } from '../store.js'
 
 export function ActorList() {
@@ -8,12 +8,15 @@ export function ActorList() {
   const selectActor = useStore((s) => s.selectActor)
 
   // Build parent→children map
-  const childrenOf = new Map<string | undefined, string[]>()
-  for (const actor of actors.values()) {
-    const parent = actor.parentSessionId
-    if (!childrenOf.has(parent)) childrenOf.set(parent, [])
-    childrenOf.get(parent)!.push(actor.sessionId)
-  }
+  const childrenOf = useMemo(() => {
+    const map = new Map<string | undefined, string[]>()
+    for (const actor of actors.values()) {
+      const parent = actor.parentSessionId
+      if (!map.has(parent)) map.set(parent, [])
+      map.get(parent)!.push(actor.sessionId)
+    }
+    return map
+  }, [actors])
 
   const roots = childrenOf.get(undefined) ?? []
 
