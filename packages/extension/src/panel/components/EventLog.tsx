@@ -29,9 +29,10 @@ export function EventLog() {
     : events
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', borderTop: '1px solid #eee' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px',
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '0 10px', minHeight: 30, boxSizing: 'border-box',
         borderBottom: '1px solid #eee', background: '#fafafa', flexShrink: 0,
       }}>
         <span style={{ fontWeight: 600, fontSize: 11, color: '#666' }}>EVENTS</span>
@@ -55,14 +56,6 @@ export function EventLog() {
         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#aaa' }}>
           {events.length} events
         </span>
-        {timeTravelSeq !== null && (
-          <button
-            onClick={() => timeTravel(null)}
-            style={{ fontSize: 11, cursor: 'pointer' }}
-          >
-            ▶ Back to live
-          </button>
-        )}
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', fontFamily: 'monospace', fontSize: 11 }}>
