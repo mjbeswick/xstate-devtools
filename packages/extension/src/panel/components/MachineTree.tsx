@@ -191,7 +191,7 @@ export function MachineTree() {
       padding: '4px 6px', borderBottom: '1px solid #eee',
       fontSize: 11, color: '#666', position: 'sticky', top: 0,
       background: '#fafafa', zIndex: 1,
-      display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+      display: 'flex', alignItems: 'center', gap: 6,
     }}>
       <HeaderIconButton
         onClick={collapse.toggleLeft}
@@ -202,27 +202,22 @@ export function MachineTree() {
 
       {actor?.machine && (
         <>
-          <span style={{ fontWeight: 600 }}>{actor.machine.id}</span>
+          <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{actor.machine.id}</span>
           {actor.machine.sourceLocation && (
             <a
               href={`vscode://file/${actor.machine.sourceLocation}`}
-              style={{ color: '#1890ff', fontSize: 10, textDecoration: 'none' }}
+              style={{ color: '#1890ff', fontSize: 10, textDecoration: 'none', whiteSpace: 'nowrap' }}
               title="Open in VS Code"
             >
               ↗ source
             </a>
           )}
-        </>
-      )}
-
-      {actor?.machine && (
-        <>
           <input
             value={treeFilter}
             onChange={(e) => setTreeFilter(e.target.value)}
             placeholder="Search states…"
             style={{
-              marginLeft: 'auto', flex: '1 1 140px', minWidth: 100, maxWidth: 240,
+              flex: '1 1 80px', minWidth: 60,
               padding: '2px 6px', fontSize: 11, fontFamily: 'inherit',
               border: '1px solid #d9d9d9', borderRadius: 4,
             }}
@@ -242,6 +237,7 @@ export function MachineTree() {
         </>
       )}
 
+      <span style={{ marginLeft: 'auto' }} />
       <HeaderIconButton
         onClick={collapse.toggleRight}
         title={collapse.rightCollapsed ? 'Show side panel' : 'Hide side panel'}
