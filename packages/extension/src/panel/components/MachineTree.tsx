@@ -247,12 +247,6 @@ export function MachineTree() {
       background: '#fafafa', flexShrink: 0,
       display: 'flex', alignItems: 'center', gap: 6,
     }}>
-      <HeaderIconButton
-        onClick={collapse.toggleBottom}
-        title={collapse.bottomCollapsed ? 'Show event log' : 'Hide event log'}
-      >
-        <PanelToggleIcon side="bottom" collapsed={collapse.bottomCollapsed} />
-      </HeaderIconButton>
       {actor?.machine && (
         <>
           <input
@@ -279,6 +273,13 @@ export function MachineTree() {
           )}
         </>
       )}
+      <span style={{ marginLeft: 'auto' }} />
+      <HeaderIconButton
+        onClick={collapse.toggleBottom}
+        title={collapse.bottomCollapsed ? 'Show event log' : 'Hide event log'}
+      >
+        <PanelToggleIcon side="bottom" collapsed={collapse.bottomCollapsed} />
+      </HeaderIconButton>
     </div>
   )
 
