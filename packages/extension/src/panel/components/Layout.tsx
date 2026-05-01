@@ -60,11 +60,20 @@ export function Layout() {
         {timeTravelSeq !== null && (
           <div style={{
             background: '#fffbe6', borderBottom: '1px solid #ffe58f',
-            padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 8,
+            padding: '4px 10px', minHeight: 30, boxSizing: 'border-box',
+            display: 'flex', alignItems: 'center', gap: 8,
             fontSize: 12,
           }}>
             <span>⏮ Time travel — seq {timeTravelSeq}</span>
-            <button onClick={() => timeTravel(null)} style={{ marginLeft: 'auto', cursor: 'pointer' }}>
+            <button
+              onClick={() => timeTravel(null)}
+              style={{
+                marginLeft: 'auto', cursor: 'pointer',
+                padding: '2px 10px', fontSize: 11, lineHeight: 1.4,
+                background: '#fff', color: '#444',
+                border: '1px solid #d9d9d9', borderRadius: 4,
+              }}
+            >
               Back to live
             </button>
           </div>
