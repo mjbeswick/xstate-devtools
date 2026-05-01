@@ -3,4 +3,5 @@ import { vitePlugin as remix } from '@remix-run/dev'
 
 export default defineConfig({
   plugins: [remix()],
+  server: { port: 5273 },
 })

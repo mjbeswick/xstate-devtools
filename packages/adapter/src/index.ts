@@ -34,6 +34,14 @@ function serializeSnapshot(snapshot: any): SerializedSnapshot {
   }
 }
 
+function safeSerializeSnapshot(actorRef: AnyActorRef): SerializedSnapshot {
+  try {
+    return serializeSnapshot(actorRef.getSnapshot())
+  } catch {
+    return { value: null, context: undefined, status: 'active' }
+  }
+}
+
 let globalSeq = 0
 
 export function createAdapter() {
@@ -44,7 +52,8 @@ export function createAdapter() {
   }
 
   function checkAndNotifyStop(actorRef: AnyActorRef) {
-    const snap = actorRef.getSnapshot()
+    let snap: any
+    try { snap = actorRef.getSnapshot() } catch { return }
     if (snap?.status !== 'active') {
       postToExtension({
         type: 'XSTATE_ACTOR_STOPPED',
@@ -84,7 +93,7 @@ export function createAdapter() {
         ? serializeMachine(actorRef.logic as any, getSourceLocation())
         : null
 
-      const snapshot = serializeSnapshot(actorRef.getSnapshot())
+      const snapshot = safeSerializeSnapshot(actorRef)
 
       globalSeq++
       postToExtension({
@@ -112,7 +121,7 @@ export function createAdapter() {
         type: 'XSTATE_EVENT',
         sessionId: inspectionEvent.actorRef.sessionId,
         event: inspectionEvent.event,
-        snapshotAfter: serializeSnapshot(inspectionEvent.actorRef.getSnapshot()),
+        snapshotAfter: safeSerializeSnapshot(inspectionEvent.actorRef),
         timestamp: Date.now(),
         globalSeq,
       })
