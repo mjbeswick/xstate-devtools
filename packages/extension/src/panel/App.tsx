@@ -14,6 +14,27 @@ export function App() {
   const handleMessage = useStore((s) => s.handleMessage)
   const portRef = useRef<chrome.runtime.Port | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
+  const panelSeqRef = useRef(0)
+
+  /**
+   * Rewrite each incoming message's globalSeq to a panel-monotonic value.
+   * Browser and server adapters each have their own per-process seq, so naive
+   * merging would produce overlapping values. This rebases everything onto
+   * one timeline at the point of ingest.
+   */
+  const ingest = useCallback((message: PageToExtensionMessage) => {
+    panelSeqRef.current += 1
+    const seq = panelSeqRef.current
+    if (
+      message.type === 'XSTATE_ACTOR_REGISTERED'
+      || message.type === 'XSTATE_SNAPSHOT'
+      || message.type === 'XSTATE_EVENT'
+    ) {
+      handleMessage({ ...message, globalSeq: seq })
+    } else {
+      handleMessage(message)
+    }
+  }, [handleMessage])
 
   const [serverUrl, setServerUrl] = useState<string>(() => {
     try { return localStorage.getItem(SERVER_URL_KEY) ?? DEFAULT_SERVER_URL }
@@ -33,14 +54,14 @@ export function App() {
 
     p.onMessage.addListener((message: MarkedPageMessage) => {
       if (!message?.__xstateDevtools) return
-      handleMessage(message as PageToExtensionMessage)
+      ingest(message as PageToExtensionMessage)
     })
 
     return () => {
       p.disconnect()
       portRef.current = null
     }
-  }, [handleMessage])
+  }, [ingest])
 
   // Server transport — WebSocket to user-supplied endpoint
   useEffect(() => {
@@ -71,7 +92,7 @@ export function App() {
         try {
           const data = JSON.parse(evt.data) as MarkedPageMessage
           if (!data?.__xstateDevtools) return
-          handleMessage(data as PageToExtensionMessage)
+          ingest(data as PageToExtensionMessage)
         } catch { /* ignore */ }
       }
       ws.onclose = () => {
@@ -92,7 +113,7 @@ export function App() {
       ws?.close()
       wsRef.current = null
     }
-  }, [serverEnabled, serverUrl, handleMessage])
+  }, [serverEnabled, serverUrl, ingest])
 
   const dispatch = useCallback((message: ExtensionToPageMessage) => {
     // Broadcast to all transports — receivers ignore unknown sessionIds.

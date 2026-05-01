@@ -7,6 +7,8 @@ import type {
 import { serializeMachine } from './serialize.js'
 import { sanitize } from './sanitize.js'
 
+export type Source = 'web' | 'srv'
+
 export interface Transport {
   /** Send a protocol message outbound (toward the panel). */
   send: (message: PageToExtensionMessage) => void
@@ -43,23 +45,41 @@ function safeSerializeSnapshot(actorRef: AnyActorRef): SerializedSnapshot {
   }
 }
 
-let globalSeq = 0
+// Cached on globalThis so HMR re-evaluating this module doesn't reset the
+// monotonic seq counter mid-session. The panel re-numbers messages on ingest
+// to merge multiple sources, but keeping a stable per-process seq still helps
+// when the panel reconnects to an already-running adapter.
+const SEQ_KEY = '__xstate_devtools_global_seq__'
+function nextSeq(): number {
+  const g = globalThis as Record<string, unknown>
+  const cur = (g[SEQ_KEY] as number | undefined) ?? 0
+  const next = cur + 1
+  g[SEQ_KEY] = next
+  return next
+}
 
-export function createInspector(transport: Transport) {
+export function createInspector(transport: Transport, source: Source) {
   const actorRefs = new Map<string, AnyActorRef>()
+  const prefix = source + ':'
+  const tag = (sessionId: string) => prefix + sessionId
+  const tagOptional = (id: string | undefined) => (id ? prefix + id : undefined)
+  const stripIfMine = (id: string): string | null =>
+    id.startsWith(prefix) ? id.slice(prefix.length) : null
 
   function checkAndNotifyStop(actorRef: AnyActorRef) {
     let snap: any
     try { snap = actorRef.getSnapshot() } catch { return }
     if (snap?.status !== 'active') {
-      transport.send({ type: 'XSTATE_ACTOR_STOPPED', sessionId: actorRef.sessionId })
+      transport.send({ type: 'XSTATE_ACTOR_STOPPED', sessionId: tag(actorRef.sessionId) })
       actorRefs.delete(actorRef.sessionId)
     }
   }
 
   const unsubscribe = transport.subscribe((message) => {
     if (message.type === 'XSTATE_DISPATCH') {
-      const ref = actorRefs.get(message.sessionId)
+      const local = stripIfMine(message.sessionId)
+      if (local === null) return // not for this transport source
+      const ref = actorRefs.get(local)
       if (ref) {
         try { ref.send(message.event) } catch (e) {
           console.warn('[xstate-devtools] dispatch error:', e)
@@ -78,35 +98,32 @@ export function createInspector(transport: Transport) {
         ? serializeMachine(actorRef.logic as any, getSourceLocation())
         : null
 
-      globalSeq++
       transport.send({
         type: 'XSTATE_ACTOR_REGISTERED',
-        sessionId,
-        parentSessionId: (actorRef as any)._parent?.sessionId,
+        sessionId: tag(sessionId),
+        parentSessionId: tagOptional((actorRef as any)._parent?.sessionId),
         machine,
         snapshot: safeSerializeSnapshot(actorRef),
-        globalSeq,
+        globalSeq: nextSeq(),
         timestamp: Date.now(),
       })
     } else if (inspectionEvent.type === '@xstate.snapshot') {
-      globalSeq++
       transport.send({
         type: 'XSTATE_SNAPSHOT',
-        sessionId: inspectionEvent.actorRef.sessionId,
+        sessionId: tag(inspectionEvent.actorRef.sessionId),
         snapshot: serializeSnapshot(inspectionEvent.snapshot),
         timestamp: Date.now(),
-        globalSeq,
+        globalSeq: nextSeq(),
       })
       checkAndNotifyStop(inspectionEvent.actorRef)
     } else if (inspectionEvent.type === '@xstate.event') {
-      globalSeq++
       transport.send({
         type: 'XSTATE_EVENT',
-        sessionId: inspectionEvent.actorRef.sessionId,
+        sessionId: tag(inspectionEvent.actorRef.sessionId),
         event: inspectionEvent.event,
         snapshotAfter: safeSerializeSnapshot(inspectionEvent.actorRef),
         timestamp: Date.now(),
-        globalSeq,
+        globalSeq: nextSeq(),
       })
       checkAndNotifyStop(inspectionEvent.actorRef)
     }

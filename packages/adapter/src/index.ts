@@ -32,5 +32,5 @@ export function createAdapter() {
     },
   }
 
-  return createInspector(transport)
+  return createInspector(transport, 'web')
 }
