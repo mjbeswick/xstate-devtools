@@ -144,10 +144,6 @@ export function JsonView({
     <div style={{
       fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
       fontSize: 11,
-      background: '#fff',
-      border: '1px solid #eee',
-      borderRadius: 4,
-      padding: 6,
       overflow: 'auto',
     }}>
       <JsonNode value={value} depth={0} defaultOpenDepth={defaultOpenDepth} isLast />
