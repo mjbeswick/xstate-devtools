@@ -1,7 +1,16 @@
 // packages/extension/src/panel/components/MachineTree.tsx
 import React from 'react'
 import { useStore, getDisplaySnapshot } from '../store.js'
-import { getActiveNodeIds, getActivePaths } from '../active-nodes.js'
+import { getActiveNodeIds } from '../active-nodes.js'
+
+function findPath(root: SerializedStateNode, id: string): SerializedStateNode[] | null {
+  if (root.id === id) return [root]
+  for (const child of Object.values(root.states)) {
+    const sub = findPath(child, id)
+    if (sub) return [root, ...sub]
+  }
+  return null
+}
 import { usePanelCollapse } from '../panel-collapse-context.js'
 import type { SerializedStateNode } from '../../shared/types.js'
 
@@ -312,47 +321,42 @@ export function MachineTree() {
     ? getActiveNodeIds(snapshot.value as any, actor.machine.root)
     : new Set<string>()
 
-  const activePaths = snapshot
-    ? getActivePaths(snapshot.value as any, actor.machine.root)
-    : []
+  const breadcrumbPath = selectedStateNodeId
+    ? findPath(actor.machine.root, selectedStateNodeId)
+    : null
 
   const noMatches = matchSet !== null && matchSet.size === 0
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {Header}
-      {activePaths.length > 0 && (
+      {breadcrumbPath && (
         <div style={{
           padding: '4px 10px', borderBottom: '1px solid #eee',
           background: '#fff', fontSize: 11, color: '#555',
-          display: 'flex', flexDirection: 'column', gap: 2,
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2,
         }}>
-          {activePaths.map((path, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-              {path.map((n, j) => {
-                const isLeaf = j === path.length - 1
-                const isSelected = n.id === selectedStateNodeId
-                return (
-                  <React.Fragment key={n.id}>
-                    {j > 0 && <span style={{ color: '#bbb' }}>›</span>}
-                    <button
-                      onClick={() => selectStateNode(n.id)}
-                      title={n.id}
-                      style={{
-                        padding: '0 4px', border: 'none', background: isSelected ? '#e6f4ff' : 'transparent',
-                        borderRadius: 3, cursor: 'pointer',
-                        fontFamily: 'monospace', fontSize: 11,
-                        color: isSelected ? '#0958d9' : (isLeaf ? '#237804' : '#555'),
-                        fontWeight: isLeaf ? 600 : 400,
-                      }}
-                    >
-                      {n.key}
-                    </button>
-                  </React.Fragment>
-                )
-              })}
-            </div>
-          ))}
+          {breadcrumbPath.map((n, j) => {
+            const isLeaf = j === breadcrumbPath.length - 1
+            return (
+              <React.Fragment key={n.id}>
+                {j > 0 && <span style={{ color: '#bbb' }}>›</span>}
+                <button
+                  onClick={() => selectStateNode(n.id)}
+                  title={n.id}
+                  style={{
+                    padding: '0 4px', border: 'none',
+                    background: 'transparent', borderRadius: 3, cursor: 'pointer',
+                    fontFamily: 'monospace', fontSize: 11,
+                    color: isLeaf ? '#0958d9' : '#555',
+                    fontWeight: isLeaf ? 600 : 400,
+                  }}
+                >
+                  {n.key}
+                </button>
+              </React.Fragment>
+            )
+          })}
         </div>
       )}
       <div style={{ flex: 1, overflow: 'auto' }}>
