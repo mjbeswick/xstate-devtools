@@ -1,7 +1,7 @@
 // packages/extension/src/panel/components/SidePanel.tsx
 import React, { useState, useCallback } from 'react'
 import { useStore, getDisplaySnapshot } from '../store.js'
-import { usePort } from '../port-context.js'
+import { useDispatch } from '../port-context.js'
 import type { SerializedStateNode, SerializedTransition } from '../../shared/types.js'
 
 type Tab = 'transitions' | 'context'
@@ -79,7 +79,7 @@ export function SidePanel() {
     selectedActorId ? getDisplaySnapshot(s, selectedActorId) : null
   )
 
-  const port = usePort()
+  const dispatch_ = useDispatch()
 
   const [tab, setTab] = useState<Tab>('transitions')
   const [payloadJson, setPayloadJson] = useState('{}')
@@ -92,7 +92,7 @@ export function SidePanel() {
     : null
 
   const dispatch = useCallback((eventType: string) => {
-    if (!selectedActorId || !port) return
+    if (!selectedActorId) return
     let payload: Record<string, unknown> = {}
     try {
       payload = JSON.parse(payloadJson)
@@ -101,13 +101,12 @@ export function SidePanel() {
       setPayloadError('Invalid JSON')
       return
     }
-    port.postMessage({
-      __xstateDevtools: true,
+    dispatch_({
       type: 'XSTATE_DISPATCH',
       sessionId: selectedActorId,
       event: { type: eventType, ...payload },
     })
-  }, [selectedActorId, payloadJson, port])
+  }, [selectedActorId, payloadJson, dispatch_])
 
   if (!actor) {
     return (
