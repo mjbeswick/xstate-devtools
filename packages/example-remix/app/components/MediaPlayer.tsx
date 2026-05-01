@@ -1,19 +1,20 @@
-import React from 'react'
 import { useMachine } from '@xstate/react'
 import { playerMachine } from '../machines/player.machine.js'
 import { inspect } from '../inspector.client.js'
 
 export function MediaPlayer() {
   const [state, send] = useMachine(playerMachine, { inspect })
+  const showBuffer = state.matches('buffering')
+    || (state.context.bufferProgress > 0 && state.context.bufferProgress < 100)
 
   return (
     <div style={{ border: '1px solid #eee', padding: 16, borderRadius: 8 }}>
       <h3>Player Machine — state: <code>{JSON.stringify(state.value)}</code></h3>
       <p style={{ fontSize: 12, color: '#666', margin: '4px 0 8px' }}>
-        Position: {state.context.position}s / {state.context.duration}s | Vol: {state.context.volume}%
+        Position: {state.context.position}s / {state.context.duration}s | Vol: {state.context.volume}% | Rate: {state.context.rate}×
       </p>
 
-      {(state.value === 'buffering' || (state.context.bufferProgress > 0 && state.context.bufferProgress < 100)) && (
+      {showBuffer && (
         <div style={{ height: 4, background: '#eee', borderRadius: 2, margin: '8px 0' }}>
           <div style={{
             height: '100%',
@@ -25,14 +26,27 @@ export function MediaPlayer() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
         <button onClick={() => send({ type: 'LOAD', src: 'example.mp4', duration: 120 })}>Load</button>
         <button onClick={() => send({ type: 'PLAY' })}>Play</button>
         <button onClick={() => send({ type: 'PAUSE' })}>Pause</button>
-        <button onClick={() => send({ type: 'SEEK', position: 30 })}>Seek 30s</button>
-        <button onClick={() => send({ type: 'VOLUME', level: 50 })}>Vol 50%</button>
+        <button onClick={() => send({ type: 'PAUSE_AUTO' })}>Pause (auto-buffer)</button>
         <button onClick={() => send({ type: 'STOP' })}>Stop</button>
       </div>
+
+      {state.matches({ active: 'playing' }) && (
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #eee' }}>
+          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Playback controls:</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button onClick={() => send({ type: 'SEEK_START' })}>Start scrubbing</button>
+            <button onClick={() => send({ type: 'SEEK_END' })}>End scrubbing</button>
+            <button onClick={() => send({ type: 'SEEK', position: state.context.position + 10 })}>Seek +10s</button>
+            <button onClick={() => send({ type: 'RATE_FAST' })}>2× speed</button>
+            <button onClick={() => send({ type: 'RATE_NORMAL' })}>1× speed</button>
+            <button onClick={() => send({ type: 'VOLUME', level: 50 })}>Vol 50%</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

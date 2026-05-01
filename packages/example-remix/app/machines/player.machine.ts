@@ -24,14 +24,20 @@ export const playerMachine = setup({
       duration: number
       bufferProgress: number
       volume: number
+      rate: number
     },
     events: {} as
       | { type: 'LOAD'; src: string; duration: number }
       | { type: 'PLAY' }
       | { type: 'PAUSE' }
+      | { type: 'PAUSE_AUTO' }
       | { type: 'SEEK'; position: number }
+      | { type: 'SEEK_START' }
+      | { type: 'SEEK_END' }
       | { type: 'STOP' }
       | { type: 'VOLUME'; level: number }
+      | { type: 'RATE_NORMAL' }
+      | { type: 'RATE_FAST' }
       | { type: 'BUFFER_PROGRESS'; progress: number }
       | { type: 'BUFFER_COMPLETE' },
   },
@@ -53,12 +59,14 @@ export const playerMachine = setup({
       if (event.type !== 'BUFFER_PROGRESS') return {}
       return { bufferProgress: event.progress }
     }),
-    resetPlayer: assign({ src: null, position: 0, duration: 0, bufferProgress: 0 }),
+    setRateNormal: assign({ rate: 1 }),
+    setRateFast: assign({ rate: 2 }),
+    resetPlayer: assign({ src: null, position: 0, duration: 0, bufferProgress: 0, rate: 1 }),
   },
 }).createMachine({
   id: 'player',
   initial: 'idle',
-  context: { src: null, position: 0, duration: 0, bufferProgress: 0, volume: 80 },
+  context: { src: null, position: 0, duration: 0, bufferProgress: 0, volume: 80, rate: 1 },
   states: {
     idle: {
       on: { LOAD: { target: 'buffering', actions: 'loadSrc' } },
@@ -71,23 +79,57 @@ export const playerMachine = setup({
       },
       on: {
         BUFFER_PROGRESS: { actions: 'updateBufferProgress' },
-        BUFFER_COMPLETE: 'playing',
+        BUFFER_COMPLETE: 'active',
         STOP: { target: 'idle', actions: 'resetPlayer' },
       },
     },
-    playing: {
+    active: {
+      initial: 'playing',
       on: {
-        PAUSE: 'paused',
-        SEEK: { actions: 'updatePosition' },
         VOLUME: { actions: 'updateVolume' },
         STOP: { target: 'idle', actions: 'resetPlayer' },
       },
-    },
-    paused: {
-      on: {
-        PLAY: 'playing',
-        SEEK: { actions: 'updatePosition' },
-        STOP: { target: 'idle', actions: 'resetPlayer' },
+      states: {
+        playing: {
+          initial: 'normal',
+          on: {
+            PAUSE: '#player.active.paused.manual',
+            PAUSE_AUTO: '#player.active.paused.autoBuffer',
+          },
+          states: {
+            normal: {
+              on: {
+                SEEK_START: 'scrubbing',
+                RATE_FAST: { target: 'fastForward', actions: 'setRateFast' },
+                SEEK: { actions: 'updatePosition' },
+              },
+            },
+            scrubbing: {
+              on: {
+                SEEK: { actions: 'updatePosition' },
+                SEEK_END: 'normal',
+              },
+            },
+            fastForward: {
+              on: {
+                RATE_NORMAL: { target: 'normal', actions: 'setRateNormal' },
+                SEEK: { actions: 'updatePosition' },
+              },
+            },
+          },
+        },
+        paused: {
+          initial: 'manual',
+          on: { PLAY: 'playing' },
+          states: {
+            manual: {
+              on: { SEEK: { actions: 'updatePosition' } },
+            },
+            autoBuffer: {
+              on: { SEEK: { actions: 'updatePosition' } },
+            },
+          },
+        },
       },
     },
   },

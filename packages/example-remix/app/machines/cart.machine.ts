@@ -14,7 +14,10 @@ export const cartMachine = setup({
       | { type: 'REMOVE_ITEM'; id: string }
       | { type: 'START_CHECKOUT' }
       | { type: 'APPLY_PROMO'; code: string }
-      | { type: 'SELECT_PAYMENT'; method: string }
+      | { type: 'OPEN_PAYMENT' }
+      | { type: 'PICK_CARD' }
+      | { type: 'PICK_PAYPAL' }
+      | { type: 'CONFIRM_PAYMENT' }
       | { type: 'SUBMIT_ORDER' }
       | { type: 'RESET' },
   },
@@ -39,10 +42,8 @@ export const cartMachine = setup({
       if (event.type !== 'APPLY_PROMO') return {}
       return { promoCode: event.code }
     }),
-    selectPayment: assign(({ event }) => {
-      if (event.type !== 'SELECT_PAYMENT') return {}
-      return { paymentMethod: event.method }
-    }),
+    setCard: assign({ paymentMethod: 'card' }),
+    setPaypal: assign({ paymentMethod: 'paypal' }),
     resetCart: assign({ items: [], promoCode: null, paymentMethod: null }),
   },
 }).createMachine({
@@ -68,14 +69,44 @@ export const cartMachine = setup({
           on: { START_CHECKOUT: { target: 'details', guard: 'hasItems' } },
         },
         details: {
+          initial: 'reviewing',
           on: {
             APPLY_PROMO: { actions: 'applyPromo' },
-            SELECT_PAYMENT: { actions: 'selectPayment' },
             SUBMIT_ORDER: { target: 'processing', guard: 'hasPaymentMethod' },
+          },
+          states: {
+            reviewing: {
+              on: { OPEN_PAYMENT: 'choosingPayment' },
+            },
+            choosingPayment: {
+              initial: 'card',
+              states: {
+                card: {
+                  on: {
+                    PICK_PAYPAL: 'paypal',
+                    CONFIRM_PAYMENT: { target: '#cart.checkout.details.reviewing', actions: 'setCard' },
+                  },
+                },
+                paypal: {
+                  on: {
+                    PICK_CARD: 'card',
+                    CONFIRM_PAYMENT: { target: '#cart.checkout.details.reviewing', actions: 'setPaypal' },
+                  },
+                },
+              },
+            },
           },
         },
         processing: {
-          after: { 1500: 'confirmed' },
+          initial: 'charging',
+          states: {
+            charging: {
+              after: { 800: 'confirming' },
+            },
+            confirming: {
+              after: { 700: '#cart.checkout.confirmed' },
+            },
+          },
         },
         confirmed: {
           on: { RESET: { target: 'idle', actions: 'resetCart' } },
