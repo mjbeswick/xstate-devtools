@@ -30,14 +30,6 @@ export const authMachine = setup({
       if (event.type !== 'SUBMIT') return {}
       return { email: event.email, password: event.password, error: null }
     }),
-    setToken: assign(({ event }) => {
-      if (event.type !== 'xstate.done.actor.login') return {}
-      return { token: (event.output as any).token }
-    }),
-    setError: assign(({ event }) => {
-      if (event.type !== 'xstate.error.actor.login') return {}
-      return { error: (event.error as Error).message }
-    }),
     clearCredentials: assign({ email: '', password: '', token: null, error: null }),
   },
 }).createMachine({
@@ -59,8 +51,14 @@ export const authMachine = setup({
         id: 'login',
         src: 'loginService',
         input: ({ context }) => ({ email: context.email, password: context.password }),
-        onDone: { target: 'authenticated', actions: 'setToken' },
-        onError: { target: 'failed', actions: 'setError' },
+        onDone: {
+          target: 'authenticated',
+          actions: assign({ token: ({ event }) => event.output.token }),
+        },
+        onError: {
+          target: 'failed',
+          actions: assign({ error: ({ event }) => (event.error as Error).message }),
+        },
       },
     },
     authenticated: {

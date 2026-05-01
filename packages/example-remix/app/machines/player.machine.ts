@@ -1,6 +1,9 @@
 import { setup, assign, fromCallback } from 'xstate'
 
-const bufferActor = fromCallback<any, { duration: number }>(({ sendBack, input }) => {
+const bufferActor = fromCallback<
+  { type: 'BUFFER_PROGRESS'; progress: number } | { type: 'BUFFER_COMPLETE' },
+  { duration: number }
+>(({ sendBack }) => {
   let progress = 0
   const interval = setInterval(() => {
     progress += 10
@@ -9,7 +12,7 @@ const bufferActor = fromCallback<any, { duration: number }>(({ sendBack, input }
       sendBack({ type: 'BUFFER_COMPLETE' })
       clearInterval(interval)
     }
-  }, Math.max(50, input.duration / 10))
+  }, 100)
   return () => clearInterval(interval)
 })
 
