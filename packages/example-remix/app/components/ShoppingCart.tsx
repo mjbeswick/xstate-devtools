@@ -1,6 +1,7 @@
 import React from 'react'
 import { useMachine } from '@xstate/react'
 import { cartMachine } from '../machines/cart.machine.js'
+import { inspect } from '../inspector.client.js'
 
 const ITEMS = [
   { id: '1', name: 'Widget A', price: 9.99, qty: 1 },
@@ -8,11 +9,7 @@ const ITEMS = [
   { id: '3', name: 'Widget C', price: 4.99, qty: 1 },
 ]
 
-interface Props {
-  inspect?: (event: any) => void
-}
-
-export function ShoppingCart({ inspect }: Props) {
+export function ShoppingCart() {
   const [state, send] = useMachine(cartMachine, { inspect })
   const checkoutState = (state.value as any).checkout as string
 

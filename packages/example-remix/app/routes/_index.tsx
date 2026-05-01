@@ -2,7 +2,6 @@ import React from 'react'
 import { AuthForm } from '../components/AuthForm.js'
 import { ShoppingCart } from '../components/ShoppingCart.js'
 import { MediaPlayer } from '../components/MediaPlayer.js'
-import { inspect } from '../inspector.client.js'
 
 export default function Index() {
   return (
@@ -13,9 +12,9 @@ export default function Index() {
         Click events in the log to time-travel.
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 600 }}>
-        <AuthForm inspect={inspect} />
-        <ShoppingCart inspect={inspect} />
-        <MediaPlayer inspect={inspect} />
+        <AuthForm />
+        <ShoppingCart />
+        <MediaPlayer />
       </div>
     </div>
   )

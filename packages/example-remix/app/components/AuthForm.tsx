@@ -1,12 +1,9 @@
 import React, { useState } from 'react'
 import { useMachine } from '@xstate/react'
 import { authMachine } from '../machines/auth.machine.js'
+import { inspect } from '../inspector.client.js'
 
-interface Props {
-  inspect?: (event: any) => void
-}
-
-export function AuthForm({ inspect }: Props) {
+export function AuthForm() {
   const [state, send] = useMachine(authMachine, { inspect })
   const [email, setEmail] = useState('user@example.com')
   const [password, setPassword] = useState('secret')

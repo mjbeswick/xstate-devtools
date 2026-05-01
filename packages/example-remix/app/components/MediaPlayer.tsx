@@ -1,12 +1,9 @@
 import React from 'react'
 import { useMachine } from '@xstate/react'
 import { playerMachine } from '../machines/player.machine.js'
+import { inspect } from '../inspector.client.js'
 
-interface Props {
-  inspect?: (event: any) => void
-}
-
-export function MediaPlayer({ inspect }: Props) {
+export function MediaPlayer() {
   const [state, send] = useMachine(playerMachine, { inspect })
 
   return (
