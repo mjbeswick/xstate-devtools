@@ -1,5 +1,6 @@
 // Chrome-DevTools-style stacked accordion section.
 import React, { useState } from 'react'
+import { ChevronDown, ChevronRight } from './Icons.js'
 
 export interface AccordionSectionProps {
   title: React.ReactNode
@@ -35,8 +36,8 @@ export function AccordionSection({
           borderTop: '1px solid #e8e8e8',
         }}
       >
-        <span style={{ fontSize: 9, color: '#888', width: 10 }}>
-          {isOpen ? '▼' : '▶'}
+        <span style={{ display: 'inline-flex', color: '#888', width: 14 }}>
+          {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </span>
         <span style={{ flex: 1 }}>{title}</span>
         {actions && (

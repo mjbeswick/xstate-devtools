@@ -8,6 +8,7 @@ import { SidePanel } from './SidePanel.js'
 import { EventLog } from './EventLog.js'
 import { useStore } from '../store.js'
 import { PanelCollapseContext } from '../panel-collapse-context.js'
+import { History } from './Icons.js'
 
 // Thin Chrome-DevTools-style dividers: 1px visible border with a wider
 // invisible hit area for easier grabbing.
@@ -64,7 +65,10 @@ export function Layout() {
             display: 'flex', alignItems: 'center', gap: 8,
             fontSize: 12,
           }}>
-            <span>⏮ Time travel — seq {timeTravelSeq}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <History size={14} />
+              Time travel — seq {timeTravelSeq}
+            </span>
             <button
               onClick={() => timeTravel(null)}
               style={{

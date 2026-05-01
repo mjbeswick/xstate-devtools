@@ -1,5 +1,6 @@
 // Lightweight collapsible JSON viewer — no external deps.
 import React, { useState } from 'react'
+import { ChevronDown, ChevronRight } from './Icons.js'
 
 const colors = {
   key: '#871094',
@@ -68,7 +69,7 @@ function JsonNode({ k, value, depth, defaultOpenDepth, isLast }: NodeProps) {
   if (!isContainer) {
     return (
       <div style={{ paddingLeft: depth * 14, lineHeight: 1.5 }}>
-        <span style={{ display: 'inline-block', width: 10 }} />
+        <span style={{ display: 'inline-block', width: 12 }} />
         {renderKey()}
         <Primitive value={value} />
         {!isLast && <span style={{ color: colors.punct }}>,</span>}
@@ -89,12 +90,12 @@ function JsonNode({ k, value, depth, defaultOpenDepth, isLast }: NodeProps) {
       <span
         onClick={() => !empty && setOpen(!open)}
         style={{
-          display: 'inline-block', width: 10,
+          display: 'inline-flex', width: 12, height: 12, verticalAlign: 'middle',
           color: colors.toggle, cursor: empty ? 'default' : 'pointer',
-          userSelect: 'none', textAlign: 'center',
+          userSelect: 'none', alignItems: 'center', justifyContent: 'center',
         }}
       >
-        {empty ? '' : open ? '▾' : '▸'}
+        {empty ? null : open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
       </span>
       {renderKey()}
       <span style={{ color: colors.bracket }}>{open_}</span>
@@ -115,7 +116,7 @@ function JsonNode({ k, value, depth, defaultOpenDepth, isLast }: NodeProps) {
             ))}
           </div>
           <div style={{ paddingLeft: 0 }}>
-            <span style={{ display: 'inline-block', width: 10 }} />
+            <span style={{ display: 'inline-block', width: 12 }} />
             <span style={{ color: colors.bracket }}>{close_}</span>
             {!isLast && <span style={{ color: colors.punct }}>,</span>}
           </div>

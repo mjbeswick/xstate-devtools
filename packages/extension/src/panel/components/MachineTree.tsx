@@ -12,46 +12,8 @@ function findPath(root: SerializedStateNode, id: string): SerializedStateNode[] 
   return null
 }
 import { usePanelCollapse } from '../panel-collapse-context.js'
+import { ChevronDown, ChevronRight, PanelToggle, ExternalLink, Close } from './Icons.js'
 import type { SerializedStateNode } from '../../shared/types.js'
-
-function PanelToggleIcon({ side, collapsed }: { side: 'left' | 'right' | 'bottom'; collapsed: boolean }) {
-  // Material-style panel-close icons — a frame with a thin bar on one edge and
-  // an arrow pointing toward where the panel will move when toggled.
-  // Inline SVG to avoid font/CSP dependencies in the extension.
-  if (side === 'bottom') {
-    const flip = collapsed
-    return (
-      <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-        <rect x="3" y="4" width="18" height="16" rx="2" ry="2"
-          fill="none" stroke="currentColor" strokeWidth="1.6" />
-        <line x1="3" y1="15" x2="21" y2="15"
-          stroke="currentColor" strokeWidth="1.6" />
-        <polyline
-          points={flip ? '9,12 12,10 15,12' : '9,10 12,12 15,10'}
-          fill="none" stroke="currentColor" strokeWidth="1.6"
-          strokeLinecap="round" strokeLinejoin="round"
-        />
-      </svg>
-    )
-  }
-  const flip = (side === 'left') !== collapsed
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="3" y="4" width="18" height="16" rx="2" ry="2"
-        fill="none" stroke="currentColor" strokeWidth="1.6" />
-      <line
-        x1={side === 'left' ? '8' : '16'} x2={side === 'left' ? '8' : '16'}
-        y1="4" y2="20"
-        stroke="currentColor" strokeWidth="1.6"
-      />
-      <polyline
-        points={flip ? '13,9 11,12 13,15' : '11,9 13,12 11,15'}
-        fill="none" stroke="currentColor" strokeWidth="1.6"
-        strokeLinecap="round" strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
 
 function HeaderIconButton({
   onClick, title, children,
@@ -156,15 +118,20 @@ function StateNodeRow({
         }}
         onClick={() => onSelect(node.id)}
       >
-        {hasChildren && (
+        {hasChildren ? (
           <span
             onClick={(e) => { e.stopPropagation(); if (!filterActive) setUserExpanded((ex) => !ex) }}
-            style={{ color: '#aaa', fontSize: 10, width: 10, cursor: filterActive ? 'default' : 'pointer' }}
+            style={{
+              color: '#888', width: 14, height: 14,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              cursor: filterActive ? 'default' : 'pointer', flexShrink: 0,
+            }}
           >
-            {expanded ? '▼' : '▶'}
+            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           </span>
+        ) : (
+          <span style={{ width: 14, flexShrink: 0 }} />
         )}
-        {!hasChildren && <span style={{ width: 10 }} />}
         <span style={{ color: typeColor[node.type] ?? '#595959', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>
           {node.type.slice(0, 4)}
         </span>
@@ -223,7 +190,7 @@ export function MachineTree() {
         onClick={collapse.toggleLeft}
         title={collapse.leftCollapsed ? 'Show actor list' : 'Hide actor list'}
       >
-        <PanelToggleIcon side="left" collapsed={collapse.leftCollapsed} />
+        <PanelToggle side="left" collapsed={collapse.leftCollapsed} />
       </HeaderIconButton>
 
       {actor?.machine && (
@@ -232,10 +199,13 @@ export function MachineTree() {
           {actor.machine.sourceLocation && (
             <a
               href={`vscode://file/${actor.machine.sourceLocation}`}
-              style={{ color: '#1890ff', fontSize: 10, textDecoration: 'none', whiteSpace: 'nowrap' }}
+              style={{
+                color: '#1890ff', fontSize: 10, textDecoration: 'none',
+                whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 2,
+              }}
               title="Open in VS Code"
             >
-              ↗ source
+              <ExternalLink size={11} /> source
             </a>
           )}
         </>
@@ -246,7 +216,7 @@ export function MachineTree() {
         onClick={collapse.toggleRight}
         title={collapse.rightCollapsed ? 'Show side panel' : 'Hide side panel'}
       >
-        <PanelToggleIcon side="right" collapsed={collapse.rightCollapsed} />
+        <PanelToggle side="right" collapsed={collapse.rightCollapsed} />
       </HeaderIconButton>
     </div>
   )
@@ -270,16 +240,9 @@ export function MachineTree() {
             }}
           />
           {treeFilter && (
-            <button
-              onClick={() => setTreeFilter('')}
-              style={{
-                padding: '2px 6px', fontSize: 10, cursor: 'pointer',
-                background: '#fff', border: '1px solid #d9d9d9', borderRadius: 4,
-              }}
-              title="Clear search"
-            >
-              ×
-            </button>
+            <HeaderIconButton onClick={() => setTreeFilter('')} title="Clear search">
+              <Close size={14} />
+            </HeaderIconButton>
           )}
         </>
       )}
@@ -288,7 +251,7 @@ export function MachineTree() {
         onClick={collapse.toggleBottom}
         title={collapse.bottomCollapsed ? 'Show event log' : 'Hide event log'}
       >
-        <PanelToggleIcon side="bottom" collapsed={collapse.bottomCollapsed} />
+        <PanelToggle side="bottom" collapsed={collapse.bottomCollapsed} />
       </HeaderIconButton>
     </div>
   )
