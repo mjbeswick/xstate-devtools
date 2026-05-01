@@ -28,8 +28,7 @@ const OPEN_STATE = 1
  */
 export function createServerAdapter(options: ServerAdapterOptions = {}) {
   const port = options.port
-    ?? Number(process.env.XSTATE_DEVTOOLS_PORT)
-    || 9301
+    ?? (Number(process.env.XSTATE_DEVTOOLS_PORT) || 9301)
   const host = options.host ?? '127.0.0.1'
 
   // Reuse across hot reloads — Vite/Remix re-evaluate modules and would
