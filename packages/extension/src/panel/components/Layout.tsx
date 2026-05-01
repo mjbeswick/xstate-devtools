@@ -123,12 +123,12 @@ export function Layout() {
             defaultSize={30}
             minSize={10}
             collapsible
-            collapsedSize={0}
+            collapsedSize={4}
             onCollapse={() => setBottomCollapsed(true)}
             onExpand={() => setBottomCollapsed(false)}
             style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
           >
-            {!bottomCollapsed && <EventLog />}
+            <EventLog collapsed={bottomCollapsed} onExpand={() => logRef.current?.expand()} />
           </Panel>
         </PanelGroup>
       </div>

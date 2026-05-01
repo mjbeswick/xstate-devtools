@@ -1,13 +1,19 @@
 // packages/extension/src/panel/components/EventLog.tsx
 import React, { useRef, useEffect, useState } from 'react'
 import { useStore } from '../store.js'
+import { ChevronDown, ChevronUp } from './Icons.js'
 
 function formatTime(ts: number) {
   const d = new Date(ts)
   return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}.${d.getMilliseconds().toString().padStart(3, '0')}`
 }
 
-export function EventLog() {
+interface Props {
+  collapsed?: boolean
+  onExpand?: () => void
+}
+
+export function EventLog({ collapsed = false, onExpand }: Props = {}) {
   const events = useStore((s) => s.events)
   const actors = useStore((s) => s.actors)
   const timeTravelSeq = useStore((s) => s.timeTravelSeq)
@@ -19,14 +25,36 @@ export function EventLog() {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (autoScroll && timeTravelSeq === null) {
+    if (!collapsed && autoScroll && timeTravelSeq === null) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [events, autoScroll, timeTravelSeq])
+  }, [events, autoScroll, timeTravelSeq, collapsed])
 
   const filtered = filter
     ? events.filter((e) => e.event.type.toLowerCase().includes(filter.toLowerCase()))
     : events
+
+  if (collapsed) {
+    return (
+      <div
+        onClick={onExpand}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '0 10px', minHeight: 30, height: '100%', boxSizing: 'border-box',
+          background: '#fafafa', cursor: 'pointer', userSelect: 'none',
+        }}
+        title="Show event log"
+      >
+        <span style={{ display: 'inline-flex', color: '#666' }}>
+          <ChevronUp size={14} />
+        </span>
+        <span style={{ fontWeight: 600, fontSize: 11, color: '#666' }}>EVENTS</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#aaa' }}>
+          {events.length}
+        </span>
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -35,6 +63,9 @@ export function EventLog() {
         padding: '0 10px', minHeight: 30, boxSizing: 'border-box',
         borderBottom: '1px solid #eee', background: '#fafafa', flexShrink: 0,
       }}>
+        <span style={{ display: 'inline-flex', color: '#666' }}>
+          <ChevronDown size={14} />
+        </span>
         <span style={{ fontWeight: 600, fontSize: 11, color: '#666' }}>EVENTS</span>
         <input
           value={filter}
