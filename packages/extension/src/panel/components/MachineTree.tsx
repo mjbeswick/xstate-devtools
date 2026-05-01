@@ -5,10 +5,26 @@ import { getActiveNodeIds } from '../active-nodes.js'
 import { usePanelCollapse } from '../panel-collapse-context.js'
 import type { SerializedStateNode } from '../../shared/types.js'
 
-function PanelToggleIcon({ side, collapsed }: { side: 'left' | 'right'; collapsed: boolean }) {
-  // Material-style "left_panel_close" / "right_panel_close" — a thin bar at the
-  // edge with an arrow indicating the direction the panel will move.
+function PanelToggleIcon({ side, collapsed }: { side: 'left' | 'right' | 'bottom'; collapsed: boolean }) {
+  // Material-style panel-close icons — a frame with a thin bar on one edge and
+  // an arrow pointing toward where the panel will move when toggled.
   // Inline SVG to avoid font/CSP dependencies in the extension.
+  if (side === 'bottom') {
+    const flip = collapsed
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="16" rx="2" ry="2"
+          fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <line x1="3" y1="15" x2="21" y2="15"
+          stroke="currentColor" strokeWidth="1.6" />
+        <polyline
+          points={flip ? '9,12 12,10 15,12' : '9,10 12,12 15,10'}
+          fill="none" stroke="currentColor" strokeWidth="1.6"
+          strokeLinecap="round" strokeLinejoin="round"
+        />
+      </svg>
+    )
+  }
   const flip = (side === 'left') !== collapsed
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
@@ -212,28 +228,6 @@ export function MachineTree() {
               ↗ source
             </a>
           )}
-          <input
-            value={treeFilter}
-            onChange={(e) => setTreeFilter(e.target.value)}
-            placeholder="Search states…"
-            style={{
-              flex: '1 1 80px', minWidth: 60,
-              padding: '2px 6px', fontSize: 11, fontFamily: 'inherit',
-              border: '1px solid #d9d9d9', borderRadius: 4,
-            }}
-          />
-          {treeFilter && (
-            <button
-              onClick={() => setTreeFilter('')}
-              style={{
-                padding: '2px 6px', fontSize: 10, cursor: 'pointer',
-                background: '#fafafa', border: '1px solid #d9d9d9', borderRadius: 4,
-              }}
-              title="Clear search"
-            >
-              ×
-            </button>
-          )}
         </>
       )}
 
@@ -247,13 +241,55 @@ export function MachineTree() {
     </div>
   )
 
+  const Footer = (
+    <div style={{
+      padding: '4px 6px', borderTop: '1px solid #eee',
+      background: '#fafafa', flexShrink: 0,
+      display: 'flex', alignItems: 'center', gap: 6,
+    }}>
+      <HeaderIconButton
+        onClick={collapse.toggleBottom}
+        title={collapse.bottomCollapsed ? 'Show event log' : 'Hide event log'}
+      >
+        <PanelToggleIcon side="bottom" collapsed={collapse.bottomCollapsed} />
+      </HeaderIconButton>
+      {actor?.machine && (
+        <>
+          <input
+            value={treeFilter}
+            onChange={(e) => setTreeFilter(e.target.value)}
+            placeholder="Search states…"
+            style={{
+              flex: '1 1 auto', minWidth: 60,
+              padding: '2px 6px', fontSize: 11, fontFamily: 'inherit',
+              border: '1px solid #d9d9d9', borderRadius: 4,
+            }}
+          />
+          {treeFilter && (
+            <button
+              onClick={() => setTreeFilter('')}
+              style={{
+                padding: '2px 6px', fontSize: 10, cursor: 'pointer',
+                background: '#fff', border: '1px solid #d9d9d9', borderRadius: 4,
+              }}
+              title="Clear search"
+            >
+              ×
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
+
   if (!actor) {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {Header}
-        <div style={{ padding: 24, color: '#aaa', fontSize: 12 }}>
+        <div style={{ flex: 1, padding: 24, color: '#aaa', fontSize: 12 }}>
           Select an actor from the left panel.
         </div>
+        {Footer}
       </div>
     )
   }
@@ -262,9 +298,10 @@ export function MachineTree() {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {Header}
-        <div style={{ padding: 24, color: '#aaa', fontSize: 12 }}>
+        <div style={{ flex: 1, padding: 24, color: '#aaa', fontSize: 12 }}>
           No machine definition available for this actor.
         </div>
+        {Footer}
       </div>
     )
   }
@@ -276,23 +313,26 @@ export function MachineTree() {
   const noMatches = matchSet !== null && matchSet.size === 0
 
   return (
-    <div style={{ height: '100%', overflow: 'auto' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {Header}
-      {noMatches ? (
-        <div style={{ padding: 16, color: '#aaa', fontSize: 12 }}>
-          No states match "{treeFilter}".
-        </div>
-      ) : (
-        <StateNodeRow
-          node={actor.machine.root}
-          activeIds={activeIds}
-          selectedId={selectedStateNodeId}
-          onSelect={selectStateNode}
-          depth={0}
-          filter={treeFilter}
-          matchSet={matchSet}
-        />
-      )}
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        {noMatches ? (
+          <div style={{ padding: 16, color: '#aaa', fontSize: 12 }}>
+            No states match "{treeFilter}".
+          </div>
+        ) : (
+          <StateNodeRow
+            node={actor.machine.root}
+            activeIds={activeIds}
+            selectedId={selectedStateNodeId}
+            onSelect={selectStateNode}
+            depth={0}
+            filter={treeFilter}
+            matchSet={matchSet}
+          />
+        )}
+      </div>
+      {Footer}
     </div>
   )
 }

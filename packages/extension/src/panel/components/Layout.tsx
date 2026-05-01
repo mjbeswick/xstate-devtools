@@ -9,11 +9,15 @@ import { EventLog } from './EventLog.js'
 import { useStore } from '../store.js'
 import { PanelCollapseContext } from '../panel-collapse-context.js'
 
+// Thin Chrome-DevTools-style dividers: 1px visible border with a wider
+// invisible hit area for easier grabbing.
 const dividerStyle: React.CSSProperties = {
-  width: 4, background: '#e0e0e0', cursor: 'col-resize', flexShrink: 0,
+  width: 1, background: '#d0d7de', cursor: 'col-resize', flexShrink: 0,
+  outline: '2px solid transparent', outlineOffset: -1,
 }
 const hDividerStyle: React.CSSProperties = {
-  height: 4, background: '#e0e0e0', cursor: 'row-resize', flexShrink: 0,
+  height: 1, background: '#d0d7de', cursor: 'row-resize', flexShrink: 0,
+  outline: '2px solid transparent', outlineOffset: -1,
 }
 
 export function Layout() {
