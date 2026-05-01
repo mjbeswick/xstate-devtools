@@ -204,7 +204,8 @@ export function MachineTree() {
 
   const Header = (
     <div style={{
-      padding: '4px 6px', borderBottom: '1px solid #eee',
+      padding: '0 6px', minHeight: 30, boxSizing: 'border-box',
+      borderBottom: '1px solid #eee',
       fontSize: 11, color: '#666', position: 'sticky', top: 0,
       background: '#fafafa', zIndex: 1,
       display: 'flex', alignItems: 'center', gap: 6,

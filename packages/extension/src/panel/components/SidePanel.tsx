@@ -89,14 +89,14 @@ export function SidePanel() {
 
   if (!actor) {
     return (
-      <div style={{ padding: 16, color: '#aaa', fontSize: 12, borderLeft: '1px solid #eee' }}>
+      <div style={{ padding: 16, color: '#aaa', fontSize: 12 }}>
         Select an actor to inspect.
       </div>
     )
   }
 
   return (
-    <div style={{ borderLeft: '1px solid #eee', height: '100%', overflow: 'auto', background: '#fff' }}>
+    <div style={{ height: '100%', overflow: 'auto', background: '#fff' }}>
       <AccordionSection
         title={node ? <>Transitions — <code style={{ fontSize: 11 }}>{node.key}</code></> : 'Transitions'}
       >

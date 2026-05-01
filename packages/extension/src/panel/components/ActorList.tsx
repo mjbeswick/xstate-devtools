@@ -54,8 +54,13 @@ export function ActorList() {
   }
 
   return (
-    <div style={{ height: '100%', borderRight: '1px solid #eee', background: '#fafafa' }}>
-      <div style={{ padding: '8px 12px', fontWeight: 600, borderBottom: '1px solid #eee', fontSize: 11, color: '#666' }}>
+    <div style={{ height: '100%', background: '#fafafa' }}>
+      <div style={{
+        padding: '4px 10px', minHeight: 30, boxSizing: 'border-box',
+        fontWeight: 600, borderBottom: '1px solid #eee',
+        fontSize: 11, color: '#666', background: '#fafafa',
+        display: 'flex', alignItems: 'center',
+      }}>
         ACTORS
       </div>
       {roots.length === 0 ? (
