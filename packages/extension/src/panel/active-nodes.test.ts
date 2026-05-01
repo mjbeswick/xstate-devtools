@@ -48,6 +48,21 @@ describe('getActiveNodeIds', () => {
     expect(getActiveNodeIds(null, node).size).toBe(0)
   })
 
+  it('treats history nodes as atomic (no recursion)', () => {
+    const node: SerializedStateNode = {
+      id: 'root', key: 'root', type: 'compound', initial: 'active',
+      states: {
+        active: atomicNode('root.active'),
+        hist: { ...atomicNode('root.hist'), type: 'history' },
+      },
+      on: [], always: [], entry: [], exit: [], invoke: [],
+    }
+    // History resolves to its parent's compound value — value at this level is the sibling key
+    const ids = getActiveNodeIds('active', node)
+    expect(ids.has('root.active')).toBe(true)
+    expect(ids.has('root.hist')).toBe(false)
+  })
+
   it('handles nested compound states', () => {
     const node: SerializedStateNode = {
       id: 'root', key: 'root', type: 'compound', initial: 'a',

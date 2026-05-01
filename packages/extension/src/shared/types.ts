@@ -49,6 +49,7 @@ export interface ActorRecord {
   snapshot: SerializedSnapshot
   status: 'active' | 'done' | 'error' | 'stopped'
   registeredAt: number
+  registeredAtSeq: number
 }
 
 export interface EventRecord {

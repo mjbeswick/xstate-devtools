@@ -16,15 +16,30 @@ export interface InspectorStore {
   selectedStateNodeId: string | null
   timeTravelSeq: number | null   // null = live; number = frozen at that seq
 
-  // Returns the snapshot to display for an actor (live or time-travelled)
-  getDisplaySnapshot: (sessionId: string) => ActorRecord['snapshot'] | null
-
   // Message handler — call this from the port listener
   handleMessage: (msg: PageToExtensionMessage) => void
 
   selectActor: (sessionId: string | null) => void
   selectStateNode: (id: string | null) => void
   timeTravel: (seq: number | null) => void
+}
+
+/** Pure function — use as a Zustand selector: useStore(s => getDisplaySnapshot(s, id)) */
+export function getDisplaySnapshot(
+  state: Pick<InspectorStore, 'actors' | 'events' | 'timeTravelSeq' | 'registeredSnapshots'>,
+  sessionId: string
+): ActorRecord['snapshot'] | null {
+  const actor = state.actors.get(sessionId)
+  if (!actor) return null
+  if (state.timeTravelSeq === null) return actor.snapshot
+
+  for (let i = state.events.length - 1; i >= 0; i--) {
+    const evt = state.events[i]
+    if (evt.sessionId === sessionId && evt.globalSeq <= state.timeTravelSeq) {
+      return evt.snapshotAfter
+    }
+  }
+  return state.registeredSnapshots.get(sessionId) ?? actor.snapshot
 }
 
 export const useStore = create<InspectorStore>((set, get) => ({
@@ -34,23 +49,6 @@ export const useStore = create<InspectorStore>((set, get) => ({
   selectedActorId: null,
   selectedStateNodeId: null,
   timeTravelSeq: null,
-
-  getDisplaySnapshot(sessionId) {
-    const { actors, registeredSnapshots, events, timeTravelSeq } = get()
-    const actor = actors.get(sessionId)
-    if (!actor) return null
-    if (timeTravelSeq === null) return actor.snapshot
-
-    // Find the latest event at or before timeTravelSeq for this actor
-    for (let i = events.length - 1; i >= 0; i--) {
-      const evt = events[i]
-      if (evt.sessionId === sessionId && evt.globalSeq <= timeTravelSeq) {
-        return evt.snapshotAfter
-      }
-    }
-    // No events for this actor before that seq — use registration snapshot
-    return registeredSnapshots.get(sessionId) ?? actor.snapshot
-  },
 
   handleMessage(msg) {
     set((state) => {
@@ -67,6 +65,7 @@ export const useStore = create<InspectorStore>((set, get) => ({
             snapshot: msg.snapshot,
             status: 'active',
             registeredAt: Date.now(),
+            registeredAtSeq: msg.globalSeq,
           })
           registeredSnapshots.set(msg.sessionId, msg.snapshot)
           break
@@ -91,11 +90,20 @@ export const useStore = create<InspectorStore>((set, get) => ({
             globalSeq: msg.globalSeq,
           })
           if (events.length > MAX_EVENTS) events.shift()
-          break
+
+          // Clamp time travel if oldest event was evicted
+          const timeTravelSeq = state.timeTravelSeq
+          const newTimeTravelSeq =
+            timeTravelSeq !== null && events.length > 0 && timeTravelSeq < events[0].globalSeq
+              ? events[0].globalSeq
+              : timeTravelSeq
+
+          return { actors, registeredSnapshots, events, timeTravelSeq: newTimeTravelSeq }
         }
         case 'XSTATE_ACTOR_STOPPED': {
           const actor = actors.get(msg.sessionId)
           if (actor) actors.set(msg.sessionId, { ...actor, status: 'stopped' })
+          registeredSnapshots.delete(msg.sessionId)
           break
         }
       }

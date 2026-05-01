@@ -1,6 +1,6 @@
 // packages/extension/src/panel/store.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useStore } from './store.js'
+import { useStore, getDisplaySnapshot } from './store.js'
 import type { SerializedMachine, SerializedSnapshot } from '../shared/types.js'
 
 const mockMachine: SerializedMachine = {
@@ -84,7 +84,7 @@ describe('handleMessage', () => {
         globalSeq: i + 2,
       })
     }
-    expect(useStore.getState().events.length).toBeLessThanOrEqual(500)
+    expect(useStore.getState().events.length).toBe(500)
   })
 
   it('marks actor as stopped on XSTATE_ACTOR_STOPPED', () => {
@@ -103,7 +103,7 @@ describe('handleMessage', () => {
 
 describe('time travel', () => {
   it('getDisplaySnapshot returns historical snapshot when time-travelling', () => {
-    const { handleMessage, timeTravel, getDisplaySnapshot } = useStore.getState()
+    const { handleMessage, timeTravel } = useStore.getState()
     handleMessage({
       type: 'XSTATE_ACTOR_REGISTERED',
       sessionId: 'a1',
@@ -130,14 +130,14 @@ describe('time travel', () => {
     })
 
     timeTravel(2)
-    expect(getDisplaySnapshot('a1')?.value).toBe('running')
+    expect(getDisplaySnapshot(useStore.getState(), 'a1')?.value).toBe('running')
 
     timeTravel(null)
-    expect(getDisplaySnapshot('a1')?.value).toBe('idle')
+    expect(getDisplaySnapshot(useStore.getState(), 'a1')?.value).toBe('idle')
   })
 
   it('returns registration snapshot when no events precede the travel point', () => {
-    const { handleMessage, timeTravel, getDisplaySnapshot } = useStore.getState()
+    const { handleMessage, timeTravel } = useStore.getState()
     handleMessage({
       type: 'XSTATE_ACTOR_REGISTERED',
       sessionId: 'a1',
@@ -156,7 +156,7 @@ describe('time travel', () => {
     })
     // Travel to seq 2 — between registration (1) and first event (5)
     timeTravel(2)
-    expect(getDisplaySnapshot('a1')?.value).toBe('idle')
+    expect(getDisplaySnapshot(useStore.getState(), 'a1')?.value).toBe('idle')
   })
 })
 

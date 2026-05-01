@@ -20,7 +20,7 @@ function walkNode(
 ): void {
   active.add(node.id)
 
-  if (node.type === 'atomic' || node.type === 'final') return
+  if (node.type === 'atomic' || node.type === 'final' || node.type === 'history') return
 
   if (node.type === 'parallel') {
     const obj = value as Record<string, StateValue>
