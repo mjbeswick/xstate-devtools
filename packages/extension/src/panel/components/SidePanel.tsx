@@ -3,6 +3,7 @@ import React, { useState, useCallback } from 'react'
 import { useStore, getDisplaySnapshot } from '../store.js'
 import { useDispatch } from '../port-context.js'
 import { AccordionSection } from './Accordion.js'
+import { JsonView } from './JsonView.js'
 import type { SerializedStateNode, SerializedTransition } from '../../shared/types.js'
 
 function findNode(root: SerializedStateNode, id: string): SerializedStateNode | null {
@@ -160,15 +161,11 @@ export function SidePanel() {
 
       <AccordionSection title="Context">
         {snapshot ? (
-          <pre style={{
-            fontSize: 11, background: '#f5f5f5', padding: 8,
-            borderRadius: 4, overflow: 'auto', margin: 0,
-            fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          }}>
-            {snapshot.context === undefined
-              ? '(no context)'
-              : JSON.stringify(snapshot.context, null, 2)}
-          </pre>
+          snapshot.context === undefined ? (
+            <div style={{ color: '#aaa', fontSize: 11 }}>(no context)</div>
+          ) : (
+            <JsonView value={snapshot.context} />
+          )
         ) : (
           <div style={{ color: '#aaa', fontSize: 11 }}>No snapshot available.</div>
         )}
