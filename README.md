@@ -2,6 +2,8 @@
 
 Chrome DevTools extension for inspecting XState v5 machines at runtime — both browser-side and Node.js-side actors — with time travel and event dispatch.
 
+![XState DevTools panel](docs/screenshot.png)
+
 ## What you get
 
 - **Actor list** with parent → child hierarchy
