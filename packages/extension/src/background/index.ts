@@ -30,9 +30,22 @@ chrome.runtime.onConnect.addListener((port: chrome.runtime.Port) => {
   port.onMessage.addListener((message: MarkedExtensionMessage) => {
     if (!message?.__xstateDevtools) return
     if (message.type === 'XSTATE_DISPATCH') {
-      chrome.tabs.sendMessage(tabId, message)
+      chrome.tabs.sendMessage(tabId, message, () => void chrome.runtime.lastError)
     }
   })
+})
+
+// Clean up when tab is closed or navigated
+chrome.tabs.onRemoved.addListener((tabId) => {
+  pendingMessages.delete(tabId)
+  panelPorts.delete(tabId)
+})
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === 'loading') {
+    // Tab navigated — stale buffered messages are no longer valid
+    pendingMessages.delete(tabId)
+  }
 })
 
 // Content script → panel (inspection events)

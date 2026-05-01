@@ -1,5 +1,5 @@
 // packages/adapter/src/react.tsx
-import React, { createContext, useContext, useRef, type ReactNode } from 'react'
+import React, { createContext, useContext, useRef, useEffect, type ReactNode } from 'react'
 import { useMachine as useXStateMachine, useActorRef as useXStateActorRef } from '@xstate/react'
 import type { AnyStateMachine, ActorOptions } from 'xstate'
 import { createAdapter } from './index.js'
@@ -13,6 +13,14 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
   if (!adapterRef.current && typeof window !== 'undefined') {
     adapterRef.current = createAdapter()
   }
+
+  useEffect(() => {
+    return () => {
+      adapterRef.current?.dispose()
+      adapterRef.current = null
+    }
+  }, [])
+
   return (
     <InspectorContext.Provider value={adapterRef.current}>
       {children}

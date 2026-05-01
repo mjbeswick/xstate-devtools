@@ -43,21 +43,33 @@ export function createAdapter() {
     window.__XSTATE_DEVTOOLS__?.send({ ...message as object, __xstateDevtools: true })
   }
 
-  // Listen for dispatch events from extension (relayed by injected script via postMessage)
-  if (typeof window !== 'undefined') {
-    window.addEventListener('message', (evt) => {
-      if (evt.source !== window) return
-      const data = evt.data
-      if (!data?.__xstateDevtools) return
-      if (data.type === 'XSTATE_DISPATCH') {
-        const ref = actorRefs.get(data.sessionId)
-        if (ref) {
-          try { ref.send(data.event) } catch (e) {
-            console.warn('[xstate-devtools] dispatch error:', e)
-          }
+  function checkAndNotifyStop(actorRef: AnyActorRef) {
+    const snap = actorRef.getSnapshot()
+    if (snap?.status !== 'active') {
+      postToExtension({
+        type: 'XSTATE_ACTOR_STOPPED',
+        sessionId: actorRef.sessionId,
+      })
+      actorRefs.delete(actorRef.sessionId)
+    }
+  }
+
+  function handleDispatch(evt: MessageEvent) {
+    if (evt.source !== window) return
+    const data = evt.data
+    if (!data?.__xstateDevtools) return
+    if (data.type === 'XSTATE_DISPATCH') {
+      const ref = actorRefs.get(data.sessionId)
+      if (ref) {
+        try { ref.send(data.event) } catch (e) {
+          console.warn('[xstate-devtools] dispatch error:', e)
         }
       }
-    })
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('message', handleDispatch)
   }
 
   const inspect = (inspectionEvent: any) => {
@@ -74,13 +86,14 @@ export function createAdapter() {
 
       const snapshot = serializeSnapshot(actorRef.getSnapshot())
 
+      globalSeq++
       postToExtension({
         type: 'XSTATE_ACTOR_REGISTERED',
         sessionId,
         parentSessionId: (actorRef as any)._parent?.sessionId,
         machine,
         snapshot,
-        globalSeq: 0,
+        globalSeq,
         timestamp: Date.now(),
       })
     } else if (inspectionEvent.type === '@xstate.snapshot') {
@@ -92,6 +105,7 @@ export function createAdapter() {
         timestamp: Date.now(),
         globalSeq,
       })
+      checkAndNotifyStop(inspectionEvent.actorRef)
     } else if (inspectionEvent.type === '@xstate.event') {
       globalSeq++
       postToExtension({
@@ -102,17 +116,16 @@ export function createAdapter() {
         timestamp: Date.now(),
         globalSeq,
       })
-      // Check if actor is stopping
-      const snap = inspectionEvent.actorRef.getSnapshot()
-      if (snap?.status !== 'active') {
-        postToExtension({
-          type: 'XSTATE_ACTOR_STOPPED',
-          sessionId: inspectionEvent.actorRef.sessionId,
-        })
-        actorRefs.delete(inspectionEvent.actorRef.sessionId)
-      }
+      checkAndNotifyStop(inspectionEvent.actorRef)
     }
   }
 
-  return { inspect }
+  function dispose() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('message', handleDispatch)
+    }
+    actorRefs.clear()
+  }
+
+  return { inspect, dispose }
 }

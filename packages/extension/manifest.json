@@ -22,11 +22,5 @@
     "type": "module"
   },
   "permissions": [],
-  "web_accessible_resources": [
-    {
-      "resources": ["src/panel/index.html"],
-      "matches": ["<all_urls>"]
-    }
-  ],
   "icons": {}
 }
