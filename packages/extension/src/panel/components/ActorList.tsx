@@ -6,6 +6,7 @@ export function ActorList() {
   const actors = useStore((s) => s.actors)
   const selectedActorId = useStore((s) => s.selectedActorId)
   const selectActor = useStore((s) => s.selectActor)
+  const portConnected = useStore((s) => s.portConnected)
 
   // Build parent→children map
   const childrenOf = useMemo(() => {
@@ -64,8 +65,18 @@ export function ActorList() {
         ACTORS
       </div>
       {roots.length === 0 ? (
-        <div style={{ padding: 12, color: '#aaa', fontSize: 11 }}>
-          No actors detected.<br />Make sure the adapter is wired up.
+        <div style={{ padding: '12px 10px', fontSize: 11 }}>
+          {portConnected ? (
+            <span style={{ color: '#aaa' }}>
+              No actors detected.<br />
+              Make sure the adapter is wired up on the page.
+            </span>
+          ) : (
+            <span style={{ color: '#cf1322' }}>
+              Not connected.<br />
+              Open DevTools on an inspected tab and reload the page.
+            </span>
+          )}
         </div>
       ) : (
         roots.map((sid) => renderActor(sid, 0))

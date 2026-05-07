@@ -6,6 +6,7 @@
     "dev:extension": "npm run dev --workspace=packages/extension",
     "dev:example": "npm run dev --workspace=packages/example-remix",
     "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "watch": "npm run watch --workspaces --if-present"
   }
 }

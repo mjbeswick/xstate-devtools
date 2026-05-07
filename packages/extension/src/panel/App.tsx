@@ -6,12 +6,28 @@ import { DispatchContext } from './port-context.js'
 import type {
   PageToExtensionMessage, ExtensionToPageMessage, MarkedPageMessage,
 } from '../shared/types.js'
+import { debugLog, infoLog, summarizeMessage, warnLog } from '../shared/debug.js'
 
 const SERVER_URL_KEY = 'xstate-devtools.serverUrl'
 const DEFAULT_SERVER_URL = 'ws://localhost:9301'
 
+const PAGE_MESSAGE_TYPES = new Set([
+  'XSTATE_ACTOR_REGISTERED',
+  'XSTATE_SNAPSHOT',
+  'XSTATE_EVENT',
+  'XSTATE_ACTOR_STOPPED',
+])
+
+function asPageMessage(data: unknown): PageToExtensionMessage | null {
+  if (!data || typeof data !== 'object') return null
+  const type = (data as { type?: unknown }).type
+  if (typeof type !== 'string' || !PAGE_MESSAGE_TYPES.has(type)) return null
+  return data as PageToExtensionMessage
+}
+
 export function App() {
   const handleMessage = useStore((s) => s.handleMessage)
+  const setPortConnectedInStore = useStore((s) => s.setPortConnected)
   const portRef = useRef<chrome.runtime.Port | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const panelSeqRef = useRef(0)
@@ -25,6 +41,10 @@ export function App() {
   const ingest = useCallback((message: PageToExtensionMessage) => {
     panelSeqRef.current += 1
     const seq = panelSeqRef.current
+    debugLog('panel', 'ingesting message', {
+      original: summarizeMessage(message),
+      rebasedGlobalSeq: seq,
+    })
     if (
       message.type === 'XSTATE_ACTOR_REGISTERED'
       || message.type === 'XSTATE_SNAPSHOT'
@@ -45,23 +65,44 @@ export function App() {
     catch { return false }
   })
   const [serverStatus, setServerStatus] = useState<'idle' | 'connecting' | 'open' | 'closed' | 'error'>('idle')
+  const [portConnected, setPortConnected] = useState(false)
+  const [browserMsgCount, setBrowserMsgCount] = useState(0)
 
   // Browser transport — content-script port
   useEffect(() => {
     const tabId = chrome.devtools.inspectedWindow.tabId
+    infoLog('panel', 'connecting to background port', { tabId })
     const p = chrome.runtime.connect({ name: `xstate-panel-${tabId}` })
     portRef.current = p
+    setPortConnected(true)
+    setPortConnectedInStore(true)
+    infoLog('panel', 'connected to background port', { tabId, portName: p.name })
 
-    p.onMessage.addListener((message: MarkedPageMessage) => {
-      if (!message?.__xstateDevtools) return
-      ingest(message as PageToExtensionMessage)
+    p.onMessage.addListener((message: MarkedPageMessage | PageToExtensionMessage) => {
+      const normalized = asPageMessage(message)
+      if (!normalized) return
+      debugLog('panel', 'received message from browser transport', summarizeMessage(normalized))
+      setBrowserMsgCount((n) => {
+        if (n === 0) infoLog('panel', 'first message received from browser transport', summarizeMessage(normalized))
+        return n + 1
+      })
+      ingest(normalized)
+    })
+
+    p.onDisconnect.addListener(() => {
+      setPortConnected(false)
+      setPortConnectedInStore(false)
+      infoLog('panel', 'background port disconnected', { tabId, portName: p.name })
     })
 
     return () => {
+      infoLog('panel', 'disconnecting background port', { tabId, portName: p.name })
       p.disconnect()
       portRef.current = null
+      setPortConnected(false)
+      setPortConnectedInStore(false)
     }
-  }, [ingest])
+  }, [ingest, setPortConnectedInStore])
 
   // Server transport — WebSocket to user-supplied endpoint
   useEffect(() => {
@@ -79,29 +120,44 @@ export function App() {
     function connect() {
       if (cancelled) return
       setServerStatus('connecting')
+      infoLog('panel', 'connecting to server transport', { serverUrl })
       try {
         ws = new WebSocket(serverUrl)
-      } catch {
+      } catch (error) {
         setServerStatus('error')
+        warnLog('panel', 'failed to create WebSocket', { serverUrl, error })
         return
       }
       wsRef.current = ws
 
-      ws.onopen = () => setServerStatus('open')
+      ws.onopen = () => {
+        setServerStatus('open')
+        infoLog('panel', 'server transport open', { serverUrl })
+      }
       ws.onmessage = (evt) => {
         try {
-          const data = JSON.parse(evt.data) as MarkedPageMessage
-          if (!data?.__xstateDevtools) return
-          ingest(data as PageToExtensionMessage)
-        } catch { /* ignore */ }
+          const parsed = JSON.parse(evt.data) as MarkedPageMessage | PageToExtensionMessage
+          const normalized = asPageMessage(parsed)
+          if (!normalized) return
+          debugLog('panel', 'received message from server transport', summarizeMessage(normalized))
+          ingest(normalized)
+        } catch (error) {
+          warnLog('panel', 'failed to parse server transport message', {
+            serverUrl,
+            error,
+            raw: typeof evt.data === 'string' ? evt.data : String(evt.data),
+          })
+        }
       }
       ws.onclose = () => {
         setServerStatus('closed')
+        infoLog('panel', 'server transport closed; scheduling reconnect', { serverUrl })
         if (cancelled) return
         reconnectTimer = window.setTimeout(connect, 2000)
       }
       ws.onerror = () => {
         setServerStatus('error')
+        warnLog('panel', 'server transport error', { serverUrl, readyState: ws.readyState })
       }
     }
 
@@ -117,10 +173,15 @@ export function App() {
 
   const dispatch = useCallback((message: ExtensionToPageMessage) => {
     // Broadcast to all transports — receivers ignore unknown sessionIds.
+    debugLog('panel', 'dispatching event to transports', summarizeMessage(message))
     portRef.current?.postMessage({ ...message, __xstateDevtools: true })
     const ws = wsRef.current
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(message))
+    } else {
+      debugLog('panel', 'server transport unavailable for dispatch', {
+        readyState: ws?.readyState ?? null,
+      })
     }
   }, [])
 
@@ -136,6 +197,8 @@ export function App() {
   return (
     <DispatchContext.Provider value={dispatch}>
       <ServerStatusBar
+        portConnected={portConnected}
+        browserMsgCount={browserMsgCount}
         enabled={serverEnabled}
         url={serverUrl}
         status={serverStatus}
@@ -148,8 +211,10 @@ export function App() {
 }
 
 function ServerStatusBar({
-  enabled, url, status, onToggle, onUrlChange,
+  portConnected, browserMsgCount, enabled, url, status, onToggle, onUrlChange,
 }: {
+  portConnected: boolean
+  browserMsgCount: number
   enabled: boolean
   url: string
   status: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
@@ -171,6 +236,18 @@ function ServerStatusBar({
       padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 8,
       fontSize: 11, flexShrink: 0,
     }}>
+      {/* Browser transport indicator */}
+      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={portConnected ? `Browser transport connected (${browserMsgCount} messages received)` : 'Browser transport disconnected'}>
+        <span style={{
+          display: 'inline-block', width: 8, height: 8,
+          borderRadius: '50%', background: portConnected ? '#52c41a' : '#ff4d4f',
+          flexShrink: 0,
+        }} />
+        <span style={{ color: portConnected ? '#389e0d' : '#cf1322' }}>
+          {portConnected ? `Connected${browserMsgCount > 0 ? ` · ${browserMsgCount} msg` : ''}` : 'Disconnected'}
+        </span>
+      </span>
+      <span style={{ color: '#ddd' }}>|</span>
       <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
         <input
           type="checkbox"

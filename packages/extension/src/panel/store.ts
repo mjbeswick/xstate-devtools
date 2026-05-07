@@ -16,6 +16,7 @@ export interface InspectorStore {
   selectedStateNodeId: string | null
   timeTravelSeq: number | null   // null = live; number = frozen at that seq
   treeFilter: string
+  portConnected: boolean
 
   // Message handler — call this from the port listener
   handleMessage: (msg: PageToExtensionMessage) => void
@@ -24,6 +25,7 @@ export interface InspectorStore {
   selectStateNode: (id: string | null) => void
   timeTravel: (seq: number | null) => void
   setTreeFilter: (filter: string) => void
+  setPortConnected: (connected: boolean) => void
 }
 
 /** Pure function — use as a Zustand selector: useStore(s => getDisplaySnapshot(s, id)) */
@@ -52,6 +54,7 @@ export const useStore = create<InspectorStore>((set, get) => ({
   selectedStateNodeId: null,
   timeTravelSeq: null,
   treeFilter: '',
+  portConnected: false,
 
   handleMessage(msg) {
     set((state) => {
@@ -129,5 +132,9 @@ export const useStore = create<InspectorStore>((set, get) => ({
 
   setTreeFilter(filter) {
     set({ treeFilter: filter })
+  },
+
+  setPortConnected(connected) {
+    set({ portConnected: connected })
   },
 }))

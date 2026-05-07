@@ -20,6 +20,44 @@ interface ClientLike {
 
 const OPEN_STATE = 1
 
+function summarizeMessage(message: ExtensionToPageMessage | PageToExtensionMessage) {
+  const summary: Record<string, unknown> = { type: message.type }
+  if ('sessionId' in message) summary.sessionId = message.sessionId
+  if ('parentSessionId' in message && message.parentSessionId) {
+    summary.parentSessionId = message.parentSessionId
+  }
+  if ('globalSeq' in message) summary.globalSeq = message.globalSeq
+  if ('timestamp' in message) summary.timestamp = message.timestamp
+  if ('event' in message && message.event && typeof message.event === 'object' && 'type' in message.event) {
+    summary.eventType = message.event.type
+  }
+  return summary
+}
+
+function debugLog(message: string, details?: unknown) {
+  if (details === undefined) {
+    console.debug(`[xstate-devtools:server] ${message}`)
+    return
+  }
+  console.debug(`[xstate-devtools:server] ${message}`, details)
+}
+
+function infoLog(message: string, details?: unknown) {
+  if (details === undefined) {
+    console.info(`[xstate-devtools:server] ${message}`)
+    return
+  }
+  console.info(`[xstate-devtools:server] ${message}`, details)
+}
+
+function warnLog(message: string, details?: unknown) {
+  if (details === undefined) {
+    console.warn(`[xstate-devtools:server] ${message}`)
+    return
+  }
+  console.warn(`[xstate-devtools:server] ${message}`, details)
+}
+
 interface CachedServer {
   clients: Set<ClientLike>
   dispatchHandlers: Set<(msg: ExtensionToPageMessage) => void>
@@ -47,6 +85,7 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
     ?? (Number(process.env.XSTATE_DEVTOOLS_PORT) || 9301)
   const host = options.host ?? '127.0.0.1'
   const bufferSize = options.bufferSize ?? 200
+  infoLog('createServerAdapter called', { host, port, bufferSize })
 
   const key = `__xstate_devtools_server_${port}__`
   const cache = (globalThis as Record<string, unknown>)[key] as CachedServer | undefined
@@ -54,6 +93,12 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
   let server: CachedServer
   if (cache) {
     server = cache
+    infoLog('reusing cached WebSocket server', {
+      host,
+      port,
+      clientCount: server.clients.size,
+      bufferedMessages: server.buffer.length,
+    })
     // honour the most recent caller's buffer size if larger
     if (bufferSize > server.bufferSize) server.bufferSize = bufferSize
   } else {
@@ -68,6 +113,7 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
       activated: false,
       close: () => {
         closed = true
+        infoLog('closing WebSocket server', { host, port, clientCount: clients.size })
         try { wss?.close() } catch { /* noop */ }
         clients.clear()
         dispatchHandlers.clear()
@@ -84,10 +130,22 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
         const WSServer = (mod as any).WebSocketServer ?? (mod as any).Server
         if (closed) return
         wss = new WSServer({ port, host })
+        infoLog('WebSocket server listening', { host, port })
         wss.on('connection', (ws: ClientLike) => {
+          infoLog('panel connected to WebSocket server', {
+            host,
+            port,
+            activated: server.activated,
+            bufferedMessages: server.buffer.length,
+          })
           // Drain bootstrap buffer to the first client only.
           if (!server.activated) {
             server.activated = true
+            infoLog('flushing bootstrap buffer to first panel', {
+              host,
+              port,
+              bufferedMessages: server.buffer.length,
+            })
             for (const payload of server.buffer) {
               try { ws.send(payload) } catch { /* ignore */ }
             }
@@ -98,22 +156,34 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
             try {
               const text = typeof raw === 'string' ? raw : (raw as Buffer).toString('utf8')
               const msg = JSON.parse(text) as ExtensionToPageMessage
+              debugLog('received dispatch from panel', summarizeMessage(msg))
               for (const cb of server.dispatchHandlers) cb(msg)
-            } catch {
-              // ignore malformed messages
+            } catch (error) {
+              warnLog('failed to parse panel message', { error })
             }
           })
-          ws.on('close', () => server.clients.delete(ws))
-          ws.on('error', () => server.clients.delete(ws))
+          ws.on('close', () => {
+            server.clients.delete(ws)
+            infoLog('panel disconnected from WebSocket server', {
+              host,
+              port,
+              clientCount: server.clients.size,
+            })
+          })
+          ws.on('error', (error: unknown) => {
+            server.clients.delete(ws)
+            warnLog('WebSocket client error', { error })
+          })
         })
         wss.on('error', (err: Error) => {
-          console.warn('[xstate-devtools] WS server error:', err.message)
+          warnLog('WS server error', { host, port, message: err.message })
         })
       } catch (e) {
-        console.warn(
-          '[xstate-devtools] could not start server adapter — install `ws` to enable.',
-          (e as Error).message,
-        )
+        warnLog('could not start server adapter — install `ws` to enable', {
+          host,
+          port,
+          message: (e as Error).message,
+        })
       }
     })()
 
@@ -127,17 +197,36 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
         // No panel has connected yet — buffer for the first one.
         if (server.buffer.length >= server.bufferSize) server.buffer.shift()
         server.buffer.push(payload)
+        debugLog('buffered outgoing adapter message; no panel connected yet', {
+          bufferedMessages: server.buffer.length,
+          message: summarizeMessage(message),
+        })
         return
       }
+      let sentCount = 0
       for (const ws of server.clients) {
         if (ws.readyState === OPEN_STATE) {
-          try { ws.send(payload) } catch { /* ignore */ }
+          try {
+            ws.send(payload)
+            sentCount += 1
+          } catch {
+            /* ignore */
+          }
         }
       }
+      debugLog('sent adapter message to connected panels', {
+        sentCount,
+        clientCount: server.clients.size,
+        message: summarizeMessage(message),
+      })
     },
     subscribe(handler) {
       server.dispatchHandlers.add(handler)
-      return () => server.dispatchHandlers.delete(handler)
+      debugLog('registered dispatch handler', { handlerCount: server.dispatchHandlers.size })
+      return () => {
+        server.dispatchHandlers.delete(handler)
+        debugLog('removed dispatch handler', { handlerCount: server.dispatchHandlers.size })
+      }
     },
   }
 

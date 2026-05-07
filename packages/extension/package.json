@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "watch": "vite build --watch"
   },
   "dependencies": {
     "react": "^18.3.0",
