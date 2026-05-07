@@ -1,11 +1,11 @@
-import { setup, assign, fromPromise } from 'xstate'
+import { assign, fromPromise, setup } from 'xstate'
 
 const loginService = fromPromise<{ token: string }, { email: string; password: string }>(
   async ({ input }) => {
     await new Promise((r) => setTimeout(r, 1000))
     if (input.password === 'wrong') throw new Error('Invalid credentials')
-    return { token: 'fake-jwt-' + input.email }
-  }
+    return { token: `fake-jwt-${input.email}` }
+  },
 )
 
 const verifyMfa = fromPromise<{ ok: true }, { code: string }>(async ({ input }) => {

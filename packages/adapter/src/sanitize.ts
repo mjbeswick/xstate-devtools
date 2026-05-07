@@ -9,7 +9,7 @@ export function sanitize(value: unknown, depth = 0): unknown {
   if (value === null || value === undefined) return value
   if (typeof value === 'boolean' || typeof value === 'number') return value
   if (typeof value === 'string') {
-    return value.length > MAX_STRING_LENGTH ? value.slice(0, MAX_STRING_LENGTH) + '…' : value
+    return value.length > MAX_STRING_LENGTH ? `${value.slice(0, MAX_STRING_LENGTH)}…` : value
   }
   if (typeof value === 'function') return `[Function: ${value.name || '(anonymous)'}]`
   if (typeof value === 'symbol') return `[Symbol: ${value.description ?? ''}]`
@@ -50,7 +50,10 @@ export function sanitize(value: unknown, depth = 0): unknown {
     const result: Record<string, unknown> = {}
     let count = 0
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (count++ >= MAX_ARRAY_LENGTH) { result['…'] = '[truncated]'; break }
+      if (count++ >= MAX_ARRAY_LENGTH) {
+        result['…'] = '[truncated]'
+        break
+      }
       result[k] = sanitize(v, depth + 1)
     }
     return result

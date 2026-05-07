@@ -1,6 +1,6 @@
 // Sample server-side XState actor — runs in the Remix dev process and
 // is visible in the DevTools panel via the WS bridge (createServerAdapter).
-import { setup, assign, createActor, fromCallback } from 'xstate'
+import { assign, createActor, fromCallback, setup } from 'xstate'
 import { inspect } from './inspector.server.js'
 
 const tickActor = fromCallback<{ type: 'TICK' }>(({ sendBack }) => {
@@ -44,7 +44,13 @@ const orchestratorMachine = setup({
       },
     },
     paused: {
-      on: { RESUME: 'running', RESET: { target: 'running', actions: assign({ ticks: 0, jobsProcessed: 0, lastJobId: null }) } },
+      on: {
+        RESUME: 'running',
+        RESET: {
+          target: 'running',
+          actions: assign({ ticks: 0, jobsProcessed: 0, lastJobId: null }),
+        },
+      },
     },
   },
 })

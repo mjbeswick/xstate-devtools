@@ -1,7 +1,7 @@
 // packages/extension/src/panel/components/MachineTree.tsx
 import React from 'react'
-import { useStore, getDisplaySnapshot } from '../store.js'
 import { getActiveNodeIds } from '../active-nodes.js'
+import { getDisplaySnapshot, useStore } from '../store.js'
 
 function findPath(root: SerializedStateNode, id: string): SerializedStateNode[] | null {
   if (root.id === id) return [root]
@@ -11,25 +11,43 @@ function findPath(root: SerializedStateNode, id: string): SerializedStateNode[] 
   }
   return null
 }
-import { usePanelCollapse } from '../panel-collapse-context.js'
-import { ChevronDown, ChevronRight, PanelToggle, ExternalLink, Close } from './Icons.js'
+
 import type { SerializedStateNode } from '../../shared/types.js'
+import { usePanelCollapse } from '../panel-collapse-context.js'
+import { ChevronDown, ChevronRight, Close, ExternalLink, PanelToggle } from './Icons.js'
 
 function HeaderIconButton({
-  onClick, title, children,
-}: { onClick: () => void; title: string; children: React.ReactNode }) {
+  onClick,
+  title,
+  children,
+}: {
+  onClick: () => void
+  title: string
+  children: React.ReactNode
+}) {
   return (
     <button
       onClick={onClick}
       title={title}
       style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 22, height: 22, padding: 0,
-        background: 'transparent', border: 'none', borderRadius: 4,
-        cursor: 'pointer', color: '#666',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 22,
+        height: 22,
+        padding: 0,
+        background: 'transparent',
+        border: 'none',
+        borderRadius: 4,
+        cursor: 'pointer',
+        color: '#666',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = '#eee' }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = '#eee'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent'
+      }}
     >
       {children}
     </button>
@@ -98,8 +116,11 @@ function StateNodeRow({
   const expanded = filterActive ? true : userExpanded
 
   const typeColor: Record<string, string> = {
-    parallel: '#722ed1', final: '#d4380d', history: '#d48806',
-    atomic: '#595959', compound: '#595959',
+    parallel: '#722ed1',
+    final: '#d4380d',
+    history: '#d48806',
+    atomic: '#595959',
+    compound: '#595959',
   }
 
   if (matchSet && !matchSet.has(node.id)) return null
@@ -109,22 +130,34 @@ function StateNodeRow({
       <div
         style={{
           paddingLeft: 8 + depth * 18,
-          paddingTop: 3, paddingBottom: 3,
-          display: 'flex', alignItems: 'center', gap: 6,
+          paddingTop: 3,
+          paddingBottom: 3,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
           cursor: 'pointer',
           background: isSelected ? '#e6f4ff' : isActive ? '#f6ffed' : 'transparent',
           borderLeft: isActive ? '3px solid #52c41a' : '3px solid transparent',
-          fontFamily: 'monospace', fontSize: 12,
+          fontFamily: 'monospace',
+          fontSize: 12,
         }}
         onClick={() => onSelect(node.id)}
       >
         {hasChildren ? (
           <span
-            onClick={(e) => { e.stopPropagation(); if (!filterActive) setUserExpanded((ex) => !ex) }}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (!filterActive) setUserExpanded((ex) => !ex)
+            }}
             style={{
-              color: '#888', width: 14, height: 14,
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              cursor: filterActive ? 'default' : 'pointer', flexShrink: 0,
+              color: '#888',
+              width: 14,
+              height: 14,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: filterActive ? 'default' : 'pointer',
+              flexShrink: 0,
             }}
           >
             {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -132,28 +165,39 @@ function StateNodeRow({
         ) : (
           <span style={{ width: 14, flexShrink: 0 }} />
         )}
-        <span style={{ color: typeColor[node.type] ?? '#595959', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>
+        <span
+          style={{
+            color: typeColor[node.type] ?? '#595959',
+            fontSize: 10,
+            textTransform: 'uppercase',
+            letterSpacing: 1,
+          }}
+        >
           {node.type.slice(0, 4)}
         </span>
         <span style={{ fontWeight: isActive ? 700 : 400, color: isActive ? '#237804' : '#333' }}>
           {highlight(node.key, filter)}
         </span>
         {node.invoke.length > 0 && (
-          <span title="has invoked services" style={{ color: '#096dd9', fontSize: 10 }}>⚙</span>
+          <span title="has invoked services" style={{ color: '#096dd9', fontSize: 10 }}>
+            ⚙
+          </span>
         )}
       </div>
-      {expanded && hasChildren && Object.values(node.states).map((child) => (
-        <StateNodeRow
-          key={child.id}
-          node={child}
-          activeIds={activeIds}
-          selectedId={selectedId}
-          onSelect={onSelect}
-          depth={depth + 1}
-          filter={filter}
-          matchSet={matchSet}
-        />
-      ))}
+      {expanded &&
+        hasChildren &&
+        Object.values(node.states).map((child) => (
+          <StateNodeRow
+            key={child.id}
+            node={child}
+            activeIds={activeIds}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            depth={depth + 1}
+            filter={filter}
+            matchSet={matchSet}
+          />
+        ))}
     </>
   )
 }
@@ -167,7 +211,7 @@ export function MachineTree() {
   const actors = useStore((s) => s.actors)
   const portConnected = useStore((s) => s.portConnected)
   const snapshot = useStore((s) =>
-    selectedActorId ? getDisplaySnapshot(s, selectedActorId) : null
+    selectedActorId ? getDisplaySnapshot(s, selectedActorId) : null,
   )
 
   const collapse = usePanelCollapse()
@@ -180,13 +224,23 @@ export function MachineTree() {
   }, [actor?.machine, treeFilter])
 
   const Header = (
-    <div style={{
-      padding: '0 6px', minHeight: 30, boxSizing: 'border-box',
-      borderBottom: '1px solid #eee',
-      fontSize: 11, color: '#666', position: 'sticky', top: 0,
-      background: '#fafafa', zIndex: 1,
-      display: 'flex', alignItems: 'center', gap: 6,
-    }}>
+    <div
+      style={{
+        padding: '0 6px',
+        minHeight: 30,
+        boxSizing: 'border-box',
+        borderBottom: '1px solid #eee',
+        fontSize: 11,
+        color: '#666',
+        position: 'sticky',
+        top: 0,
+        background: '#fafafa',
+        zIndex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+      }}
+    >
       <HeaderIconButton
         onClick={collapse.toggleLeft}
         title={collapse.leftCollapsed ? 'Show actor list' : 'Hide actor list'}
@@ -201,8 +255,13 @@ export function MachineTree() {
             <a
               href={`vscode://file/${actor.machine.sourceLocation}`}
               style={{
-                color: '#1890ff', fontSize: 10, textDecoration: 'none',
-                whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 2,
+                color: '#1890ff',
+                fontSize: 10,
+                textDecoration: 'none',
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 2,
               }}
               title="Open in VS Code"
             >
@@ -213,14 +272,18 @@ export function MachineTree() {
       )}
 
       <span style={{ marginLeft: 'auto' }} />
-      <span style={{
-        fontSize: 10, fontWeight: 500, padding: '1px 6px',
-        borderRadius: 10,
-        background: portConnected ? '#f6ffed' : '#fff1f0',
-        color: portConnected ? '#389e0d' : '#cf1322',
-        border: `1px solid ${portConnected ? '#b7eb8f' : '#ffa39e'}`,
-        whiteSpace: 'nowrap',
-      }}>
+      <span
+        style={{
+          fontSize: 10,
+          fontWeight: 500,
+          padding: '1px 6px',
+          borderRadius: 10,
+          background: portConnected ? '#f6ffed' : '#fff1f0',
+          color: portConnected ? '#389e0d' : '#cf1322',
+          border: `1px solid ${portConnected ? '#b7eb8f' : '#ffa39e'}`,
+          whiteSpace: 'nowrap',
+        }}
+      >
         {portConnected ? '● Connected' : '○ Not connected'}
       </span>
       <HeaderIconButton
@@ -233,11 +296,17 @@ export function MachineTree() {
   )
 
   const Footer = (
-    <div style={{
-      padding: '4px 6px', borderTop: '1px solid #eee',
-      background: '#fafafa', flexShrink: 0,
-      display: 'flex', alignItems: 'center', gap: 6,
-    }}>
+    <div
+      style={{
+        padding: '4px 6px',
+        borderTop: '1px solid #eee',
+        background: '#fafafa',
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+      }}
+    >
       {actor?.machine && (
         <>
           <input
@@ -245,9 +314,13 @@ export function MachineTree() {
             onChange={(e) => setTreeFilter(e.target.value)}
             placeholder="Search states…"
             style={{
-              flex: '1 1 auto', minWidth: 60,
-              padding: '2px 6px', fontSize: 11, fontFamily: 'inherit',
-              border: '1px solid #d9d9d9', borderRadius: 4,
+              flex: '1 1 auto',
+              minWidth: 60,
+              padding: '2px 6px',
+              fontSize: 11,
+              fontFamily: 'inherit',
+              border: '1px solid #d9d9d9',
+              borderRadius: 4,
             }}
           />
           {treeFilter && (
@@ -271,18 +344,29 @@ export function MachineTree() {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {Header}
-        <div style={{
-          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 24, textAlign: 'center',
-        }}>
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+            textAlign: 'center',
+          }}
+        >
           {!portConnected ? (
             <div style={{ fontSize: 12 }}>
-              <div style={{ color: '#cf1322', fontWeight: 500, marginBottom: 4 }}>Not connected</div>
-              <div style={{ color: '#8c8c8c' }}>Open DevTools on an inspected tab and reload the page.</div>
+              <div style={{ color: '#cf1322', fontWeight: 500, marginBottom: 4 }}>
+                Not connected
+              </div>
+              <div style={{ color: '#8c8c8c' }}>
+                Open DevTools on an inspected tab and reload the page.
+              </div>
             </div>
           ) : actors.size === 0 ? (
             <div style={{ fontSize: 12, color: '#8c8c8c' }}>
-              No actors detected.<br />
+              No actors detected.
+              <br />
               Make sure the adapter is wired up on the page.{' '}
               <a
                 href="https://github.com/mjbeswick/xstate-devtools#wiring-it-into-your-app"
@@ -294,7 +378,9 @@ export function MachineTree() {
               </a>
             </div>
           ) : (
-            <span style={{ fontSize: 12, color: '#aaa' }}>Select an actor from the left panel.</span>
+            <span style={{ fontSize: 12, color: '#aaa' }}>
+              Select an actor from the left panel.
+            </span>
           )}
         </div>
         {Footer}
@@ -328,11 +414,19 @@ export function MachineTree() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {Header}
       {breadcrumbPath && (
-        <div style={{
-          padding: '4px 10px', borderBottom: '1px solid #eee',
-          background: '#fff', fontSize: 11, color: '#555',
-          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2,
-        }}>
+        <div
+          style={{
+            padding: '4px 10px',
+            borderBottom: '1px solid #eee',
+            background: '#fff',
+            fontSize: 11,
+            color: '#555',
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 2,
+          }}
+        >
           {breadcrumbPath.map((n, j) => {
             const isLeaf = j === breadcrumbPath.length - 1
             return (
@@ -342,9 +436,13 @@ export function MachineTree() {
                   onClick={() => selectStateNode(n.id)}
                   title={n.id}
                   style={{
-                    padding: '0 4px', border: 'none',
-                    background: 'transparent', borderRadius: 3, cursor: 'pointer',
-                    fontFamily: 'monospace', fontSize: 11,
+                    padding: '0 4px',
+                    border: 'none',
+                    background: 'transparent',
+                    borderRadius: 3,
+                    cursor: 'pointer',
+                    fontFamily: 'monospace',
+                    fontSize: 11,
                     color: isLeaf ? '#0958d9' : '#555',
                     fontWeight: isLeaf ? 600 : 400,
                   }}

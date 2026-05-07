@@ -1,6 +1,11 @@
 // packages/adapter/src/serialize.ts
 import type { AnyStateMachine } from 'xstate'
-import type { SerializedMachine, SerializedStateNode, SerializedTransition, SerializedInvoke } from '../../extension/src/shared/types.js'
+import type {
+  SerializedInvoke,
+  SerializedMachine,
+  SerializedStateNode,
+  SerializedTransition,
+} from '../../extension/src/shared/types.js'
 
 function serializeGuard(guard: unknown): string | undefined {
   if (!guard) return undefined
@@ -35,9 +40,7 @@ function serializeTransitionList(transitions: any[]): SerializedTransition[] {
 function serializeInvokes(node: any): SerializedInvoke[] {
   return (node.invoke as any[]).map((inv: any) => ({
     id: inv.id ?? '(unknown)',
-    src: typeof inv.src === 'string'
-      ? inv.src
-      : inv.src?.id ?? inv.src?.name ?? '(inline)',
+    src: typeof inv.src === 'string' ? inv.src : (inv.src?.id ?? inv.src?.name ?? '(inline)'),
   }))
 }
 
@@ -57,7 +60,7 @@ function serializeNode(node: any): SerializedStateNode {
     type: node.type,
     initial: node.initial?.target?.[0]?.key,
     states: Object.fromEntries(
-      Object.entries(node.states ?? {}).map(([k, v]) => [k, serializeNode(v)])
+      Object.entries(node.states ?? {}).map(([k, v]) => [k, serializeNode(v)]),
     ),
     on: allTransitions,
     always,
@@ -67,7 +70,10 @@ function serializeNode(node: any): SerializedStateNode {
   }
 }
 
-export function serializeMachine(machine: AnyStateMachine, sourceLocation?: string): SerializedMachine {
+export function serializeMachine(
+  machine: AnyStateMachine,
+  sourceLocation?: string,
+): SerializedMachine {
   return {
     id: machine.id,
     root: serializeNode(machine.root),

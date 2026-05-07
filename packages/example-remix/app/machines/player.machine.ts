@@ -1,4 +1,4 @@
-import { setup, assign, fromCallback } from 'xstate'
+import { assign, fromCallback, setup } from 'xstate'
 
 const bufferActor = fromCallback<
   { type: 'BUFFER_PROGRESS'; progress: number } | { type: 'BUFFER_COMPLETE' },

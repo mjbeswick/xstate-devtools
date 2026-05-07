@@ -1,5 +1,6 @@
 // Chrome-DevTools-style stacked accordion section.
-import React, { useState } from 'react'
+import type React from 'react'
+import { useState } from 'react'
 import { ChevronDown, ChevronRight } from './Icons.js'
 
 export interface AccordionSectionProps {
@@ -15,7 +16,12 @@ export interface AccordionSectionProps {
 }
 
 export function AccordionSection({
-  title, actions, defaultOpen = true, open, onOpenChange, children,
+  title,
+  actions,
+  defaultOpen = true,
+  open,
+  onOpenChange,
+  children,
 }: AccordionSectionProps) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen)
   const isOpen = open ?? internalOpen
@@ -29,10 +35,16 @@ export function AccordionSection({
       <div
         onClick={() => setOpen(!isOpen)}
         style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '4px 8px', background: '#f5f5f5',
-          fontSize: 11, fontWeight: 600, color: '#444',
-          cursor: 'pointer', userSelect: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '4px 8px',
+          background: '#f5f5f5',
+          fontSize: 11,
+          fontWeight: 600,
+          color: '#444',
+          cursor: 'pointer',
+          userSelect: 'none',
           borderTop: '1px solid #e8e8e8',
         }}
       >
@@ -49,11 +61,7 @@ export function AccordionSection({
           </span>
         )}
       </div>
-      {isOpen && (
-        <div style={{ padding: '8px 10px' }}>
-          {children}
-        </div>
-      )}
+      {isOpen && <div style={{ padding: '8px 10px' }}>{children}</div>}
     </div>
   )
 }

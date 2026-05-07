@@ -1,8 +1,10 @@
 // packages/extension/src/panel/store.ts
 import { create } from 'zustand'
 import type {
-  ActorRecord, EventRecord, SerializedStateNode,
-  PageToExtensionMessage, SerializedSnapshot,
+  ActorRecord,
+  EventRecord,
+  PageToExtensionMessage,
+  SerializedSnapshot,
 } from '../shared/types.js'
 
 const MAX_EVENTS = 500
@@ -14,7 +16,7 @@ export interface InspectorStore {
   events: EventRecord[]
   selectedActorId: string | null
   selectedStateNodeId: string | null
-  timeTravelSeq: number | null   // null = live; number = frozen at that seq
+  timeTravelSeq: number | null // null = live; number = frozen at that seq
   treeFilter: string
   portConnected: boolean
 
@@ -31,7 +33,7 @@ export interface InspectorStore {
 /** Pure function — use as a Zustand selector: useStore(s => getDisplaySnapshot(s, id)) */
 export function getDisplaySnapshot(
   state: Pick<InspectorStore, 'actors' | 'events' | 'timeTravelSeq' | 'registeredSnapshots'>,
-  sessionId: string
+  sessionId: string,
 ): ActorRecord['snapshot'] | null {
   const actor = state.actors.get(sessionId)
   if (!actor) return null
@@ -46,7 +48,7 @@ export function getDisplaySnapshot(
   return state.registeredSnapshots.get(sessionId) ?? actor.snapshot
 }
 
-export const useStore = create<InspectorStore>((set, get) => ({
+export const useStore = create<InspectorStore>((set, _get) => ({
   actors: new Map(),
   registeredSnapshots: new Map(),
   events: [],

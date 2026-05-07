@@ -3,9 +3,9 @@
 export type StateNodeType = 'atomic' | 'compound' | 'parallel' | 'final' | 'history'
 
 export interface SerializedTransition {
-  targets: string[]   // absolute state node ids
-  guard?: string      // guard name or "(inline)"
-  actions: string[]   // action names
+  targets: string[] // absolute state node ids
+  guard?: string // guard name or "(inline)"
+  actions: string[] // action names
   eventType: string
 }
 
@@ -22,22 +22,22 @@ export interface SerializedStateNode {
   type: StateNodeType
   initial?: string
   states: Record<string, SerializedStateNode>
-  on: SerializedTransition[]           // all transitions from this node
-  always: SerializedTransition[]       // eventless transitions
-  entry: string[]                      // action names
-  exit: string[]                       // action names
+  on: SerializedTransition[] // all transitions from this node
+  always: SerializedTransition[] // eventless transitions
+  entry: string[] // action names
+  exit: string[] // action names
   invoke: SerializedInvoke[]
 }
 
 export interface SerializedMachine {
   id: string
   root: SerializedStateNode
-  sourceLocation?: string              // "file.ts:42" from Error().stack
+  sourceLocation?: string // "file.ts:42" from Error().stack
 }
 
 export interface SerializedSnapshot {
-  value: unknown                       // XState StateValue (string | object)
-  context: unknown                     // sanitized context
+  value: unknown // XState StateValue (string | object)
+  context: unknown // sanitized context
   status: 'active' | 'done' | 'error' | 'stopped'
   error?: unknown
 }
@@ -45,7 +45,7 @@ export interface SerializedSnapshot {
 export interface ActorRecord {
   sessionId: string
   parentSessionId?: string
-  machine: SerializedMachine | null    // null for non-machine actors (promise, callback)
+  machine: SerializedMachine | null // null for non-machine actors (promise, callback)
   snapshot: SerializedSnapshot
   status: 'active' | 'done' | 'error' | 'stopped'
   registeredAt: number

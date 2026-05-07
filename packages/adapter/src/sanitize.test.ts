@@ -1,5 +1,5 @@
 // packages/adapter/src/sanitize.test.ts
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { sanitize } from './sanitize.js'
 
 describe('sanitize', () => {
@@ -42,9 +42,12 @@ describe('sanitize', () => {
   })
 
   it('handles deep linear nesting', () => {
-    let deep: any = {}
+    const deep: any = {}
     let curr = deep
-    for (let i = 0; i < 15; i++) { curr.child = {}; curr = curr.child }
+    for (let i = 0; i < 15; i++) {
+      curr.child = {}
+      curr = curr.child
+    }
     curr.value = 'bottom'
     const result = JSON.stringify(sanitize(deep))
     expect(result).toContain('[MaxDepth]')

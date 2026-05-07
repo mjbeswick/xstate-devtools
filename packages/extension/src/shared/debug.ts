@@ -28,7 +28,12 @@ export function summarizeMessage(message: unknown) {
   }
   if ('globalSeq' in message) summary.globalSeq = message.globalSeq
   if ('timestamp' in message) summary.timestamp = message.timestamp
-  if ('event' in message && message.event && typeof message.event === 'object' && 'type' in message.event) {
+  if (
+    'event' in message &&
+    message.event &&
+    typeof message.event === 'object' &&
+    'type' in message.event
+  ) {
     summary.eventType = message.event.type
   }
 

@@ -1,12 +1,12 @@
 // packages/extension/src/background/index.ts
 
-import type {
-  MarkedPageMessage,
-  MarkedExtensionMessage,
-  PageToExtensionMessage,
-  ExtensionToPageMessage,
-} from '../shared/types.js'
 import { debugLog, infoLog, summarizeMessage } from '../shared/debug.js'
+import type {
+  ExtensionToPageMessage,
+  MarkedExtensionMessage,
+  MarkedPageMessage,
+  PageToExtensionMessage,
+} from '../shared/types.js'
 
 // tabId → devtools panel port
 const panelPorts = new Map<number, chrome.runtime.Port>()
@@ -75,11 +75,13 @@ function sendPanelConnected(tabId: number): void {
     infoLog('background', 'sending PANEL_CONNECTED via content port', { tabId })
     csPort.postMessage({ type: 'XSTATE_PANEL_CONNECTED', __xstateDevtools: true })
   } else {
-    infoLog('background', 'sending PANEL_CONNECTED via chrome.tabs.sendMessage (fallback)', { tabId })
+    infoLog('background', 'sending PANEL_CONNECTED via chrome.tabs.sendMessage (fallback)', {
+      tabId,
+    })
     chrome.tabs.sendMessage(
       tabId,
       { type: 'XSTATE_PANEL_CONNECTED', __xstateDevtools: true },
-      () => void chrome.runtime.lastError
+      () => void chrome.runtime.lastError,
     )
   }
 }
@@ -98,7 +100,11 @@ chrome.runtime.onConnect.addListener((port: chrome.runtime.Port) => {
     // killed while the panel was open: the content script reconnects ~250 ms
     // later and the panel's actor list needs to be repopulated.
     if (panelPorts.has(tabId)) {
-      infoLog('background', 'panel already connected; sending PANEL_CONNECTED via new content port', { tabId })
+      infoLog(
+        'background',
+        'panel already connected; sending PANEL_CONNECTED via new content port',
+        { tabId },
+      )
       port.postMessage({ type: 'XSTATE_PANEL_CONNECTED', __xstateDevtools: true })
     }
 
@@ -186,7 +192,11 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
     pendingMessages.delete(tabId)
     const panelPort = panelPorts.get(tabId)
     if (panelPort) {
-      try { panelPort.postMessage({ type: 'XSTATE_PAGE_NAVIGATED' }) } catch { /* port closing */ }
+      try {
+        panelPort.postMessage({ type: 'XSTATE_PAGE_NAVIGATED' })
+      } catch {
+        /* port closing */
+      }
     }
     infoLog('background', 'tab started loading; cleared pending messages', { tabId })
   }
@@ -204,12 +214,16 @@ chrome.runtime.onMessage.addListener(
 
     if (normalized.type === 'XSTATE_ADAPTER_READY') {
       if (panelPorts.has(tabId)) {
-        infoLog('background', 'adapter ready (sendMessage fallback); sending PANEL_CONNECTED for resync', { tabId })
+        infoLog(
+          'background',
+          'adapter ready (sendMessage fallback); sending PANEL_CONNECTED for resync',
+          { tabId },
+        )
         sendPanelConnected(tabId)
       }
       return
     }
 
     forwardToPanel(tabId, normalized)
-  }
+  },
 )

@@ -1,6 +1,9 @@
 // Server entrypoint — exposes a WebSocket bridge so the DevTools panel
 // can connect to actors running in Node.
-import type { ExtensionToPageMessage, PageToExtensionMessage } from '../../extension/src/shared/types.js'
+import type {
+  ExtensionToPageMessage,
+  PageToExtensionMessage,
+} from '../../extension/src/shared/types.js'
 import { createInspector, type Transport } from './core.js'
 
 export interface ServerAdapterOptions {
@@ -28,7 +31,12 @@ function summarizeMessage(message: ExtensionToPageMessage | PageToExtensionMessa
   }
   if ('globalSeq' in message) summary.globalSeq = message.globalSeq
   if ('timestamp' in message) summary.timestamp = message.timestamp
-  if ('event' in message && message.event && typeof message.event === 'object' && 'type' in message.event) {
+  if (
+    'event' in message &&
+    message.event &&
+    typeof message.event === 'object' &&
+    'type' in message.event
+  ) {
     summary.eventType = message.event.type
   }
   return summary
@@ -81,8 +89,7 @@ interface CachedServer {
  * actors registered at boot are visible.
  */
 export function createServerAdapter(options: ServerAdapterOptions = {}) {
-  const port = options.port
-    ?? (Number(process.env.XSTATE_DEVTOOLS_PORT) || 9301)
+  const port = options.port ?? (Number(process.env.XSTATE_DEVTOOLS_PORT) || 9301)
   const host = options.host ?? '127.0.0.1'
   const bufferSize = options.bufferSize ?? 200
   infoLog('createServerAdapter called', { host, port, bufferSize })
@@ -109,12 +116,19 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
     let closed = false
 
     server = {
-      clients, dispatchHandlers, buffer, bufferSize,
+      clients,
+      dispatchHandlers,
+      buffer,
+      bufferSize,
       activated: false,
       close: () => {
         closed = true
         infoLog('closing WebSocket server', { host, port, clientCount: clients.size })
-        try { wss?.close() } catch { /* noop */ }
+        try {
+          wss?.close()
+        } catch {
+          /* noop */
+        }
         clients.clear()
         dispatchHandlers.clear()
         buffer.length = 0
@@ -147,7 +161,11 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
               bufferedMessages: server.buffer.length,
             })
             for (const payload of server.buffer) {
-              try { ws.send(payload) } catch { /* ignore */ }
+              try {
+                ws.send(payload)
+              } catch {
+                /* ignore */
+              }
             }
             server.buffer.length = 0
           }

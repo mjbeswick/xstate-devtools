@@ -1,6 +1,5 @@
 // packages/extension/src/injected/index.ts
 
-import type { MarkedExtensionMessage } from '../shared/types.js'
 import { debugLog, infoLog, summarizeMessage } from '../shared/debug.js'
 
 infoLog('injected', 'page hook installed')

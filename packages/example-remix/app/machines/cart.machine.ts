@@ -1,4 +1,4 @@
-import { setup, assign } from 'xstate'
+import { assign, setup } from 'xstate'
 
 type Item = { id: string; name: string; price: number; qty: number }
 
@@ -30,7 +30,9 @@ export const cartMachine = setup({
       if (event.type !== 'ADD_ITEM') return {}
       const existing = context.items.find((i) => i.id === event.item.id)
       if (existing) {
-        return { items: context.items.map((i) => i.id === event.item.id ? { ...i, qty: i.qty + 1 } : i) }
+        return {
+          items: context.items.map((i) => (i.id === event.item.id ? { ...i, qty: i.qty + 1 } : i)),
+        }
       }
       return { items: [...context.items, event.item] }
     }),
@@ -84,13 +86,19 @@ export const cartMachine = setup({
                 card: {
                   on: {
                     PICK_PAYPAL: 'paypal',
-                    CONFIRM_PAYMENT: { target: '#cart.checkout.details.reviewing', actions: 'setCard' },
+                    CONFIRM_PAYMENT: {
+                      target: '#cart.checkout.details.reviewing',
+                      actions: 'setCard',
+                    },
                   },
                 },
                 paypal: {
                   on: {
                     PICK_CARD: 'card',
-                    CONFIRM_PAYMENT: { target: '#cart.checkout.details.reviewing', actions: 'setPaypal' },
+                    CONFIRM_PAYMENT: {
+                      target: '#cart.checkout.details.reviewing',
+                      actions: 'setPaypal',
+                    },
                   },
                 },
               },

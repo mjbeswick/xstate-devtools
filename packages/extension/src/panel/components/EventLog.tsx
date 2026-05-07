@@ -1,5 +1,5 @@
 // packages/extension/src/panel/components/EventLog.tsx
-import React, { useRef, useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store.js'
 import { ChevronDown, ChevronUp } from './Icons.js'
 
@@ -28,7 +28,7 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
     if (!collapsed && autoScroll && timeTravelSeq === null) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [events, autoScroll, timeTravelSeq, collapsed])
+  }, [autoScroll, timeTravelSeq, collapsed])
 
   const filtered = filter
     ? events.filter((e) => e.event.type.toLowerCase().includes(filter.toLowerCase()))
@@ -39,9 +39,16 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
       <div
         onClick={onExpand}
         style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '0 10px', minHeight: 30, height: '100%', boxSizing: 'border-box',
-          background: '#fafafa', cursor: 'pointer', userSelect: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '0 10px',
+          minHeight: 30,
+          height: '100%',
+          boxSizing: 'border-box',
+          background: '#fafafa',
+          cursor: 'pointer',
+          userSelect: 'none',
         }}
         title="Show event log"
       >
@@ -49,20 +56,26 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
           <ChevronUp size={14} />
         </span>
         <span style={{ fontWeight: 600, fontSize: 11, color: '#666' }}>EVENTS</span>
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#aaa' }}>
-          {events.length}
-        </span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#aaa' }}>{events.length}</span>
       </div>
     )
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: '0 10px', minHeight: 30, boxSizing: 'border-box',
-        borderBottom: '1px solid #eee', background: '#fafafa', flexShrink: 0,
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '0 10px',
+          minHeight: 30,
+          boxSizing: 'border-box',
+          borderBottom: '1px solid #eee',
+          background: '#fafafa',
+          flexShrink: 0,
+        }}
+      >
         <span style={{ display: 'inline-flex', color: '#666' }}>
           <ChevronDown size={14} />
         </span>
@@ -72,11 +85,16 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter by type…"
           style={{
-            fontSize: 11, padding: '2px 6px',
-            border: '1px solid #d9d9d9', borderRadius: 4, width: 160,
+            fontSize: 11,
+            padding: '2px 6px',
+            border: '1px solid #d9d9d9',
+            borderRadius: 4,
+            width: 160,
           }}
         />
-        <label style={{ fontSize: 11, color: '#666', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <label
+          style={{ fontSize: 11, color: '#666', display: 'flex', alignItems: 'center', gap: 4 }}
+        >
           <input
             type="checkbox"
             checked={autoScroll}
@@ -112,10 +130,14 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
               title="Click to time travel to this event"
             >
               <span style={{ color: '#aaa' }}>{formatTime(evt.timestamp)}</span>
-              <span style={{
-                color: '#595959', overflow: 'hidden',
-                textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
+              <span
+                style={{
+                  color: '#595959',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
                 {actorLabel}
               </span>
               <span style={{ fontWeight: 600, color: '#003a8c' }}>{evt.event.type}</span>

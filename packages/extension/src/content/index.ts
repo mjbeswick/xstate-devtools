@@ -1,12 +1,12 @@
 // packages/extension/src/content/index.ts
 
-import type {
-  MarkedPageMessage,
-  MarkedExtensionMessage,
-  PageToExtensionMessage,
-  ExtensionToPageMessage,
-} from '../shared/types.js'
 import { debugLog, infoLog, summarizeMessage } from '../shared/debug.js'
+import type {
+  ExtensionToPageMessage,
+  MarkedExtensionMessage,
+  MarkedPageMessage,
+  PageToExtensionMessage,
+} from '../shared/types.js'
 
 infoLog('content', 'content script loaded')
 
@@ -83,7 +83,11 @@ window.addEventListener('message', (evt: MessageEvent) => {
     bgPort.postMessage(marked)
   } else {
     // Fallback: sendMessage wakes up the service worker during the reconnect gap.
-    try { chrome.runtime.sendMessage(marked) } catch { /* extension context invalidated */ }
+    try {
+      chrome.runtime.sendMessage(marked)
+    } catch {
+      /* extension context invalidated */
+    }
   }
 })
 
@@ -94,6 +98,10 @@ chrome.runtime.onMessage.addListener((message: MarkedExtensionMessage | Extensio
   const dispatch = asDispatchMessage(message)
   if (!dispatch) return
   const marked: MarkedExtensionMessage = { ...dispatch, __xstateDevtools: true }
-  debugLog('content', 'forwarding dispatch from background sendMessage fallback to page', summarizeMessage(marked))
+  debugLog(
+    'content',
+    'forwarding dispatch from background sendMessage fallback to page',
+    summarizeMessage(marked),
+  )
   window.postMessage(marked, '*')
 })

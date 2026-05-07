@@ -2,10 +2,12 @@
 // Browser and server entrypoints supply their own transports.
 import type { AnyActorRef } from 'xstate'
 import type {
-  ExtensionToPageMessage, PageToExtensionMessage, SerializedSnapshot,
+  ExtensionToPageMessage,
+  PageToExtensionMessage,
+  SerializedSnapshot,
 } from '../../extension/src/shared/types.js'
-import { serializeMachine } from './serialize.js'
 import { sanitize } from './sanitize.js'
+import { serializeMachine } from './serialize.js'
 
 export type Source = 'web' | 'srv'
 
@@ -24,7 +26,12 @@ function summarizeMessage(message: ExtensionToPageMessage | PageToExtensionMessa
   }
   if ('globalSeq' in message) summary.globalSeq = message.globalSeq
   if ('timestamp' in message) summary.timestamp = message.timestamp
-  if ('event' in message && message.event && typeof message.event === 'object' && 'type' in message.event) {
+  if (
+    'event' in message &&
+    message.event &&
+    typeof message.event === 'object' &&
+    'type' in message.event
+  ) {
     summary.eventType = message.event.type
   }
   return summary
@@ -69,7 +76,7 @@ function getSourceLocation(): string | undefined {
   try {
     const lines = new Error().stack?.split('\n') ?? []
     const callerLine = lines.find(
-      (l, i) => i > 3 && !l.includes('xstate') && !l.includes('adapter')
+      (l, i) => i > 3 && !l.includes('xstate') && !l.includes('adapter'),
     )
     return callerLine?.trim().replace(/^at\s+/, '')
   } catch {
@@ -109,7 +116,7 @@ function nextSeq(): number {
 
 export function createInspector(transport: Transport, source: Source) {
   const actorRefs = new Map<string, AnyActorRef>()
-  const prefix = source + ':'
+  const prefix = `${source}:`
   const tag = (sessionId: string) => prefix + sessionId
   const tagOptional = (id: string | undefined) => (id ? prefix + id : undefined)
   const stripIfMine = (id: string): string | null =>
@@ -117,7 +124,11 @@ export function createInspector(transport: Transport, source: Source) {
 
   function checkAndNotifyStop(actorRef: AnyActorRef) {
     let snap: any
-    try { snap = actorRef.getSnapshot() } catch { return }
+    try {
+      snap = actorRef.getSnapshot()
+    } catch {
+      return
+    }
     if (snap?.status !== 'active') {
       const message: PageToExtensionMessage = {
         type: 'XSTATE_ACTOR_STOPPED',
@@ -138,9 +149,7 @@ export function createInspector(transport: Transport, source: Source) {
       infoLog(source, 'panel connected; resyncing actors', { actorCount: actorRefs.size })
       actorRefs.forEach((actorRef, sessionId) => {
         const actorLogic = (actorRef as { logic?: unknown }).logic as any
-        const machine = actorLogic?.root
-          ? serializeMachine(actorLogic, getSourceLocation())
-          : null
+        const machine = actorLogic?.root ? serializeMachine(actorLogic, getSourceLocation()) : null
         const resyncMessage: PageToExtensionMessage = {
           type: 'XSTATE_ACTOR_REGISTERED',
           sessionId: tag(sessionId),
@@ -197,9 +206,7 @@ export function createInspector(transport: Transport, source: Source) {
       actorRefs.set(sessionId, actorRef)
 
       const actorLogic = (actorRef as { logic?: unknown }).logic as any
-      const machine = actorLogic?.root
-        ? serializeMachine(actorLogic, getSourceLocation())
-        : null
+      const machine = actorLogic?.root ? serializeMachine(actorLogic, getSourceLocation()) : null
 
       const message: PageToExtensionMessage = {
         type: 'XSTATE_ACTOR_REGISTERED',
@@ -240,7 +247,11 @@ export function createInspector(transport: Transport, source: Source) {
       transport.send(message)
       checkAndNotifyStop(inspectionEvent.actorRef)
     } else {
-      debugLog(source, 'ignoring unsupported inspection event', summarizeInspectionEvent(inspectionEvent))
+      debugLog(
+        source,
+        'ignoring unsupported inspection event',
+        summarizeInspectionEvent(inspectionEvent),
+      )
     }
   }
 

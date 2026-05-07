@@ -1,12 +1,14 @@
 // packages/extension/src/panel/App.tsx
-import React, { useEffect, useRef, useState, useCallback } from 'react'
-import { useStore } from './store.js'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { debugLog, infoLog, summarizeMessage, warnLog } from '../shared/debug.js'
+import type {
+  ExtensionToPageMessage,
+  MarkedPageMessage,
+  PageToExtensionMessage,
+} from '../shared/types.js'
 import { Layout } from './components/Layout.js'
 import { DispatchContext } from './port-context.js'
-import type {
-  PageToExtensionMessage, ExtensionToPageMessage, MarkedPageMessage,
-} from '../shared/types.js'
-import { debugLog, infoLog, summarizeMessage, warnLog } from '../shared/debug.js'
+import { useStore } from './store.js'
 
 const SERVER_URL_KEY = 'xstate-devtools.serverUrl'
 const DEFAULT_SERVER_URL = 'ws://localhost:9301'
@@ -34,7 +36,10 @@ export function App() {
 
   // Mount log — helps confirm the panel React app has initialised
   useEffect(() => {
-    console.log('[xstate-devtools:panel] panel mounted, tabId =', chrome.devtools.inspectedWindow.tabId)
+    console.log(
+      '[xstate-devtools:panel] panel mounted, tabId =',
+      chrome.devtools.inspectedWindow.tabId,
+    )
   }, [])
   const wsRef = useRef<WebSocket | null>(null)
   const panelSeqRef = useRef(0)
@@ -51,38 +56,49 @@ export function App() {
    * merging would produce overlapping values. This rebases everything onto
    * one timeline at the point of ingest.
    */
-  const ingest = useCallback((message: PageToExtensionMessage) => {
-    if (message.type === 'XSTATE_PAGE_NAVIGATED') {
-      console.log('[xstate-devtools:panel] page navigated — clearing actor store')
-      handleMessage(message)
-      return
-    }
-    panelSeqRef.current += 1
-    const seq = panelSeqRef.current
-    debugLog('panel', 'ingesting message', {
-      original: summarizeMessage(message),
-      rebasedGlobalSeq: seq,
-    })
-    if (
-      message.type === 'XSTATE_ACTOR_REGISTERED'
-      || message.type === 'XSTATE_SNAPSHOT'
-      || message.type === 'XSTATE_EVENT'
-    ) {
-      handleMessage({ ...message, globalSeq: seq })
-    } else {
-      handleMessage(message)
-    }
-  }, [handleMessage])
+  const ingest = useCallback(
+    (message: PageToExtensionMessage) => {
+      if (message.type === 'XSTATE_PAGE_NAVIGATED') {
+        console.log('[xstate-devtools:panel] page navigated — clearing actor store')
+        handleMessage(message)
+        return
+      }
+      panelSeqRef.current += 1
+      const seq = panelSeqRef.current
+      debugLog('panel', 'ingesting message', {
+        original: summarizeMessage(message),
+        rebasedGlobalSeq: seq,
+      })
+      if (
+        message.type === 'XSTATE_ACTOR_REGISTERED' ||
+        message.type === 'XSTATE_SNAPSHOT' ||
+        message.type === 'XSTATE_EVENT'
+      ) {
+        handleMessage({ ...message, globalSeq: seq })
+      } else {
+        handleMessage(message)
+      }
+    },
+    [handleMessage],
+  )
 
   const [serverUrl, setServerUrl] = useState<string>(() => {
-    try { return localStorage.getItem(SERVER_URL_KEY) ?? DEFAULT_SERVER_URL }
-    catch { return DEFAULT_SERVER_URL }
+    try {
+      return localStorage.getItem(SERVER_URL_KEY) ?? DEFAULT_SERVER_URL
+    } catch {
+      return DEFAULT_SERVER_URL
+    }
   })
   const [serverEnabled, setServerEnabled] = useState<boolean>(() => {
-    try { return localStorage.getItem(SERVER_URL_KEY + '.enabled') === '1' }
-    catch { return false }
+    try {
+      return localStorage.getItem(`${SERVER_URL_KEY}.enabled`) === '1'
+    } catch {
+      return false
+    }
   })
-  const [serverStatus, setServerStatus] = useState<'idle' | 'connecting' | 'open' | 'closed' | 'error'>('idle')
+  const [serverStatus, setServerStatus] = useState<
+    'idle' | 'connecting' | 'open' | 'closed' | 'error'
+  >('idle')
   const [portConnected, setPortConnected] = useState(false)
   const [browserMsgCount, setBrowserMsgCount] = useState(0)
 
@@ -110,7 +126,12 @@ export function App() {
       if (!normalized) return
       debugLog('panel', 'received message from browser transport', summarizeMessage(normalized))
       setBrowserMsgCount((n) => {
-        if (n === 0) infoLog('panel', 'first message received from browser transport', summarizeMessage(normalized))
+        if (n === 0)
+          infoLog(
+            'panel',
+            'first message received from browser transport',
+            summarizeMessage(normalized),
+          )
         return n + 1
       })
       ingest(normalized)
@@ -119,7 +140,10 @@ export function App() {
     p.onDisconnect.addListener(() => {
       setPortConnected(false)
       setPortConnectedInStore(false)
-      infoLog('panel', 'background port disconnected; scheduling reconnect', { tabId, portName: p.name })
+      infoLog('panel', 'background port disconnected; scheduling reconnect', {
+        tabId,
+        portName: p.name,
+      })
       // Auto-reconnect: the MV3 service worker can be killed at any time.
       // Reconnecting re-triggers the resync flow so the panel stays populated.
       reconnectTimerRef.current = window.setTimeout(() => {
@@ -171,7 +195,11 @@ export function App() {
         setServerStatus('open')
         infoLog('panel', 'server transport open', { serverUrl })
         // Ask the server adapter to resync its actors, same as the browser transport does
-        try { ws.send(JSON.stringify({ type: 'XSTATE_PANEL_CONNECTED' })) } catch { /* ignore */ }
+        try {
+          ws.send(JSON.stringify({ type: 'XSTATE_PANEL_CONNECTED' }))
+        } catch {
+          /* ignore */
+        }
       }
       ws.onmessage = (evt) => {
         try {
@@ -226,11 +254,19 @@ export function App() {
 
   const onToggleServer = (enabled: boolean) => {
     setServerEnabled(enabled)
-    try { localStorage.setItem(SERVER_URL_KEY + '.enabled', enabled ? '1' : '0') } catch { /* noop */ }
+    try {
+      localStorage.setItem(`${SERVER_URL_KEY}.enabled`, enabled ? '1' : '0')
+    } catch {
+      /* noop */
+    }
   }
   const onSetServerUrl = (url: string) => {
     setServerUrl(url)
-    try { localStorage.setItem(SERVER_URL_KEY, url) } catch { /* noop */ }
+    try {
+      localStorage.setItem(SERVER_URL_KEY, url)
+    } catch {
+      /* noop */
+    }
   }
 
   return (
@@ -250,7 +286,13 @@ export function App() {
 }
 
 function ServerStatusBar({
-  portConnected, browserMsgCount, enabled, url, status, onToggle, onUrlChange,
+  portConnected,
+  browserMsgCount,
+  enabled,
+  url,
+  status,
+  onToggle,
+  onUrlChange,
 }: {
   portConnected: boolean
   browserMsgCount: number
@@ -264,26 +306,50 @@ function ServerStatusBar({
   const [draft, setDraft] = useState(url)
 
   const dot =
-    status === 'open' ? '#52c41a'
-    : status === 'connecting' ? '#faad14'
-    : status === 'error' ? '#ff4d4f'
-    : '#d9d9d9'
+    status === 'open'
+      ? '#52c41a'
+      : status === 'connecting'
+        ? '#faad14'
+        : status === 'error'
+          ? '#ff4d4f'
+          : '#d9d9d9'
 
   return (
-    <div style={{
-      borderBottom: '1px solid #eee', background: '#fafafa',
-      padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 8,
-      fontSize: 11, flexShrink: 0,
-    }}>
+    <div
+      style={{
+        borderBottom: '1px solid #eee',
+        background: '#fafafa',
+        padding: '4px 12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        fontSize: 11,
+        flexShrink: 0,
+      }}
+    >
       {/* Browser transport indicator */}
-      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={portConnected ? `Browser transport connected (${browserMsgCount} messages received)` : 'Browser transport disconnected'}>
-        <span style={{
-          display: 'inline-block', width: 8, height: 8,
-          borderRadius: '50%', background: portConnected ? '#52c41a' : '#ff4d4f',
-          flexShrink: 0,
-        }} />
+      <span
+        style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+        title={
+          portConnected
+            ? `Browser transport connected (${browserMsgCount} messages received)`
+            : 'Browser transport disconnected'
+        }
+      >
+        <span
+          style={{
+            display: 'inline-block',
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: portConnected ? '#52c41a' : '#ff4d4f',
+            flexShrink: 0,
+          }}
+        />
         <span style={{ color: portConnected ? '#389e0d' : '#cf1322' }}>
-          {portConnected ? `Connected${browserMsgCount > 0 ? ` · ${browserMsgCount} msg` : ''}` : 'Disconnected'}
+          {portConnected
+            ? `Connected${browserMsgCount > 0 ? ` · ${browserMsgCount} msg` : ''}`
+            : 'Disconnected'}
         </span>
       </span>
       <span style={{ color: '#ddd' }}>|</span>
@@ -298,37 +364,74 @@ function ServerStatusBar({
       </label>
       {enabled && (
         <>
-          <span style={{
-            display: 'inline-block', width: 8, height: 8,
-            borderRadius: '50%', background: dot,
-          }} title={status} />
+          <span
+            style={{
+              display: 'inline-block',
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: dot,
+            }}
+            title={status}
+          />
           {editing ? (
             <>
               <input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') { onUrlChange(draft); setEditing(false) }
-                  if (e.key === 'Escape') { setDraft(url); setEditing(false) }
+                  if (e.key === 'Enter') {
+                    onUrlChange(draft)
+                    setEditing(false)
+                  }
+                  if (e.key === 'Escape') {
+                    setDraft(url)
+                    setEditing(false)
+                  }
                 }}
-                autoFocus
                 style={{
-                  fontFamily: 'monospace', fontSize: 11, padding: '1px 6px',
-                  border: '1px solid #d9d9d9', borderRadius: 4, width: 240,
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  padding: '1px 6px',
+                  border: '1px solid #d9d9d9',
+                  borderRadius: 4,
+                  width: 240,
                 }}
               />
-              <button onClick={() => { onUrlChange(draft); setEditing(false) }} style={{ fontSize: 11 }}>Save</button>
-              <button onClick={() => { setDraft(url); setEditing(false) }} style={{ fontSize: 11 }}>Cancel</button>
+              <button
+                onClick={() => {
+                  onUrlChange(draft)
+                  setEditing(false)
+                }}
+                style={{ fontSize: 11 }}
+              >
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setDraft(url)
+                  setEditing(false)
+                }}
+                style={{ fontSize: 11 }}
+              >
+                Cancel
+              </button>
             </>
           ) : (
             <>
               <code style={{ fontSize: 11 }}>{url}</code>
-              <button onClick={() => { setDraft(url); setEditing(true) }} style={{ fontSize: 11 }}>Edit</button>
+              <button
+                onClick={() => {
+                  setDraft(url)
+                  setEditing(true)
+                }}
+                style={{ fontSize: 11 }}
+              >
+                Edit
+              </button>
             </>
           )}
-          <span style={{ color: '#999', marginLeft: 'auto' }}>
-            status: {status}
-          </span>
+          <span style={{ color: '#999', marginLeft: 'auto' }}>status: {status}</span>
         </>
       )}
     </div>

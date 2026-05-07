@@ -1,5 +1,5 @@
 // Lightweight collapsible JSON viewer — no external deps.
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { ChevronDown, ChevronRight } from './Icons.js'
 
 const colors = {
@@ -15,7 +15,9 @@ const colors = {
 
 type Json = unknown
 
-function typeOf(value: Json): 'object' | 'array' | 'string' | 'number' | 'boolean' | 'null' | 'undefined' | 'other' {
+function typeOf(
+  value: Json,
+): 'object' | 'array' | 'string' | 'number' | 'boolean' | 'null' | 'undefined' | 'other' {
   if (value === null) return 'null'
   if (value === undefined) return 'undefined'
   if (Array.isArray(value)) return 'array'
@@ -59,9 +61,7 @@ function JsonNode({ k, value, depth, defaultOpenDepth, isLast }: NodeProps) {
   const renderKey = () =>
     k !== undefined && (
       <>
-        <span style={{ color: colors.key }}>
-          {typeof k === 'string' ? `"${k}"` : k}
-        </span>
+        <span style={{ color: colors.key }}>{typeof k === 'string' ? `"${k}"` : k}</span>
         <span style={{ color: colors.punct }}>: </span>
       </>
     )
@@ -90,9 +90,15 @@ function JsonNode({ k, value, depth, defaultOpenDepth, isLast }: NodeProps) {
       <span
         onClick={() => !empty && setOpen(!open)}
         style={{
-          display: 'inline-flex', width: 12, height: 12, verticalAlign: 'middle',
-          color: colors.toggle, cursor: empty ? 'default' : 'pointer',
-          userSelect: 'none', alignItems: 'center', justifyContent: 'center',
+          display: 'inline-flex',
+          width: 12,
+          height: 12,
+          verticalAlign: 'middle',
+          color: colors.toggle,
+          cursor: empty ? 'default' : 'pointer',
+          userSelect: 'none',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
         {empty ? null : open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -142,11 +148,13 @@ export function JsonView({
   defaultOpenDepth?: number
 }) {
   return (
-    <div style={{
-      fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
-      fontSize: 11,
-      overflow: 'auto',
-    }}>
+    <div
+      style={{
+        fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+        fontSize: 11,
+        overflow: 'auto',
+      }}
+    >
       <JsonNode value={value} depth={0} defaultOpenDepth={defaultOpenDepth} isLast />
     </div>
   )

@@ -6,6 +6,7 @@
     "strict": true,
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM"],
+    "types": ["chrome"],
     "skipLibCheck": true
   },
   "include": ["src", "manifest.json"]

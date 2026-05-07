@@ -1,5 +1,5 @@
 // Inline Material-style SVG icons. No font/CSP dependencies.
-import React from 'react'
+import type React from 'react'
 
 interface IconProps {
   size?: number
@@ -9,24 +9,46 @@ interface IconProps {
 
 function svgProps({ size = 16, color = 'currentColor', style }: IconProps) {
   return {
-    width: size, height: size, viewBox: '0 0 24 24',
-    fill: 'none', stroke: color, strokeWidth: 1.6,
-    strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
-    style, 'aria-hidden': true,
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: color,
+    strokeWidth: 1.6,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    style,
+    'aria-hidden': true,
   }
 }
 
 export function ChevronDown(p: IconProps = {}) {
-  return <svg {...svgProps(p)}><polyline points="6 9 12 15 18 9" /></svg>
+  return (
+    <svg {...svgProps(p)}>
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  )
 }
 export function ChevronRight(p: IconProps = {}) {
-  return <svg {...svgProps(p)}><polyline points="9 6 15 12 9 18" /></svg>
+  return (
+    <svg {...svgProps(p)}>
+      <polyline points="9 6 15 12 9 18" />
+    </svg>
+  )
 }
 export function ChevronLeft(p: IconProps = {}) {
-  return <svg {...svgProps(p)}><polyline points="15 6 9 12 15 18" /></svg>
+  return (
+    <svg {...svgProps(p)}>
+      <polyline points="15 6 9 12 15 18" />
+    </svg>
+  )
 }
 export function ChevronUp(p: IconProps = {}) {
-  return <svg {...svgProps(p)}><polyline points="6 15 12 9 18 15" /></svg>
+  return (
+    <svg {...svgProps(p)}>
+      <polyline points="6 15 12 9 18 15" />
+    </svg>
+  )
 }
 
 export function Close(p: IconProps = {}) {
@@ -67,7 +89,11 @@ export function Settings(p: IconProps = {}) {
   )
 }
 
-export function PanelToggle({ side, collapsed, ...p }: IconProps & { side: 'left' | 'right' | 'bottom'; collapsed: boolean }) {
+export function PanelToggle({
+  side,
+  collapsed,
+  ...p
+}: IconProps & { side: 'left' | 'right' | 'bottom'; collapsed: boolean }) {
   if (side === 'bottom') {
     const flip = collapsed
     return (
@@ -82,10 +108,7 @@ export function PanelToggle({ side, collapsed, ...p }: IconProps & { side: 'left
   return (
     <svg {...svgProps(p)}>
       <rect x="3" y="4" width="18" height="16" rx="2" ry="2" />
-      <line
-        x1={side === 'left' ? '8' : '16'} x2={side === 'left' ? '8' : '16'}
-        y1="4" y2="20"
-      />
+      <line x1={side === 'left' ? '8' : '16'} x2={side === 'left' ? '8' : '16'} y1="4" y2="20" />
       <polyline points={flip ? '13,9 11,12 13,15' : '11,9 13,12 11,15'} />
     </svg>
   )

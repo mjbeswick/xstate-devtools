@@ -1,22 +1,51 @@
 // packages/extension/src/panel/store.test.ts
-import { describe, it, expect, beforeEach } from 'vitest'
-import { useStore, getDisplaySnapshot } from './store.js'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type { SerializedMachine, SerializedSnapshot } from '../shared/types.js'
+import { getDisplaySnapshot, useStore } from './store.js'
 
 const mockMachine: SerializedMachine = {
   id: 'test',
   root: {
-    id: 'test', key: 'test', type: 'compound', initial: 'idle',
+    id: 'test',
+    key: 'test',
+    type: 'compound',
+    initial: 'idle',
     states: {
-      idle: { id: 'test.idle', key: 'idle', type: 'atomic', states: {}, on: [], always: [], entry: [], exit: [], invoke: [] },
-      running: { id: 'test.running', key: 'running', type: 'atomic', states: {}, on: [], always: [], entry: [], exit: [], invoke: [] },
+      idle: {
+        id: 'test.idle',
+        key: 'idle',
+        type: 'atomic',
+        states: {},
+        on: [],
+        always: [],
+        entry: [],
+        exit: [],
+        invoke: [],
+      },
+      running: {
+        id: 'test.running',
+        key: 'running',
+        type: 'atomic',
+        states: {},
+        on: [],
+        always: [],
+        entry: [],
+        exit: [],
+        invoke: [],
+      },
     },
-    on: [], always: [], entry: [], exit: [], invoke: [],
+    on: [],
+    always: [],
+    entry: [],
+    exit: [],
+    invoke: [],
   },
 }
 
 const snap = (value: unknown): SerializedSnapshot => ({
-  value, context: {}, status: 'active',
+  value,
+  context: {},
+  status: 'active',
 })
 
 beforeEach(() => {

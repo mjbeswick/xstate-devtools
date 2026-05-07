@@ -1,6 +1,6 @@
 // packages/adapter/src/serialize.test.ts
-import { describe, it, expect } from 'vitest'
-import { createMachine, setup, fromPromise } from 'xstate'
+import { describe, expect, it } from 'vitest'
+import { createMachine, fromPromise, setup } from 'xstate'
 import { serializeMachine } from './serialize.js'
 
 describe('serializeMachine', () => {

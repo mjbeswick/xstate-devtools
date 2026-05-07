@@ -6,6 +6,7 @@
     "strict": true,
     "jsx": "react-jsx",
     "outDir": "./dist",
+    "rootDir": "..",
     "declaration": true,
     "skipLibCheck": true
   },

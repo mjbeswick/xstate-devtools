@@ -1,5 +1,6 @@
 // packages/extension/src/panel/components/ActorList.tsx
-import React, { useMemo } from 'react'
+import type React from 'react'
+import { useMemo } from 'react'
 import { useStore } from '../store.js'
 
 export function ActorList() {
@@ -13,7 +14,7 @@ export function ActorList() {
     for (const actor of actors.values()) {
       const parent = actor.parentSessionId
       if (!map.has(parent)) map.set(parent, [])
-      map.get(parent)!.push(actor.sessionId)
+      map.get(parent)?.push(actor.sessionId)
     }
     return map
   }, [actors])
@@ -34,18 +35,26 @@ export function ActorList() {
           onClick={() => selectActor(sessionId)}
           style={{
             paddingLeft: 8 + depth * 16,
-            paddingTop: 4, paddingBottom: 4,
+            paddingTop: 4,
+            paddingBottom: 4,
             cursor: 'pointer',
             background: isSelected ? '#d0e8ff' : 'transparent',
             color: isStopped ? '#aaa' : 'inherit',
             borderLeft: isSelected ? '2px solid #1890ff' : '2px solid transparent',
-            display: 'flex', alignItems: 'center', gap: 6,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
           }}
         >
-          <span style={{
-            width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-            background: isStopped ? '#ccc' : '#52c41a',
-          }} />
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              flexShrink: 0,
+              background: isStopped ? '#ccc' : '#52c41a',
+            }}
+          />
           <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{label}</span>
         </div>
         {children.map((cid) => renderActor(cid, depth + 1))}
@@ -55,12 +64,20 @@ export function ActorList() {
 
   return (
     <div style={{ height: '100%', background: '#fafafa' }}>
-      <div style={{
-        padding: '4px 10px', minHeight: 30, boxSizing: 'border-box',
-        fontWeight: 600, borderBottom: '1px solid #eee',
-        fontSize: 11, color: '#666', background: '#fafafa',
-        display: 'flex', alignItems: 'center',
-      }}>
+      <div
+        style={{
+          padding: '4px 10px',
+          minHeight: 30,
+          boxSizing: 'border-box',
+          fontWeight: 600,
+          borderBottom: '1px solid #eee',
+          fontSize: 11,
+          color: '#666',
+          background: '#fafafa',
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
         ACTORS
       </div>
       {roots.map((sid) => renderActor(sid, 0))}

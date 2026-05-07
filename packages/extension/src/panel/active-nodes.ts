@@ -42,7 +42,10 @@ function walkPaths(
     else out.push(prefix)
   } else {
     const entries = Object.entries(value as Record<string, StateValue>)
-    if (entries.length === 0) { out.push(prefix); return }
+    if (entries.length === 0) {
+      out.push(prefix)
+      return
+    }
     for (const [k, v] of entries) {
       const child = node.states[k]
       if (child) walkPaths(v, child, [...prefix, child], out)
@@ -52,7 +55,7 @@ function walkPaths(
 
 export function getActiveNodeIds(
   value: StateValue | null | undefined,
-  node: SerializedStateNode
+  node: SerializedStateNode,
 ): Set<string> {
   const active = new Set<string>()
   if (!value) return active
@@ -60,11 +63,7 @@ export function getActiveNodeIds(
   return active
 }
 
-function walkNode(
-  value: StateValue,
-  node: SerializedStateNode,
-  active: Set<string>
-): void {
+function walkNode(value: StateValue, node: SerializedStateNode, active: Set<string>): void {
   active.add(node.id)
 
   if (node.type === 'atomic' || node.type === 'final' || node.type === 'history') return
