@@ -91,9 +91,10 @@ export function App() {
   })
   const [serverEnabled, setServerEnabled] = useState<boolean>(() => {
     try {
-      return localStorage.getItem(`${SERVER_URL_KEY}.enabled`) === '1'
+      const stored = localStorage.getItem(`${SERVER_URL_KEY}.enabled`)
+      return stored === null ? true : stored === '1'
     } catch {
-      return false
+      return true
     }
   })
   const [serverStatus, setServerStatus] = useState<

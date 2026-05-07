@@ -238,60 +238,74 @@ export function MachineTree() {
         zIndex: 1,
         display: 'flex',
         alignItems: 'center',
-        gap: 6,
       }}
     >
-      <HeaderIconButton
-        onClick={collapse.toggleLeft}
-        title={collapse.leftCollapsed ? 'Show actor list' : 'Hide actor list'}
-      >
-        <PanelToggle side="left" collapsed={collapse.leftCollapsed} />
-      </HeaderIconButton>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <HeaderIconButton
+          onClick={collapse.toggleLeft}
+          title={collapse.leftCollapsed ? 'Show actor list' : 'Hide actor list'}
+        >
+          <PanelToggle side="left" collapsed={collapse.leftCollapsed} />
+        </HeaderIconButton>
+      </div>
 
-      {actor?.machine && (
-        <>
-          <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{actor.machine.id}</span>
-          {actor.machine.sourceLocation && (
-            <a
-              href={`vscode://file/${actor.machine.sourceLocation}`}
-              style={{
-                color: '#1890ff',
-                fontSize: 10,
-                textDecoration: 'none',
-                whiteSpace: 'nowrap',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 2,
-              }}
-              title="Open in VS Code"
-            >
-              <ExternalLink size={11} /> source
-            </a>
-          )}
-        </>
-      )}
-
-      <span style={{ marginLeft: 'auto' }} />
-      <span
+      <div
         style={{
-          fontSize: 10,
-          fontWeight: 500,
-          padding: '1px 6px',
-          borderRadius: 10,
-          background: portConnected ? '#f6ffed' : '#fff1f0',
-          color: portConnected ? '#389e0d' : '#cf1322',
-          border: `1px solid ${portConnected ? '#b7eb8f' : '#ffa39e'}`,
-          whiteSpace: 'nowrap',
+          flex: 1,
+          display: 'flex',
+          alignSelf: 'stretch',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 4,
+          overflow: 'hidden',
         }}
       >
-        {portConnected ? '● Connected' : '○ Not connected'}
-      </span>
-      <HeaderIconButton
-        onClick={collapse.toggleRight}
-        title={collapse.rightCollapsed ? 'Show side panel' : 'Hide side panel'}
-      >
-        <PanelToggle side="right" collapsed={collapse.rightCollapsed} />
-      </HeaderIconButton>
+        {actor?.machine && (
+          <>
+            <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{actor.machine.id}</span>
+            {actor.machine.sourceLocation && (
+              <a
+                href={`vscode://file/${actor.machine.sourceLocation}`}
+                style={{
+                  color: '#1890ff',
+                  fontSize: 10,
+                  textDecoration: 'none',
+                  whiteSpace: 'nowrap',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 2,
+                }}
+                title="Open in VS Code"
+              >
+                <ExternalLink size={11} /> source
+              </a>
+            )}
+          </>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 500,
+            padding: '1px 6px',
+            borderRadius: 10,
+            background: portConnected ? '#f6ffed' : '#fff1f0',
+            color: portConnected ? '#389e0d' : '#cf1322',
+            border: `1px solid ${portConnected ? '#b7eb8f' : '#ffa39e'}`,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {portConnected ? '● Connected' : '○ Not connected'}
+        </span>
+        <HeaderIconButton
+          onClick={collapse.toggleRight}
+          title={collapse.rightCollapsed ? 'Show side panel' : 'Hide side panel'}
+        >
+          <PanelToggle side="right" collapsed={collapse.rightCollapsed} />
+        </HeaderIconButton>
+      </div>
     </div>
   )
 
