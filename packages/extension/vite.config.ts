@@ -12,7 +12,9 @@ export default defineConfig({
   ],
   build: {
     outDir: 'dist',
-    emptyOutDir: true,
+    // Keep previous hashed assets so already-injected content script loaders
+    // from an older extension build can still resolve their dynamic imports.
+    emptyOutDir: false,
     rollupOptions: {
       input: {
         panel: resolve(__dirname, 'src/panel/index.html'),

@@ -131,6 +131,30 @@ export function createInspector(transport: Transport, source: Source) {
 
   const unsubscribe = transport.subscribe((message) => {
     debugLog(source, 'received message from transport', summarizeMessage(message))
+    if (message.type === 'XSTATE_PANEL_CONNECTED') {
+      // The devtools panel just connected (or reconnected).  Re-broadcast every
+      // currently-active actor so the panel is never blank because the MV3
+      // service worker was killed between page load and panel open.
+      infoLog(source, 'panel connected; resyncing actors', { actorCount: actorRefs.size })
+      actorRefs.forEach((actorRef, sessionId) => {
+        const actorLogic = (actorRef as { logic?: unknown }).logic as any
+        const machine = actorLogic?.root
+          ? serializeMachine(actorLogic, getSourceLocation())
+          : null
+        const resyncMessage: PageToExtensionMessage = {
+          type: 'XSTATE_ACTOR_REGISTERED',
+          sessionId: tag(sessionId),
+          parentSessionId: tagOptional((actorRef as any)._parent?.sessionId),
+          machine,
+          snapshot: safeSerializeSnapshot(actorRef),
+          globalSeq: nextSeq(),
+          timestamp: Date.now(),
+        }
+        debugLog(source, 'resyncing actor', summarizeMessage(resyncMessage))
+        transport.send(resyncMessage)
+      })
+      return
+    }
     if (message.type === 'XSTATE_DISPATCH') {
       const local = stripIfMine(message.sessionId)
       if (local === null) {
@@ -159,6 +183,9 @@ export function createInspector(transport: Transport, source: Source) {
       }
     }
   })
+
+  // Notify the extension that the adapter is ready
+  transport.send({ type: 'XSTATE_ADAPTER_READY' })
 
   infoLog(source, 'inspector created')
 

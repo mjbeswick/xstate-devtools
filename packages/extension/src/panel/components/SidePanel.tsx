@@ -90,7 +90,7 @@ export function SidePanel() {
 
   if (!actor) {
     return (
-      <div style={{ padding: 16, color: '#aaa', fontSize: 12 }}>
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa', fontSize: 12 }}>
         Select an actor to inspect.
       </div>
     )

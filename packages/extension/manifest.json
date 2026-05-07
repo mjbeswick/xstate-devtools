@@ -21,6 +21,12 @@
     "service_worker": "src/background/index.ts",
     "type": "module"
   },
-  "permissions": [],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "permissions": ["storage"],
   "icons": {}
 }

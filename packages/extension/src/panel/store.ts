@@ -112,6 +112,17 @@ export const useStore = create<InspectorStore>((set, get) => ({
           registeredSnapshots.delete(msg.sessionId)
           break
         }
+        case 'XSTATE_PAGE_NAVIGATED': {
+          // Page reloaded — wipe all state so fresh registrations start clean
+          return {
+            actors: new Map(),
+            registeredSnapshots: new Map(),
+            events: [],
+            selectedActorId: null,
+            selectedStateNodeId: null,
+            timeTravelSeq: null,
+          }
+        }
       }
 
       return { actors, registeredSnapshots, events }

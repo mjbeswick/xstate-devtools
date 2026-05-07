@@ -92,6 +92,16 @@ export type PageToExtensionMessage =
       type: 'XSTATE_ACTOR_STOPPED'
       sessionId: string
     }
+  /**
+   * Synthetic message emitted by the background service worker when the
+   * inspected tab starts a new navigation.  The panel should clear its actor
+   * store so stale actors from the previous page are not shown.
+   */
+  | { type: 'XSTATE_PAGE_NAVIGATED' }
+  /**
+   * Sent by the adapter when it initializes to request a resync if the panel is connected.
+   */
+  | { type: 'XSTATE_ADAPTER_READY' }
 
 // panel → service worker → content script → injected world → adapter
 export type ExtensionToPageMessage =
@@ -100,6 +110,13 @@ export type ExtensionToPageMessage =
       sessionId: string
       event: SerializedEvent
     }
+  /**
+   * Sent by the background when a devtools panel connects (or reconnects).
+   * The adapter responds by re-broadcasting XSTATE_ACTOR_REGISTERED for every
+   * currently-active actor so the panel never shows a blank list if the MV3
+   * service worker was killed between page load and panel open.
+   */
+  | { type: 'XSTATE_PANEL_CONNECTED' }
 
 // Marker added to all postMessages so content script can filter
 export type MarkedPageMessage = PageToExtensionMessage & { __xstateDevtools: true }

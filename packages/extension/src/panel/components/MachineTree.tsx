@@ -165,6 +165,7 @@ export function MachineTree() {
   const treeFilter = useStore((s) => s.treeFilter)
   const setTreeFilter = useStore((s) => s.setTreeFilter)
   const actors = useStore((s) => s.actors)
+  const portConnected = useStore((s) => s.portConnected)
   const snapshot = useStore((s) =>
     selectedActorId ? getDisplaySnapshot(s, selectedActorId) : null
   )
@@ -212,6 +213,16 @@ export function MachineTree() {
       )}
 
       <span style={{ marginLeft: 'auto' }} />
+      <span style={{
+        fontSize: 10, fontWeight: 500, padding: '1px 6px',
+        borderRadius: 10,
+        background: portConnected ? '#f6ffed' : '#fff1f0',
+        color: portConnected ? '#389e0d' : '#cf1322',
+        border: `1px solid ${portConnected ? '#b7eb8f' : '#ffa39e'}`,
+        whiteSpace: 'nowrap',
+      }}>
+        {portConnected ? '● Connected' : '○ Not connected'}
+      </span>
       <HeaderIconButton
         onClick={collapse.toggleRight}
         title={collapse.rightCollapsed ? 'Show side panel' : 'Hide side panel'}
@@ -260,8 +271,31 @@ export function MachineTree() {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {Header}
-        <div style={{ flex: 1, padding: 24, color: '#aaa', fontSize: 12 }}>
-          Select an actor from the left panel.
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 24, textAlign: 'center',
+        }}>
+          {!portConnected ? (
+            <div style={{ fontSize: 12 }}>
+              <div style={{ color: '#cf1322', fontWeight: 500, marginBottom: 4 }}>Not connected</div>
+              <div style={{ color: '#8c8c8c' }}>Open DevTools on an inspected tab and reload the page.</div>
+            </div>
+          ) : actors.size === 0 ? (
+            <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+              No actors detected.<br />
+              Make sure the adapter is wired up on the page.{' '}
+              <a
+                href="https://github.com/mjbeswick/xstate-devtools#wiring-it-into-your-app"
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: '#8c8c8c' }}
+              >
+                Help
+              </a>
+            </div>
+          ) : (
+            <span style={{ fontSize: 12, color: '#aaa' }}>Select an actor from the left panel.</span>
+          )}
         </div>
         {Footer}
       </div>

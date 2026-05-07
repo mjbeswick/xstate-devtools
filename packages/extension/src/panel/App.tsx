@@ -16,6 +16,8 @@ const PAGE_MESSAGE_TYPES = new Set([
   'XSTATE_SNAPSHOT',
   'XSTATE_EVENT',
   'XSTATE_ACTOR_STOPPED',
+  'XSTATE_PAGE_NAVIGATED',
+  'XSTATE_ADAPTER_READY',
 ])
 
 function asPageMessage(data: unknown): PageToExtensionMessage | null {
@@ -29,8 +31,19 @@ export function App() {
   const handleMessage = useStore((s) => s.handleMessage)
   const setPortConnectedInStore = useStore((s) => s.setPortConnected)
   const portRef = useRef<chrome.runtime.Port | null>(null)
+
+  // Mount log — helps confirm the panel React app has initialised
+  useEffect(() => {
+    console.log('[xstate-devtools:panel] panel mounted, tabId =', chrome.devtools.inspectedWindow.tabId)
+  }, [])
   const wsRef = useRef<WebSocket | null>(null)
   const panelSeqRef = useRef(0)
+
+  // Incrementing this causes the browser-transport effect to re-run and
+  // reconnect the background port.  Used to auto-recover after the MV3 service
+  // worker is killed and the port drops.
+  const [reconnectKey, setReconnectKey] = useState(0)
+  const reconnectTimerRef = useRef<number | null>(null)
 
   /**
    * Rewrite each incoming message's globalSeq to a panel-monotonic value.
@@ -39,6 +52,11 @@ export function App() {
    * one timeline at the point of ingest.
    */
   const ingest = useCallback((message: PageToExtensionMessage) => {
+    if (message.type === 'XSTATE_PAGE_NAVIGATED') {
+      console.log('[xstate-devtools:panel] page navigated — clearing actor store')
+      handleMessage(message)
+      return
+    }
     panelSeqRef.current += 1
     const seq = panelSeqRef.current
     debugLog('panel', 'ingesting message', {
@@ -68,10 +86,19 @@ export function App() {
   const [portConnected, setPortConnected] = useState(false)
   const [browserMsgCount, setBrowserMsgCount] = useState(0)
 
+  // Log connection state changes to console so they are visible without enabling verbose DevTools logging
+  useEffect(() => {
+    console.log('[xstate-devtools:panel] portConnected changed →', portConnected)
+  }, [portConnected])
+
+  useEffect(() => {
+    console.log('[xstate-devtools:panel] serverStatus changed →', serverStatus)
+  }, [serverStatus])
+
   // Browser transport — content-script port
   useEffect(() => {
     const tabId = chrome.devtools.inspectedWindow.tabId
-    infoLog('panel', 'connecting to background port', { tabId })
+    infoLog('panel', 'connecting to background port', { tabId, reconnectKey })
     const p = chrome.runtime.connect({ name: `xstate-panel-${tabId}` })
     portRef.current = p
     setPortConnected(true)
@@ -92,17 +119,27 @@ export function App() {
     p.onDisconnect.addListener(() => {
       setPortConnected(false)
       setPortConnectedInStore(false)
-      infoLog('panel', 'background port disconnected', { tabId, portName: p.name })
+      infoLog('panel', 'background port disconnected; scheduling reconnect', { tabId, portName: p.name })
+      // Auto-reconnect: the MV3 service worker can be killed at any time.
+      // Reconnecting re-triggers the resync flow so the panel stays populated.
+      reconnectTimerRef.current = window.setTimeout(() => {
+        reconnectTimerRef.current = null
+        setReconnectKey((k) => k + 1)
+      }, 1000)
     })
 
     return () => {
+      if (reconnectTimerRef.current !== null) {
+        clearTimeout(reconnectTimerRef.current)
+        reconnectTimerRef.current = null
+      }
       infoLog('panel', 'disconnecting background port', { tabId, portName: p.name })
       p.disconnect()
       portRef.current = null
       setPortConnected(false)
       setPortConnectedInStore(false)
     }
-  }, [ingest, setPortConnectedInStore])
+  }, [ingest, setPortConnectedInStore, reconnectKey])
 
   // Server transport — WebSocket to user-supplied endpoint
   useEffect(() => {
@@ -133,6 +170,8 @@ export function App() {
       ws.onopen = () => {
         setServerStatus('open')
         infoLog('panel', 'server transport open', { serverUrl })
+        // Ask the server adapter to resync its actors, same as the browser transport does
+        try { ws.send(JSON.stringify({ type: 'XSTATE_PANEL_CONNECTED' })) } catch { /* ignore */ }
       }
       ws.onmessage = (evt) => {
         try {
