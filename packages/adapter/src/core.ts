@@ -101,6 +101,24 @@ function safeSerializeSnapshot(actorRef: AnyActorRef): SerializedSnapshot {
   }
 }
 
+function getActorDisplayName(actorRef: AnyActorRef): string | undefined {
+  const actor = actorRef as {
+    logic?: { id?: string; src?: unknown; name?: string } | undefined
+    src?: unknown
+  }
+
+  const src = actor.src ?? actor.logic?.src
+  if (typeof src === 'string' && src.length > 0) return src
+  if (typeof actor.logic?.id === 'string' && actor.logic.id.length > 0) return actor.logic.id
+  if (typeof actor.logic?.name === 'string' && actor.logic.name.length > 0) return actor.logic.name
+  if (src && typeof src === 'object') {
+    const namedSrc = src as { id?: string; name?: string }
+    if (typeof namedSrc.id === 'string' && namedSrc.id.length > 0) return namedSrc.id
+    if (typeof namedSrc.name === 'string' && namedSrc.name.length > 0) return namedSrc.name
+  }
+  return undefined
+}
+
 // Cached on globalThis so HMR re-evaluating this module doesn't reset the
 // monotonic seq counter mid-session. The panel re-numbers messages on ingest
 // to merge multiple sources, but keeping a stable per-process seq still helps
@@ -154,6 +172,7 @@ export function createInspector(transport: Transport, source: Source) {
           type: 'XSTATE_ACTOR_REGISTERED',
           sessionId: tag(sessionId),
           parentSessionId: tagOptional((actorRef as any)._parent?.sessionId),
+          displayName: getActorDisplayName(actorRef),
           machine,
           snapshot: safeSerializeSnapshot(actorRef),
           globalSeq: nextSeq(),
@@ -212,6 +231,7 @@ export function createInspector(transport: Transport, source: Source) {
         type: 'XSTATE_ACTOR_REGISTERED',
         sessionId: tag(sessionId),
         parentSessionId: tagOptional((actorRef as any)._parent?.sessionId),
+        displayName: getActorDisplayName(actorRef),
         machine,
         snapshot: safeSerializeSnapshot(actorRef),
         globalSeq: nextSeq(),

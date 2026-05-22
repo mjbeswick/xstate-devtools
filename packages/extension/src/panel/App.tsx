@@ -8,10 +8,22 @@ import type {
 } from '../shared/types.js'
 import { Layout } from './components/Layout.js'
 import { DispatchContext } from './port-context.js'
+import { ServerControlsContext } from './server-context.js'
 import { useStore } from './store.js'
 
 const SERVER_URL_KEY = 'xstate-devtools.serverUrl'
 const DEFAULT_SERVER_URL = 'ws://localhost:9301'
+
+export function getInitialServerEnabled(
+  storage: Pick<Storage, 'getItem'> | null | undefined,
+): boolean {
+  try {
+    const stored = storage?.getItem(`${SERVER_URL_KEY}.enabled`)
+    return stored === null || stored === undefined ? true : stored === '1'
+  } catch {
+    return true
+  }
+}
 
 const PAGE_MESSAGE_TYPES = new Set([
   'XSTATE_ACTOR_REGISTERED',
@@ -90,12 +102,7 @@ export function App() {
     }
   })
   const [serverEnabled, setServerEnabled] = useState<boolean>(() => {
-    try {
-      const stored = localStorage.getItem(`${SERVER_URL_KEY}.enabled`)
-      return stored === null ? true : stored === '1'
-    } catch {
-      return true
-    }
+    return getInitialServerEnabled(typeof localStorage === 'undefined' ? null : localStorage)
   })
   const [serverStatus, setServerStatus] = useState<
     'idle' | 'connecting' | 'open' | 'closed' | 'error'
@@ -272,16 +279,26 @@ export function App() {
 
   return (
     <DispatchContext.Provider value={dispatch}>
-      <ServerStatusBar
-        portConnected={portConnected}
-        browserMsgCount={browserMsgCount}
-        enabled={serverEnabled}
-        url={serverUrl}
-        status={serverStatus}
-        onToggle={onToggleServer}
-        onUrlChange={onSetServerUrl}
-      />
-      <Layout />
+      <ServerControlsContext.Provider
+        value={{
+          enabled: serverEnabled,
+          url: serverUrl,
+          status: serverStatus,
+          onToggle: onToggleServer,
+          onUrlChange: onSetServerUrl,
+        }}
+      >
+        <ServerStatusBar
+          portConnected={portConnected}
+          browserMsgCount={browserMsgCount}
+          enabled={serverEnabled}
+          url={serverUrl}
+          status={serverStatus}
+          onToggle={onToggleServer}
+          onUrlChange={onSetServerUrl}
+        />
+        <Layout />
+      </ServerControlsContext.Provider>
     </DispatchContext.Provider>
   )
 }

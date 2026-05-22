@@ -45,6 +45,7 @@ export interface SerializedSnapshot {
 export interface ActorRecord {
   sessionId: string
   parentSessionId?: string
+  displayName?: string
   machine: SerializedMachine | null // null for non-machine actors (promise, callback)
   snapshot: SerializedSnapshot
   status: 'active' | 'done' | 'error' | 'stopped'
@@ -68,6 +69,7 @@ export type PageToExtensionMessage =
       type: 'XSTATE_ACTOR_REGISTERED'
       sessionId: string
       parentSessionId?: string
+      displayName?: string
       machine: SerializedMachine | null
       snapshot: SerializedSnapshot
       globalSeq: number

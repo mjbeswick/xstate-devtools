@@ -14,6 +14,7 @@ function findPath(root: SerializedStateNode, id: string): SerializedStateNode[] 
 
 import type { SerializedStateNode } from '../../shared/types.js'
 import { usePanelCollapse } from '../panel-collapse-context.js'
+import { useServerControls } from '../server-context.js'
 import { ChevronDown, ChevronRight, Close, ExternalLink, PanelToggle } from './Icons.js'
 
 function HeaderIconButton({
@@ -215,8 +216,34 @@ export function MachineTree() {
   )
 
   const collapse = usePanelCollapse()
+  const serverControls = useServerControls()
 
   const actor = selectedActorId ? actors.get(selectedActorId) : null
+
+  const nearestMachineAncestor = React.useMemo(() => {
+    if (!actor?.parentSessionId) return null
+
+    let currentId = actor.parentSessionId
+    while (currentId) {
+      const current = actors.get(currentId)
+      if (!current) return null
+      if (current.machine) return current
+      currentId = current.parentSessionId
+    }
+
+    return null
+  }, [actor, actors])
+
+  const selectActor = useStore((s) => s.selectActor)
+
+  const serverDot =
+    serverControls?.status === 'open'
+      ? '#52c41a'
+      : serverControls?.status === 'connecting'
+        ? '#faad14'
+        : serverControls?.status === 'error'
+          ? '#ff4d4f'
+          : '#d9d9d9'
 
   const matchSet = React.useMemo(() => {
     if (!actor?.machine || !treeFilter) return null
@@ -285,6 +312,63 @@ export function MachineTree() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {serverControls && (
+          <>
+            <label
+              title={serverControls.url}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 10,
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={serverControls.enabled}
+                onChange={(e) => serverControls.onToggle(e.target.checked)}
+                style={{ margin: 0 }}
+              />
+              <span>Server</span>
+            </label>
+            {serverControls.enabled && (
+              <>
+                <span
+                  title={`${serverControls.status} · ${serverControls.url}`}
+                  style={{
+                    display: 'inline-block',
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: serverDot,
+                    flexShrink: 0,
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    const nextUrl = window.prompt('Server adapter URL', serverControls.url)
+                    if (nextUrl) serverControls.onUrlChange(nextUrl)
+                  }}
+                  style={{
+                    padding: '1px 6px',
+                    fontSize: 10,
+                    lineHeight: 1.4,
+                    background: '#fff',
+                    color: '#444',
+                    border: '1px solid #d9d9d9',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                  }}
+                  title={serverControls.url}
+                >
+                  Edit
+                </button>
+              </>
+            )}
+          </>
+        )}
         <span
           style={{
             fontSize: 10,
@@ -406,8 +490,48 @@ export function MachineTree() {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {Header}
-        <div style={{ flex: 1, padding: 24, color: '#aaa', fontSize: 12 }}>
-          No machine definition available for this actor.
+        <div
+          style={{
+            flex: 1,
+            padding: 24,
+            color: '#666',
+            fontSize: 12,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+          }}
+        >
+          <div>
+            This actor does not expose a machine definition.
+            {actor.displayName && (
+              <>
+                {' '}
+                <code style={{ fontSize: 11 }}>{actor.displayName}</code>
+              </>
+            )}
+          </div>
+          <div style={{ color: '#8c8c8c' }}>
+            Promise, callback, and other service actors can receive events, but they do not have a
+            state tree to inspect.
+          </div>
+          {nearestMachineAncestor && (
+            <div>
+              <button
+                onClick={() => selectActor(nearestMachineAncestor.sessionId)}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  background: '#1890ff',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 4,
+                }}
+              >
+                Inspect parent machine {nearestMachineAncestor.machine?.id}
+              </button>
+            </div>
+          )}
         </div>
         {Footer}
       </div>

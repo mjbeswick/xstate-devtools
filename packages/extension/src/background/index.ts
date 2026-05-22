@@ -86,6 +86,23 @@ function sendPanelConnected(tabId: number): void {
   }
 }
 
+function queuePanelResync(tabId: number): void {
+  const delays = [0, 300, 1000]
+
+  delays.forEach((delayMs) => {
+    setTimeout(() => {
+      if (!panelPorts.has(tabId)) return
+
+      infoLog('background', 'post-navigation PANEL_CONNECTED retry', {
+        tabId,
+        delayMs,
+        hasContentPort: contentPorts.has(tabId),
+      })
+      sendPanelConnected(tabId)
+    }, delayMs)
+  })
+}
+
 chrome.runtime.onConnect.addListener((port: chrome.runtime.Port) => {
   // ── Content-script persistent port ──────────────────────────────────────
   if (port.name === 'xstate-content') {
@@ -199,6 +216,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
       }
     }
     infoLog('background', 'tab started loading; cleared pending messages', { tabId })
+    return
+  }
+
+  if (changeInfo.status === 'complete' && panelPorts.has(tabId)) {
+    // Some reloads race page boot against the initial PANEL_CONNECTED signal.
+    // Retry a few times after the navigation completes so the freshly loaded
+    // adapter can resync once its bridge and actors are ready.
+    queuePanelResync(tabId)
   }
 })
 

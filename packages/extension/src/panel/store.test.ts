@@ -71,6 +71,45 @@ describe('handleMessage', () => {
     })
     expect(useStore.getState().actors.get('a1')?.sessionId).toBe('a1')
     expect(useStore.getState().actors.get('a1')?.status).toBe('active')
+    expect(useStore.getState().selectedActorId).toBe('a1')
+  })
+
+  it('keeps the current selection when another actor registers', () => {
+    useStore.getState().handleMessage({
+      type: 'XSTATE_ACTOR_REGISTERED',
+      sessionId: 'a1',
+      machine: mockMachine,
+      snapshot: snap('idle'),
+      globalSeq: 1,
+      timestamp: 1000,
+    })
+
+    useStore.getState().selectActor('a1')
+
+    useStore.getState().handleMessage({
+      type: 'XSTATE_ACTOR_REGISTERED',
+      sessionId: 'a2',
+      machine: mockMachine,
+      snapshot: snap('idle'),
+      globalSeq: 2,
+      timestamp: 2000,
+    })
+
+    expect(useStore.getState().selectedActorId).toBe('a1')
+  })
+
+  it('stores actor displayName when provided', () => {
+    useStore.getState().handleMessage({
+      type: 'XSTATE_ACTOR_REGISTERED',
+      sessionId: 'a1',
+      displayName: 'service',
+      machine: null,
+      snapshot: snap(null),
+      globalSeq: 1,
+      timestamp: 1000,
+    })
+
+    expect(useStore.getState().actors.get('a1')?.displayName).toBe('service')
   })
 
   it('updates snapshot on XSTATE_EVENT', () => {

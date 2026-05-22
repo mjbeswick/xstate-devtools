@@ -69,6 +69,7 @@ export const useStore = create<InspectorStore>((set, _get) => ({
           actors.set(msg.sessionId, {
             sessionId: msg.sessionId,
             parentSessionId: msg.parentSessionId,
+            displayName: msg.displayName,
             machine: msg.machine,
             snapshot: msg.snapshot,
             status: 'active',
@@ -76,7 +77,12 @@ export const useStore = create<InspectorStore>((set, _get) => ({
             registeredAtSeq: msg.globalSeq,
           })
           registeredSnapshots.set(msg.sessionId, msg.snapshot)
-          break
+          return {
+            actors,
+            registeredSnapshots,
+            events,
+            selectedActorId: state.selectedActorId ?? msg.sessionId,
+          }
         }
         case 'XSTATE_SNAPSHOT': {
           const actor = actors.get(msg.sessionId)

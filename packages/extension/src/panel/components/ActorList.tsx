@@ -27,7 +27,8 @@ export function ActorList() {
     const isSelected = sessionId === selectedActorId
     const isStopped = actor.status === 'stopped'
     const children = childrenOf.get(sessionId) ?? []
-    const label = actor.machine?.id ?? sessionId.slice(0, 12)
+    const label = actor.machine?.id ?? actor.displayName ?? sessionId.slice(0, 12)
+    const detail = actor.machine ? null : actor.displayName ? 'actor' : 'session'
 
     return (
       <div key={sessionId}>
@@ -56,6 +57,11 @@ export function ActorList() {
             }}
           />
           <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{label}</span>
+          {detail && (
+            <span style={{ fontSize: 10, color: '#999', marginLeft: 'auto', paddingRight: 8 }}>
+              {detail}
+            </span>
+          )}
         </div>
         {children.map((cid) => renderActor(cid, depth + 1))}
       </div>
