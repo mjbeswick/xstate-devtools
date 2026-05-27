@@ -38,7 +38,7 @@ describe('sanitize', () => {
     const a: any = {}
     a.self = a
     expect(() => sanitize(a)).not.toThrow()
-    expect(JSON.stringify(sanitize(a))).toContain('[MaxDepth]')
+    expect(JSON.stringify(sanitize(a))).toContain('[Circular]')
   })
 
   it('handles deep linear nesting', () => {
@@ -51,5 +51,18 @@ describe('sanitize', () => {
     curr.value = 'bottom'
     const result = JSON.stringify(sanitize(deep))
     expect(result).toContain('[MaxDepth]')
+  })
+
+  it('does not duplicate shared objects across branches', () => {
+    const shared = { nested: { value: 'shared' } }
+    const value = {
+      first: shared,
+      second: shared,
+    }
+
+    const result = sanitize(value) as Record<string, unknown>
+
+    expect(result.first).toEqual({ nested: { value: 'shared' } })
+    expect(result.second).toBe('[Circular]')
   })
 })

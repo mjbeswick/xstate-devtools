@@ -4,7 +4,7 @@ const MAX_DEPTH = 10
 const MAX_STRING_LENGTH = 500
 const MAX_ARRAY_LENGTH = 100
 
-export function sanitize(value: unknown, depth = 0): unknown {
+function sanitizeValue(value: unknown, depth: number, seen: WeakSet<object>): unknown {
   if (depth > MAX_DEPTH) return '[MaxDepth]'
   if (value === null || value === undefined) return value
   if (typeof value === 'boolean' || typeof value === 'number') return value
@@ -17,11 +17,15 @@ export function sanitize(value: unknown, depth = 0): unknown {
   if (value instanceof Error) return { __type: 'Error', name: value.name, message: value.message }
   if (value instanceof Date) return { __type: 'Date', iso: value.toISOString() }
   if (value instanceof RegExp) return { __type: 'RegExp', source: value.source, flags: value.flags }
+  if (typeof value === 'object') {
+    if (seen.has(value)) return '[Circular]'
+    seen.add(value)
+  }
   if (value instanceof Map) {
     const entries: [unknown, unknown][] = []
     for (const [k, v] of value as Map<unknown, unknown>) {
       if (entries.length >= MAX_ARRAY_LENGTH) break
-      entries.push([sanitize(k, depth + 1), sanitize(v, depth + 1)])
+      entries.push([sanitizeValue(k, depth + 1, seen), sanitizeValue(v, depth + 1, seen)])
     }
     return { __type: 'Map', entries }
   }
@@ -29,7 +33,7 @@ export function sanitize(value: unknown, depth = 0): unknown {
     const values: unknown[] = []
     for (const v of value as Set<unknown>) {
       if (values.length >= MAX_ARRAY_LENGTH) break
-      values.push(sanitize(v, depth + 1))
+      values.push(sanitizeValue(v, depth + 1, seen))
     }
     return { __type: 'Set', values }
   }
@@ -42,7 +46,7 @@ export function sanitize(value: unknown, depth = 0): unknown {
   }
   if (Array.isArray(value)) {
     const sliced = value.slice(0, MAX_ARRAY_LENGTH)
-    const result = sliced.map((v) => sanitize(v, depth + 1))
+    const result = sliced.map((v) => sanitizeValue(v, depth + 1, seen))
     if (value.length > MAX_ARRAY_LENGTH) result.push(`[…${value.length - MAX_ARRAY_LENGTH} more]`)
     return result
   }
@@ -54,9 +58,13 @@ export function sanitize(value: unknown, depth = 0): unknown {
         result['…'] = '[truncated]'
         break
       }
-      result[k] = sanitize(v, depth + 1)
+      result[k] = sanitizeValue(v, depth + 1, seen)
     }
     return result
   }
   return String(value)
+}
+
+export function sanitize(value: unknown, depth = 0): unknown {
+  return sanitizeValue(value, depth, new WeakSet<object>())
 }

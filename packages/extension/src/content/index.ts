@@ -28,7 +28,13 @@ function asPageMessage(data: unknown): PageToExtensionMessage | null {
 function asDispatchMessage(data: unknown): ExtensionToPageMessage | null {
   if (!data || typeof data !== 'object') return null
   const type = (data as { type?: unknown }).type
-  if (type !== 'XSTATE_DISPATCH' && type !== 'XSTATE_PANEL_CONNECTED') return null
+  if (
+    type !== 'XSTATE_DISPATCH' &&
+    type !== 'XSTATE_SET_ACTIVE_STATE' &&
+    type !== 'XSTATE_PANEL_CONNECTED'
+  ) {
+    return null
+  }
   return data as ExtensionToPageMessage
 }
 
@@ -51,7 +57,7 @@ function connectToBg(): void {
   }
   infoLog('content', 'connected persistent port to background')
 
-  // Background → page: forward XSTATE_PANEL_CONNECTED and XSTATE_DISPATCH
+  // Background → page: forward panel control messages.
   bgPort.onMessage.addListener((message: MarkedExtensionMessage | ExtensionToPageMessage) => {
     const dispatch = asDispatchMessage(message)
     if (!dispatch) return

@@ -6,6 +6,7 @@ import type {
   MarkedExtensionMessage,
   MarkedPageMessage,
   PageToExtensionMessage,
+  PanelToBackgroundMessage,
 } from '../shared/types.js'
 
 // tabId → devtools panel port
@@ -36,9 +37,21 @@ function asPageMessage(data: unknown): MarkedPageMessage | null {
 
 function asDispatchMessage(data: unknown): MarkedExtensionMessage | null {
   if (!data || typeof data !== 'object') return null
-  if ((data as { type?: unknown }).type !== 'XSTATE_DISPATCH') return null
+  const type = (data as { type?: unknown }).type
+  if (type !== 'XSTATE_DISPATCH' && type !== 'XSTATE_SET_ACTIVE_STATE') return null
   const dispatch = data as ExtensionToPageMessage
   return { ...dispatch, __xstateDevtools: true }
+}
+
+function asPanelToBackgroundMessage(data: unknown): PanelToBackgroundMessage | null {
+  if (!data || typeof data !== 'object') return null
+  const type = (data as { type?: unknown }).type
+  const sourceLocation = (data as { sourceLocation?: unknown }).sourceLocation
+  if (type !== 'XSTATE_OPEN_SOURCE' || typeof sourceLocation !== 'string') return null
+  return {
+    type,
+    sourceLocation,
+  }
 }
 
 /** Forward a page message to the panel, or buffer it if the panel is not open. */
@@ -72,18 +85,27 @@ function forwardToPanel(tabId: number, normalized: MarkedPageMessage): void {
 function sendPanelConnected(tabId: number): void {
   const csPort = contentPorts.get(tabId)
   if (csPort) {
-    infoLog('background', 'sending PANEL_CONNECTED via content port', { tabId })
-    csPort.postMessage({ type: 'XSTATE_PANEL_CONNECTED', __xstateDevtools: true })
-  } else {
-    infoLog('background', 'sending PANEL_CONNECTED via chrome.tabs.sendMessage (fallback)', {
-      tabId,
-    })
-    chrome.tabs.sendMessage(
-      tabId,
-      { type: 'XSTATE_PANEL_CONNECTED', __xstateDevtools: true },
-      () => void chrome.runtime.lastError,
-    )
+    try {
+      infoLog('background', 'sending PANEL_CONNECTED via content port', { tabId })
+      csPort.postMessage({ type: 'XSTATE_PANEL_CONNECTED', __xstateDevtools: true })
+      return
+    } catch (error) {
+      if (contentPorts.get(tabId) === csPort) contentPorts.delete(tabId)
+      infoLog('background', 'content port unavailable for PANEL_CONNECTED; falling back', {
+        tabId,
+        error,
+      })
+    }
   }
+
+  infoLog('background', 'sending PANEL_CONNECTED via chrome.tabs.sendMessage (fallback)', {
+    tabId,
+  })
+  chrome.tabs.sendMessage(
+    tabId,
+    { type: 'XSTATE_PANEL_CONNECTED', __xstateDevtools: true },
+    () => void chrome.runtime.lastError,
+  )
 }
 
 function queuePanelResync(tabId: number): void {
@@ -100,6 +122,96 @@ function queuePanelResync(tabId: number): void {
       })
       sendPanelConnected(tabId)
     }, delayMs)
+  })
+}
+
+function normalizeFilePath(filePath: string): string | null {
+  const trimmed = filePath.trim()
+  if (!trimmed) return null
+
+  if (/^[a-zA-Z]:[\\/]/.test(trimmed)) {
+    return trimmed.replace(/\\/g, '/')
+  }
+
+  if (/^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(trimmed)) {
+    try {
+      const url = new URL(trimmed)
+      const pathname = decodeURIComponent(url.pathname)
+
+      if (url.protocol === 'file:') {
+        return pathname || null
+      }
+
+      if (pathname.startsWith('/@fs/')) {
+        return pathname.slice('/@fs'.length)
+      }
+
+      return pathname || null
+    } catch {
+      return null
+    }
+  }
+
+  if (
+    /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmed) &&
+    !/^[a-zA-Z]:[\\/]/.test(trimmed) &&
+    !trimmed.startsWith('/') &&
+    !trimmed.startsWith('./') &&
+    !trimmed.startsWith('../')
+  ) {
+    return null
+  }
+
+  return trimmed.replace(/[?#].*$/, '')
+}
+
+function parseSourceLocation(sourceLocation: string) {
+  const trimmed = sourceLocation.trim()
+  const unwrapped = trimmed.match(/\((.*)\)$/)?.[1] ?? trimmed
+  const normalizedFrame = unwrapped
+    .replace(/^at\s+/, '')
+    .replace(/^[^@\s]+@(?=[a-zA-Z][a-zA-Z\d+.-]*:\/\/)/, '')
+  const match = normalizedFrame.match(/^(.*?)(?::(\d+))?(?::(\d+))?$/)
+
+  if (!match) return null
+
+  const [, rawFilePath, line, column] = match
+  const filePath = rawFilePath ? normalizeFilePath(rawFilePath) : null
+  if (!filePath) return null
+
+  return {
+    filePath,
+    line: line ? Number(line) : undefined,
+    column: column ? Number(column) : undefined,
+  }
+}
+
+function getSourceHref(sourceLocation: string): string | null {
+  const parsed = parseSourceLocation(sourceLocation)
+  if (!parsed) return null
+
+  const encodedPath = encodeURI(parsed.filePath)
+  const pathPrefix = parsed.filePath.startsWith('/') ? '' : '/'
+  const suffix = parsed.line
+    ? `:${parsed.line}${parsed.column ? `:${parsed.column}` : ''}`
+    : ''
+
+  return `vscode://file${pathPrefix}${encodedPath}${suffix}`
+}
+
+function openSourceLocation(sourceLocation: string): void {
+  const href = getSourceHref(sourceLocation)
+  if (!href) return
+
+  chrome.tabs.create({ url: href }, () => {
+    const error = chrome.runtime.lastError
+    if (error) {
+      infoLog('background', 'failed to open source location', {
+        sourceLocation,
+        href,
+        error: error.message,
+      })
+    }
   })
 }
 
@@ -122,18 +234,26 @@ chrome.runtime.onConnect.addListener((port: chrome.runtime.Port) => {
         'panel already connected; sending PANEL_CONNECTED via new content port',
         { tabId },
       )
-      port.postMessage({ type: 'XSTATE_PANEL_CONNECTED', __xstateDevtools: true })
+      sendPanelConnected(tabId)
     }
 
     // Content script → panel: page inspection events arrive via this port.
     port.onMessage.addListener((message: MarkedPageMessage | PageToExtensionMessage) => {
+      if (contentPorts.get(tabId) !== port) {
+        debugLog('background', 'ignoring message from superseded content port', {
+          tabId,
+          message: summarizeMessage(message as PageToExtensionMessage),
+        })
+        return
+      }
+
       const normalized = asPageMessage(message)
       if (!normalized) return
 
       if (normalized.type === 'XSTATE_ADAPTER_READY') {
         if (panelPorts.has(tabId)) {
           infoLog('background', 'adapter ready; sending PANEL_CONNECTED for resync', { tabId })
-          port.postMessage({ type: 'XSTATE_PANEL_CONNECTED', __xstateDevtools: true })
+          sendPanelConnected(tabId)
         }
         return
       }
@@ -176,8 +296,21 @@ chrome.runtime.onConnect.addListener((port: chrome.runtime.Port) => {
     infoLog('background', 'panel disconnected', { tabId, portName: port.name })
   })
 
-  // Panel → content script (dispatch events)
-  port.onMessage.addListener((message: MarkedExtensionMessage | ExtensionToPageMessage) => {
+  // Panel → content script (dispatch events) or other panel-specific messages
+  port.onMessage.addListener((message: unknown) => {
+    const obj = message as { type?: string; sourceLocation?: string }
+    
+    // Handle XSTATE_OPEN_SOURCE from panel
+    if (obj.type === 'XSTATE_OPEN_SOURCE' && typeof obj.sourceLocation === 'string') {
+      debugLog('background', 'opening source location from panel', {
+        tabId,
+        sourceLocation: obj.sourceLocation,
+      })
+      openSourceLocation(obj.sourceLocation)
+      return
+    }
+
+    // Handle dispatch messages to content script
     const dispatch = asDispatchMessage(message)
     if (dispatch?.type === 'XSTATE_DISPATCH') {
       debugLog('background', 'forwarding dispatch from panel to tab', {
@@ -231,7 +364,16 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 // Used during the ~250 ms reconnect window when the persistent port is not yet
 // re-established after a service-worker restart.
 chrome.runtime.onMessage.addListener(
-  (message: MarkedPageMessage | PageToExtensionMessage, sender: chrome.runtime.MessageSender) => {
+  (message: unknown, sender: chrome.runtime.MessageSender) => {
+    const panelMessage = asPanelToBackgroundMessage(message)
+    if (panelMessage) {
+      infoLog('background', 'opening source location from runtime message', {
+        sourceLocation: panelMessage.sourceLocation,
+      })
+      openSourceLocation(panelMessage.sourceLocation)
+      return
+    }
+
     const normalized = asPageMessage(message)
     if (!normalized) return
     const tabId = sender.tab?.id

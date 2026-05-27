@@ -1,6 +1,6 @@
 // Lightweight collapsible JSON viewer — no external deps.
 import { useState } from 'react'
-import { ChevronDown, ChevronRight } from './Icons.js'
+import { DisclosureTriangle } from './Icons.js'
 
 const colors = {
   key: '#871094',
@@ -13,7 +13,13 @@ const colors = {
   toggle: '#888',
 }
 
+const INDENT_PX = 14
+
 type Json = unknown
+
+export function getNodePaddingLeft(depth: number) {
+  return depth === 0 ? 0 : INDENT_PX
+}
 
 function typeOf(
   value: Json,
@@ -68,7 +74,7 @@ function JsonNode({ k, value, depth, defaultOpenDepth, isLast }: NodeProps) {
 
   if (!isContainer) {
     return (
-      <div style={{ paddingLeft: depth * 14, lineHeight: 1.5 }}>
+      <div style={{ paddingLeft: getNodePaddingLeft(depth), lineHeight: 1.5 }}>
         <span style={{ display: 'inline-block', width: 12 }} />
         {renderKey()}
         <Primitive value={value} />
@@ -86,7 +92,7 @@ function JsonNode({ k, value, depth, defaultOpenDepth, isLast }: NodeProps) {
   const empty = entries.length === 0
 
   return (
-    <div style={{ paddingLeft: depth * 14, lineHeight: 1.5 }}>
+    <div style={{ paddingLeft: getNodePaddingLeft(depth), lineHeight: 1.5 }}>
       <span
         onClick={() => !empty && setOpen(!open)}
         style={{
@@ -101,7 +107,7 @@ function JsonNode({ k, value, depth, defaultOpenDepth, isLast }: NodeProps) {
           justifyContent: 'center',
         }}
       >
-        {empty ? null : open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        {empty ? null : <DisclosureTriangle expanded={open} size={10} color={colors.toggle} />}
       </span>
       {renderKey()}
       <span style={{ color: colors.bracket }}>{open_}</span>

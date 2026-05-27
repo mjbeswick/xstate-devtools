@@ -6,6 +6,11 @@ import type {
   PageToExtensionMessage,
   SerializedSnapshot,
 } from '../../extension/src/shared/types.js'
+import {
+  debugLog as baseDebugLog,
+  infoLog as baseInfoLog,
+  warnLog as baseWarnLog,
+} from './logging.js'
 import { sanitize } from './sanitize.js'
 import { serializeMachine } from './serialize.js'
 
@@ -18,9 +23,39 @@ export interface Transport {
   subscribe: (handler: (message: ExtensionToPageMessage) => void) => () => void
 }
 
+type StateValue = string | { [key: string]: StateValue }
+
+interface StateNodeLike {
+  id: string
+  key: string
+  type: 'atomic' | 'compound' | 'parallel' | 'final' | 'history' | string
+  parent?: StateNodeLike
+  states?: Record<string, StateNodeLike>
+  initial?: string | { target?: StateNodeLike[] }
+}
+
+interface MachineLike {
+  root: StateNodeLike
+  getStateNodeById: (id: string) => StateNodeLike
+  resolveState: (snapshot: {
+    value: unknown
+    context?: unknown
+    status?: string
+    output?: unknown
+    error?: unknown
+    historyValue?: unknown
+  }) => unknown
+}
+
+interface MutableActorRef extends AnyActorRef {
+  logic?: MachineLike
+  update?: (snapshot: unknown, event: { type: string; stateNodeId: string }) => void
+}
+
 function summarizeMessage(message: ExtensionToPageMessage | PageToExtensionMessage) {
   const summary: Record<string, unknown> = { type: message.type }
   if ('sessionId' in message) summary.sessionId = message.sessionId
+  if ('stateNodeId' in message) summary.stateNodeId = message.stateNodeId
   if ('parentSessionId' in message && message.parentSessionId) {
     summary.parentSessionId = message.parentSessionId
   }
@@ -49,27 +84,15 @@ function summarizeInspectionEvent(event: any) {
 }
 
 function debugLog(source: Source, message: string, details?: unknown) {
-  if (details === undefined) {
-    console.debug(`[xstate-devtools:${source}:adapter] ${message}`)
-    return
-  }
-  console.debug(`[xstate-devtools:${source}:adapter] ${message}`, details)
+  baseDebugLog(`${source}:adapter`, message, details)
 }
 
 function infoLog(source: Source, message: string, details?: unknown) {
-  if (details === undefined) {
-    console.info(`[xstate-devtools:${source}:adapter] ${message}`)
-    return
-  }
-  console.info(`[xstate-devtools:${source}:adapter] ${message}`, details)
+  baseInfoLog(`${source}:adapter`, message, details)
 }
 
 function warnLog(source: Source, message: string, details?: unknown) {
-  if (details === undefined) {
-    console.warn(`[xstate-devtools:${source}:adapter] ${message}`)
-    return
-  }
-  console.warn(`[xstate-devtools:${source}:adapter] ${message}`, details)
+  baseWarnLog(`${source}:adapter`, message, details)
 }
 
 function getSourceLocation(): string | undefined {
@@ -117,6 +140,148 @@ function getActorDisplayName(actorRef: AnyActorRef): string | undefined {
     if (typeof namedSrc.name === 'string' && namedSrc.name.length > 0) return namedSrc.name
   }
   return undefined
+}
+
+function getNodeInitialChild(node: StateNodeLike): StateNodeLike | null {
+  if (!node.states) return null
+  if (typeof node.initial === 'string') {
+    return node.states[node.initial] ?? null
+  }
+
+  const target = Array.isArray(node.initial?.target) ? node.initial.target[0] : null
+  return target ?? null
+}
+
+function encodeChildValue(child: StateNodeLike, childValue: StateValue): StateValue {
+  if (child.type === 'atomic' || child.type === 'final' || child.type === 'history') {
+    return child.key
+  }
+
+  return { [child.key]: childValue }
+}
+
+function getDefaultStateValue(node: StateNodeLike): StateValue {
+  if (node.type === 'parallel') {
+    const value: Record<string, StateValue> = {}
+    for (const child of Object.values(node.states ?? {})) {
+      value[child.key] = getDefaultSelectionValue(child)
+    }
+    return value
+  }
+
+  const initialChild = getNodeInitialChild(node)
+  if (!initialChild) return {}
+  return encodeChildValue(initialChild, getDefaultStateValue(initialChild))
+}
+
+function getDefaultSelectionValue(node: StateNodeLike): StateValue {
+  if (node.type === 'atomic' || node.type === 'final' || node.type === 'history') {
+    return node.key
+  }
+
+  return getDefaultStateValue(node)
+}
+
+function getExistingChildValue(value: unknown, childKey: string): StateValue | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  return (value as Record<string, StateValue>)[childKey]
+}
+
+function getPathToRoot(target: StateNodeLike, root: StateNodeLike): StateNodeLike[] {
+  const path: StateNodeLike[] = []
+  let current: StateNodeLike | undefined = target
+
+  while (current) {
+    path.unshift(current)
+    if (current.id === root.id) return path
+    current = current.parent
+  }
+
+  throw new Error(`State node '${target.id}' is not part of machine '${root.id}'`)
+}
+
+function buildTargetStateValue(
+  node: StateNodeLike,
+  path: StateNodeLike[],
+  currentValue: unknown,
+): StateValue {
+  const [, ...restPath] = path
+
+  if (restPath.length === 0) {
+    if (node.type === 'parallel') {
+      const next: Record<string, StateValue> = {}
+      for (const child of Object.values(node.states ?? {})) {
+        next[child.key] =
+          getExistingChildValue(currentValue, child.key) ?? getDefaultSelectionValue(child)
+      }
+      return next
+    }
+
+    if (node.type === 'compound') {
+      return getDefaultStateValue(node)
+    }
+
+    return node.key
+  }
+
+  const child = restPath[0]
+  if (node.type === 'parallel') {
+    const next: Record<string, StateValue> = {}
+    for (const sibling of Object.values(node.states ?? {})) {
+      if (sibling.key === child.key) {
+        next[sibling.key] = buildTargetStateValue(
+          sibling,
+          restPath,
+          getExistingChildValue(currentValue, sibling.key),
+        )
+      } else {
+        next[sibling.key] =
+          getExistingChildValue(currentValue, sibling.key) ?? getDefaultSelectionValue(sibling)
+      }
+    }
+    return next
+  }
+
+  const childValue = buildTargetStateValue(
+    child,
+    restPath,
+    getExistingChildValue(currentValue, child.key),
+  )
+  return encodeChildValue(child, childValue)
+}
+
+function setActiveState(actorRef: AnyActorRef, stateNodeId: string): void {
+  const mutableActorRef = actorRef as MutableActorRef
+  const machine = mutableActorRef.logic
+  if (!machine?.getStateNodeById || !machine.resolveState || typeof mutableActorRef.update !== 'function') {
+    throw new Error('Actor does not expose machine state mutation internals')
+  }
+
+  const currentSnapshot = actorRef.getSnapshot() as {
+    value: unknown
+    context?: unknown
+    status?: string
+    output?: unknown
+    error?: unknown
+    historyValue?: unknown
+  }
+  const targetNode = machine.getStateNodeById(stateNodeId)
+  const path = getPathToRoot(targetNode, machine.root)
+  const targetValue = buildTargetStateValue(machine.root, path, currentSnapshot?.value)
+
+  const nextSnapshot = machine.resolveState({
+    value: targetValue,
+    context: currentSnapshot?.context,
+    status: currentSnapshot?.status,
+    output: currentSnapshot?.output,
+    error: currentSnapshot?.error,
+    historyValue: currentSnapshot?.historyValue,
+  })
+
+  mutableActorRef.update(nextSnapshot, {
+    type: 'xstate.devtools.set-active-state',
+    stateNodeId,
+  })
 }
 
 // Cached on globalThis so HMR re-evaluating this module doesn't reset the
@@ -209,6 +374,34 @@ export function createInspector(transport: Transport, source: Source) {
           knownActors: actorRefs.size,
         })
       }
+      return
+    }
+    if (message.type === 'XSTATE_SET_ACTIVE_STATE') {
+      const local = stripIfMine(message.sessionId)
+      if (local === null) {
+        debugLog(source, 'ignoring state activation for different source', summarizeMessage(message))
+        return
+      }
+
+      const ref = actorRefs.get(local)
+      if (!ref) {
+        warnLog(source, 'received state activation for unknown actor', {
+          sessionId: local,
+          knownActors: actorRefs.size,
+        })
+        return
+      }
+
+      try {
+        debugLog(source, 'setting active state on actor', summarizeMessage(message))
+        setActiveState(ref, message.stateNodeId)
+      } catch (error) {
+        warnLog(source, 'failed to set active state', {
+          error,
+          sessionId: local,
+          stateNodeId: message.stateNodeId,
+        })
+      }
     }
   })
 
@@ -258,7 +451,7 @@ export function createInspector(transport: Transport, source: Source) {
       const message: PageToExtensionMessage = {
         type: 'XSTATE_EVENT',
         sessionId: tag(inspectionEvent.actorRef.sessionId),
-        event: inspectionEvent.event,
+        event: sanitize(inspectionEvent.event),
         snapshotAfter: safeSerializeSnapshot(inspectionEvent.actorRef),
         timestamp: Date.now(),
         globalSeq: nextSeq(),

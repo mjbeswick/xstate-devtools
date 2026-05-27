@@ -1,6 +1,6 @@
 // packages/extension/src/panel/components/Layout.tsx
 import type React from 'react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { PanelCollapseContext } from '../panel-collapse-context.js'
@@ -9,7 +9,49 @@ import { ActorList } from './ActorList.js'
 import { EventLog } from './EventLog.js'
 import { History } from './Icons.js'
 import { MachineTree } from './MachineTree.js'
+import { SelectedEventPanel } from './SelectedEventPanel.js'
 import { SidePanel } from './SidePanel.js'
+
+const PANEL_COLLAPSE_LEFT_KEY = 'xstate-devtools.panel.leftCollapsed'
+const PANEL_COLLAPSE_RIGHT_KEY = 'xstate-devtools.panel.rightCollapsed'
+const PANEL_COLLAPSE_SELECTED_EVENT_KEY = 'xstate-devtools.panel.selectedEventCollapsed'
+const PANEL_COLLAPSE_BOTTOM_KEY = 'xstate-devtools.panel.bottomCollapsed'
+
+const DEFAULT_PANEL_COLLAPSE_STATE = {
+  leftCollapsed: false,
+  rightCollapsed: false,
+  selectedEventCollapsed: false,
+  bottomCollapsed: false,
+}
+
+export function getInitialPanelCollapseState(
+  storage: Pick<Storage, 'getItem'> | null | undefined,
+): typeof DEFAULT_PANEL_COLLAPSE_STATE {
+  try {
+    return {
+      leftCollapsed: storage?.getItem(PANEL_COLLAPSE_LEFT_KEY) === '1',
+      rightCollapsed: storage?.getItem(PANEL_COLLAPSE_RIGHT_KEY) === '1',
+      selectedEventCollapsed: storage?.getItem(PANEL_COLLAPSE_SELECTED_EVENT_KEY) === '1',
+      bottomCollapsed: storage?.getItem(PANEL_COLLAPSE_BOTTOM_KEY) === '1',
+    }
+  } catch {
+    return DEFAULT_PANEL_COLLAPSE_STATE
+  }
+}
+
+function persistPanelCollapseState(
+  storage: Pick<Storage, 'setItem'> | null | undefined,
+  state: typeof DEFAULT_PANEL_COLLAPSE_STATE,
+) {
+  try {
+    storage?.setItem(PANEL_COLLAPSE_LEFT_KEY, state.leftCollapsed ? '1' : '0')
+    storage?.setItem(PANEL_COLLAPSE_RIGHT_KEY, state.rightCollapsed ? '1' : '0')
+    storage?.setItem(PANEL_COLLAPSE_SELECTED_EVENT_KEY, state.selectedEventCollapsed ? '1' : '0')
+    storage?.setItem(PANEL_COLLAPSE_BOTTOM_KEY, state.bottomCollapsed ? '1' : '0')
+  } catch {
+    // Ignore storage failures so the panel still works in restricted environments.
+  }
+}
 
 // Thin Chrome-DevTools-style dividers: 1px visible border with a wider
 // invisible hit area for easier grabbing.
@@ -36,16 +78,37 @@ export function Layout() {
 
   const actorListRef = useRef<ImperativePanelHandle>(null)
   const sideRef = useRef<ImperativePanelHandle>(null)
+  const selectedEventRef = useRef<ImperativePanelHandle>(null)
   const logRef = useRef<ImperativePanelHandle>(null)
+  // Prevents onResize feedback loops when syncing the two right panels.
+  const syncingRightRef = useRef(false)
 
-  const [leftCollapsed, setLeftCollapsed] = useState(false)
-  const [rightCollapsed, setRightCollapsed] = useState(false)
-  const [bottomCollapsed, setBottomCollapsed] = useState(false)
+  const initialCollapseState = useMemo(
+    () => getInitialPanelCollapseState(typeof localStorage === 'undefined' ? null : localStorage),
+    [],
+  )
+
+  const [leftCollapsed, setLeftCollapsed] = useState(initialCollapseState.leftCollapsed)
+  const [rightCollapsed, setRightCollapsed] = useState(initialCollapseState.rightCollapsed)
+  const [selectedEventCollapsed, setSelectedEventCollapsed] = useState(
+    initialCollapseState.selectedEventCollapsed,
+  )
+  const [bottomCollapsed, setBottomCollapsed] = useState(initialCollapseState.bottomCollapsed)
+
+  useEffect(() => {
+    persistPanelCollapseState(typeof localStorage === 'undefined' ? null : localStorage, {
+      leftCollapsed,
+      rightCollapsed,
+      selectedEventCollapsed,
+      bottomCollapsed,
+    })
+  }, [leftCollapsed, rightCollapsed, selectedEventCollapsed, bottomCollapsed])
 
   const collapseControls = useMemo(
     () => ({
       leftCollapsed,
       rightCollapsed,
+      selectedEventCollapsed,
       bottomCollapsed,
       toggleLeft: () => {
         const ref = actorListRef.current
@@ -59,6 +122,12 @@ export function Layout() {
         if (ref.isCollapsed()) ref.expand()
         else ref.collapse()
       },
+      toggleSelectedEvent: () => {
+        const ref = selectedEventRef.current
+        if (!ref) return
+        if (ref.isCollapsed()) ref.expand()
+        else ref.collapse()
+      },
       toggleBottom: () => {
         const ref = logRef.current
         if (!ref) return
@@ -66,7 +135,7 @@ export function Layout() {
         else ref.collapse()
       },
     }),
-    [leftCollapsed, rightCollapsed, bottomCollapsed],
+    [leftCollapsed, rightCollapsed, selectedEventCollapsed, bottomCollapsed],
   )
 
   return (
@@ -79,16 +148,17 @@ export function Layout() {
             style={{
               background: '#fffbe6',
               borderBottom: '1px solid #ffe58f',
-              padding: '4px 10px',
-              minHeight: 30,
+              height: 32,
+              padding: '0 8px',
               boxSizing: 'border-box',
               display: 'flex',
               alignItems: 'center',
-              gap: 8,
+              gap: 10,
               fontSize: 12,
+              flexShrink: 0,
             }}
           >
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, lineHeight: 1 }}>
               <History size={14} />
               Time travel — seq {timeTravelSeq}
             </span>
@@ -97,13 +167,14 @@ export function Layout() {
               style={{
                 marginLeft: 'auto',
                 cursor: 'pointer',
-                padding: '2px 10px',
+                padding: '3px 10px',
                 fontSize: 11,
-                lineHeight: 1.4,
+                fontFamily: 'inherit',
                 background: '#fff',
                 color: '#444',
                 border: '1px solid #d9d9d9',
                 borderRadius: 4,
+                verticalAlign: 'middle',
               }}
             >
               Back to live
@@ -139,6 +210,13 @@ export function Layout() {
                 collapsedSize={0}
                 onCollapse={() => setRightCollapsed(true)}
                 onExpand={() => setRightCollapsed(false)}
+                onResize={(size) => {
+                  if (size <= 0) return
+                  if (syncingRightRef.current) return
+                  syncingRightRef.current = true
+                  selectedEventRef.current?.resize(size)
+                  syncingRightRef.current = false
+                }}
                 style={{ overflow: 'auto' }}
               >
                 {!rightCollapsed && <SidePanel />}
@@ -156,7 +234,35 @@ export function Layout() {
             onExpand={() => setBottomCollapsed(false)}
             style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
           >
-            <EventLog collapsed={bottomCollapsed} onExpand={() => logRef.current?.expand()} />
+            {bottomCollapsed ? (
+              <EventLog collapsed onExpand={() => logRef.current?.expand()} />
+            ) : (
+              <PanelGroup direction="horizontal" style={{ height: '100%' }}>
+                <Panel defaultSize={70} minSize={30} style={{ overflow: 'hidden' }}>
+                  <EventLog onExpand={() => logRef.current?.expand()} />
+                </Panel>
+                <PanelResizeHandle style={dividerStyle} />
+                <Panel
+                  ref={selectedEventRef}
+                  defaultSize={25}
+                  minSize={15}
+                  collapsible
+                  collapsedSize={0}
+                  onCollapse={() => setSelectedEventCollapsed(true)}
+                  onExpand={() => setSelectedEventCollapsed(false)}
+                  onResize={(size) => {
+                    if (size <= 0) return
+                    if (syncingRightRef.current) return
+                    syncingRightRef.current = true
+                    sideRef.current?.resize(size)
+                    syncingRightRef.current = false
+                  }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  {!selectedEventCollapsed && <SelectedEventPanel />}
+                </Panel>
+              </PanelGroup>
+            )}
           </Panel>
         </PanelGroup>
       </div>

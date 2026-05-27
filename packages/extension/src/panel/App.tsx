@@ -9,21 +9,11 @@ import type {
 import { Layout } from './components/Layout.js'
 import { DispatchContext } from './port-context.js'
 import { ServerControlsContext } from './server-context.js'
+import { setBackgroundPort } from './open-source.js'
 import { useStore } from './store.js'
 
 const SERVER_URL_KEY = 'xstate-devtools.serverUrl'
 const DEFAULT_SERVER_URL = 'ws://localhost:9301'
-
-export function getInitialServerEnabled(
-  storage: Pick<Storage, 'getItem'> | null | undefined,
-): boolean {
-  try {
-    const stored = storage?.getItem(`${SERVER_URL_KEY}.enabled`)
-    return stored === null || stored === undefined ? true : stored === '1'
-  } catch {
-    return true
-  }
-}
 
 const PAGE_MESSAGE_TYPES = new Set([
   'XSTATE_ACTOR_REGISTERED',
@@ -34,6 +24,34 @@ const PAGE_MESSAGE_TYPES = new Set([
   'XSTATE_ADAPTER_READY',
 ])
 
+const BROWSER_RECONNECT_WARN_ATTEMPTS = 5
+const BROWSER_RECONNECT_WARN_ELAPSED_MS = 10_000
+
+export interface BrowserReconnectFailureState {
+  startedAt: number
+  attempts: number
+  warned: boolean
+}
+
+export function registerBrowserReconnectFailure(
+  previous: BrowserReconnectFailureState | null,
+  now: number,
+): { next: BrowserReconnectFailureState; shouldWarn: boolean; elapsedMs: number } {
+  const next: BrowserReconnectFailureState = previous
+    ? { ...previous, attempts: previous.attempts + 1 }
+    : { startedAt: now, attempts: 1, warned: false }
+
+  const elapsedMs = Math.max(0, now - next.startedAt)
+  const thresholdReached =
+    next.attempts >= BROWSER_RECONNECT_WARN_ATTEMPTS ||
+    elapsedMs >= BROWSER_RECONNECT_WARN_ELAPSED_MS
+  const shouldWarn = !next.warned && thresholdReached
+
+  if (shouldWarn) next.warned = true
+
+  return { next, shouldWarn, elapsedMs }
+}
+
 function asPageMessage(data: unknown): PageToExtensionMessage | null {
   if (!data || typeof data !== 'object') return null
   const type = (data as { type?: unknown }).type
@@ -41,8 +59,46 @@ function asPageMessage(data: unknown): PageToExtensionMessage | null {
   return data as PageToExtensionMessage
 }
 
+export function shouldResetBrowserStateOnFirstMessage(
+  message: PageToExtensionMessage,
+  actorCount: number,
+  awaitingFirstMessage: boolean,
+): boolean {
+  return awaitingFirstMessage && actorCount > 0 && message.type !== 'XSTATE_PAGE_NAVIGATED'
+}
+
+export function shouldResetPanelAfterNavigation(
+  message: PageToExtensionMessage,
+  pendingNavigationReset: boolean,
+): boolean {
+  return (
+    pendingNavigationReset &&
+    message.type !== 'XSTATE_PAGE_NAVIGATED' &&
+    message.type !== 'XSTATE_ADAPTER_READY'
+  )
+}
+
+export function getBrowserTransportStatus(
+  portConnected: boolean,
+  browserMsgCount: number,
+  serverStatus: 'idle' | 'connecting' | 'open' | 'closed' | 'error',
+): 'disconnected' | 'waiting' | 'connected' {
+  const browserConnected = portConnected && browserMsgCount > 0
+  const serverConnected = serverStatus === 'open'
+
+  if (browserConnected || serverConnected) return 'connected'
+
+  if (!portConnected && !serverConnected) return 'disconnected'
+  if (serverStatus === 'closed' || serverStatus === 'error') {
+    return 'disconnected'
+  }
+
+  return 'waiting'
+}
+
 export function App() {
   const handleMessage = useStore((s) => s.handleMessage)
+  const resetPanel = useStore((s) => s.resetPanel)
   const setPortConnectedInStore = useStore((s) => s.setPortConnected)
   const portRef = useRef<chrome.runtime.Port | null>(null)
 
@@ -61,6 +117,20 @@ export function App() {
   // worker is killed and the port drops.
   const [reconnectKey, setReconnectKey] = useState(0)
   const reconnectTimerRef = useRef<number | null>(null)
+  const awaitingBrowserFirstMessageRef = useRef(true)
+  const pendingNavigationResetRef = useRef(false)
+  const intentionalDisconnectPortRef = useRef<chrome.runtime.Port | null>(null)
+  const browserReconnectFailureRef = useRef<BrowserReconnectFailureState | null>(null)
+
+  const resetPanelState = useCallback(
+    (reason: 'page-navigated' | 'browser-resync') => {
+      panelSeqRef.current = 0
+      setBrowserMsgCount(0)
+      resetPanel()
+      infoLog('panel', 'reset panel state', { reason })
+    },
+    [resetPanel],
+  )
 
   /**
    * Rewrite each incoming message's globalSeq to a panel-monotonic value.
@@ -71,9 +141,18 @@ export function App() {
   const ingest = useCallback(
     (message: PageToExtensionMessage) => {
       if (message.type === 'XSTATE_PAGE_NAVIGATED') {
-        console.log('[xstate-devtools:panel] page navigated — clearing actor store')
-        handleMessage(message)
+        console.log('[xstate-devtools:panel] page navigated — preserving state until resync')
+        pendingNavigationResetRef.current = true
+        const currentPort = portRef.current
+        if (currentPort) {
+          intentionalDisconnectPortRef.current = currentPort
+          setReconnectKey((key) => key + 1)
+        }
         return
+      }
+      if (shouldResetPanelAfterNavigation(message, pendingNavigationResetRef.current)) {
+        resetPanelState('page-navigated')
+        pendingNavigationResetRef.current = false
       }
       panelSeqRef.current += 1
       const seq = panelSeqRef.current
@@ -91,7 +170,7 @@ export function App() {
         handleMessage(message)
       }
     },
-    [handleMessage],
+    [handleMessage, resetPanelState],
   )
 
   const [serverUrl, setServerUrl] = useState<string>(() => {
@@ -101,12 +180,9 @@ export function App() {
       return DEFAULT_SERVER_URL
     }
   })
-  const [serverEnabled, setServerEnabled] = useState<boolean>(() => {
-    return getInitialServerEnabled(typeof localStorage === 'undefined' ? null : localStorage)
-  })
   const [serverStatus, setServerStatus] = useState<
     'idle' | 'connecting' | 'open' | 'closed' | 'error'
-  >('idle')
+  >('connecting')
   const [portConnected, setPortConnected] = useState(false)
   const [browserMsgCount, setBrowserMsgCount] = useState(0)
 
@@ -122,16 +198,38 @@ export function App() {
   // Browser transport — content-script port
   useEffect(() => {
     const tabId = chrome.devtools.inspectedWindow.tabId
+    awaitingBrowserFirstMessageRef.current = true
+    pendingNavigationResetRef.current = false
     infoLog('panel', 'connecting to background port', { tabId, reconnectKey })
     const p = chrome.runtime.connect({ name: `xstate-panel-${tabId}` })
+    setBackgroundPort(p)
     portRef.current = p
     setPortConnected(true)
     setPortConnectedInStore(true)
     infoLog('panel', 'connected to background port', { tabId, portName: p.name })
+    if (browserReconnectFailureRef.current) {
+      const { attempts, startedAt } = browserReconnectFailureRef.current
+      infoLog('panel', 'background port reconnected after failures', {
+        tabId,
+        attempts,
+        elapsedMs: Math.max(0, Date.now() - startedAt),
+      })
+      browserReconnectFailureRef.current = null
+    }
 
     p.onMessage.addListener((message: MarkedPageMessage | PageToExtensionMessage) => {
       const normalized = asPageMessage(message)
       if (!normalized) return
+      if (
+        shouldResetBrowserStateOnFirstMessage(
+          normalized,
+          useStore.getState().actors.size,
+          awaitingBrowserFirstMessageRef.current,
+        )
+      ) {
+        resetPanelState('browser-resync')
+      }
+      awaitingBrowserFirstMessageRef.current = false
       debugLog('panel', 'received message from browser transport', summarizeMessage(normalized))
       setBrowserMsgCount((n) => {
         if (n === 0)
@@ -143,15 +241,33 @@ export function App() {
         return n + 1
       })
       ingest(normalized)
+      awaitingBrowserFirstMessageRef.current = normalized.type === 'XSTATE_PAGE_NAVIGATED'
     })
 
     p.onDisconnect.addListener(() => {
+      if (intentionalDisconnectPortRef.current === p) {
+        intentionalDisconnectPortRef.current = null
+        infoLog('panel', 'background port disconnected for intentional reconnect', {
+          tabId,
+          portName: p.name,
+        })
+        return
+      }
       setPortConnected(false)
       setPortConnectedInStore(false)
-      infoLog('panel', 'background port disconnected; scheduling reconnect', {
-        tabId,
-        portName: p.name,
-      })
+      const { next, shouldWarn, elapsedMs } = registerBrowserReconnectFailure(
+        browserReconnectFailureRef.current,
+        Date.now(),
+      )
+      browserReconnectFailureRef.current = next
+      if (shouldWarn) {
+        warnLog('panel', 'background port reconnect still failing', {
+          tabId,
+          attempts: next.attempts,
+          elapsedMs,
+          portName: p.name,
+        })
+      }
       // Auto-reconnect: the MV3 service worker can be killed at any time.
       // Reconnecting re-triggers the resync flow so the panel stays populated.
       reconnectTimerRef.current = window.setTimeout(() => {
@@ -165,23 +281,20 @@ export function App() {
         clearTimeout(reconnectTimerRef.current)
         reconnectTimerRef.current = null
       }
+      awaitingBrowserFirstMessageRef.current = true
+      pendingNavigationResetRef.current = false
+      browserReconnectFailureRef.current = null
       infoLog('panel', 'disconnecting background port', { tabId, portName: p.name })
+      intentionalDisconnectPortRef.current = p
       p.disconnect()
       portRef.current = null
       setPortConnected(false)
       setPortConnectedInStore(false)
     }
-  }, [ingest, setPortConnectedInStore, reconnectKey])
+  }, [ingest, setPortConnectedInStore, reconnectKey, resetPanelState])
 
-  // Server transport — WebSocket to user-supplied endpoint
+  // Server transport — WebSocket to user-supplied endpoint (always enabled)
   useEffect(() => {
-    if (!serverEnabled) {
-      wsRef.current?.close()
-      wsRef.current = null
-      setServerStatus('idle')
-      return
-    }
-
     let ws: WebSocket
     let reconnectTimer: number | null = null
     let cancelled = false
@@ -244,7 +357,7 @@ export function App() {
       ws?.close()
       wsRef.current = null
     }
-  }, [serverEnabled, serverUrl, ingest])
+  }, [serverUrl, ingest])
 
   const dispatch = useCallback((message: ExtensionToPageMessage) => {
     // Broadcast to all transports — receivers ignore unknown sessionIds.
@@ -260,14 +373,6 @@ export function App() {
     }
   }, [])
 
-  const onToggleServer = (enabled: boolean) => {
-    setServerEnabled(enabled)
-    try {
-      localStorage.setItem(`${SERVER_URL_KEY}.enabled`, enabled ? '1' : '0')
-    } catch {
-      /* noop */
-    }
-  }
   const onSetServerUrl = (url: string) => {
     setServerUrl(url)
     try {
@@ -281,177 +386,13 @@ export function App() {
     <DispatchContext.Provider value={dispatch}>
       <ServerControlsContext.Provider
         value={{
-          enabled: serverEnabled,
           url: serverUrl,
           status: serverStatus,
-          onToggle: onToggleServer,
           onUrlChange: onSetServerUrl,
         }}
       >
-        <ServerStatusBar
-          portConnected={portConnected}
-          browserMsgCount={browserMsgCount}
-          enabled={serverEnabled}
-          url={serverUrl}
-          status={serverStatus}
-          onToggle={onToggleServer}
-          onUrlChange={onSetServerUrl}
-        />
         <Layout />
       </ServerControlsContext.Provider>
     </DispatchContext.Provider>
-  )
-}
-
-function ServerStatusBar({
-  portConnected,
-  browserMsgCount,
-  enabled,
-  url,
-  status,
-  onToggle,
-  onUrlChange,
-}: {
-  portConnected: boolean
-  browserMsgCount: number
-  enabled: boolean
-  url: string
-  status: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
-  onToggle: (v: boolean) => void
-  onUrlChange: (v: string) => void
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(url)
-
-  const dot =
-    status === 'open'
-      ? '#52c41a'
-      : status === 'connecting'
-        ? '#faad14'
-        : status === 'error'
-          ? '#ff4d4f'
-          : '#d9d9d9'
-
-  return (
-    <div
-      style={{
-        borderBottom: '1px solid #eee',
-        background: '#fafafa',
-        padding: '4px 12px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        fontSize: 11,
-        flexShrink: 0,
-      }}
-    >
-      {/* Browser transport indicator */}
-      <span
-        style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-        title={
-          portConnected
-            ? `Browser transport connected (${browserMsgCount} messages received)`
-            : 'Browser transport disconnected'
-        }
-      >
-        <span
-          style={{
-            display: 'inline-block',
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            background: portConnected ? '#52c41a' : '#ff4d4f',
-            flexShrink: 0,
-          }}
-        />
-        <span style={{ color: portConnected ? '#389e0d' : '#cf1322' }}>
-          {portConnected
-            ? `Connected${browserMsgCount > 0 ? ` · ${browserMsgCount} msg` : ''}`
-            : 'Disconnected'}
-        </span>
-      </span>
-      <span style={{ color: '#ddd' }}>|</span>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => onToggle(e.target.checked)}
-          style={{ margin: 0 }}
-        />
-        Server adapter
-      </label>
-      {enabled && (
-        <>
-          <span
-            style={{
-              display: 'inline-block',
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: dot,
-            }}
-            title={status}
-          />
-          {editing ? (
-            <>
-              <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    onUrlChange(draft)
-                    setEditing(false)
-                  }
-                  if (e.key === 'Escape') {
-                    setDraft(url)
-                    setEditing(false)
-                  }
-                }}
-                style={{
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  padding: '1px 6px',
-                  border: '1px solid #d9d9d9',
-                  borderRadius: 4,
-                  width: 240,
-                }}
-              />
-              <button
-                onClick={() => {
-                  onUrlChange(draft)
-                  setEditing(false)
-                }}
-                style={{ fontSize: 11 }}
-              >
-                Save
-              </button>
-              <button
-                onClick={() => {
-                  setDraft(url)
-                  setEditing(false)
-                }}
-                style={{ fontSize: 11 }}
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <code style={{ fontSize: 11 }}>{url}</code>
-              <button
-                onClick={() => {
-                  setDraft(url)
-                  setEditing(true)
-                }}
-                style={{ fontSize: 11 }}
-              >
-                Edit
-              </button>
-            </>
-          )}
-          <span style={{ color: '#999', marginLeft: 'auto' }}>status: {status}</span>
-        </>
-      )}
-    </div>
   )
 }

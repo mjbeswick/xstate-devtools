@@ -1,9 +1,13 @@
 // packages/extension/src/panel/components/SidePanel.tsx
 import { useCallback, useState } from 'react'
 import type { SerializedStateNode, SerializedTransition } from '../../shared/types.js'
+import { getActiveNodeIds } from '../active-nodes.js'
+import { PanelContextMenu, copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
+import { openSourceLocation } from '../open-source.js'
 import { useDispatch } from '../port-context.js'
 import { getDisplaySnapshot, useStore } from '../store.js'
 import { AccordionSection } from './Accordion.js'
+import { ChevronRight } from './Icons.js'
 import { JsonView } from './JsonView.js'
 
 function findNode(root: SerializedStateNode, id: string): SerializedStateNode | null {
@@ -15,36 +19,67 @@ function findNode(root: SerializedStateNode, id: string): SerializedStateNode | 
   return null
 }
 
+function sortTransitions(transitions: SerializedTransition[]): SerializedTransition[] {
+  return [...transitions].sort((left, right) => {
+    const leftLabel = left.eventType || '(always)'
+    const rightLabel = right.eventType || '(always)'
+    const byLabel = leftLabel.localeCompare(rightLabel)
+    if (byLabel !== 0) return byLabel
+
+    const leftTargets = left.targets.join(',')
+    const rightTargets = right.targets.join(',')
+    const byTargets = leftTargets.localeCompare(rightTargets)
+    if (byTargets !== 0) return byTargets
+
+    return (left.guard || '').localeCompare(right.guard || '')
+  })
+}
+
 function TransitionRow({
   transition,
   onSend,
+  onOpenContextMenu,
 }: {
   transition: SerializedTransition
   onSend: (eventType: string) => void
+  onOpenContextMenu: (event: React.MouseEvent, transition: SerializedTransition) => void
 }) {
   return (
     <div
+      onContextMenu={(event) => onOpenContextMenu(event, transition)}
       style={{
         padding: '5px 0',
         borderBottom: '1px solid #f0f0f0',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: 8,
+        minWidth: 0,
       }}
     >
-      <div>
-        <div style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 600 }}>
+      <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+        <div
+          style={{
+            fontFamily: 'monospace',
+            fontSize: 12,
+            fontWeight: 600,
+            overflowWrap: 'anywhere',
+          }}
+        >
           {transition.eventType || '(always)'}
         </div>
-        <div style={{ fontSize: 10, color: '#888', marginTop: 2 }}>
+        <div style={{ fontSize: 10, color: '#888', marginTop: 2, overflowWrap: 'anywhere' }}>
           {transition.targets.length > 0 && (
-            <>→ {transition.targets.map((t) => t.split('.').pop()).join(', ')}</>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <ChevronRight size={10} color="#888" />
+              <span>{transition.targets.map((t) => t.split('.').pop()).join(', ')}</span>
+            </span>
           )}
           {transition.guard && <> [if: {transition.guard}]</>}
         </div>
       </div>
       {transition.eventType && (
         <button
+          type="button"
           onClick={() => onSend(transition.eventType)}
           style={{
             padding: '2px 8px',
@@ -54,6 +89,7 @@ function TransitionRow({
             color: '#fff',
             border: 'none',
             borderRadius: 4,
+            flexShrink: 0,
           }}
         >
           Send
@@ -64,6 +100,7 @@ function TransitionRow({
 }
 
 export function SidePanel() {
+  const contextMenu = usePanelContextMenu()
   const selectedActorId = useStore((s) => s.selectedActorId)
   const selectedStateNodeId = useStore((s) => s.selectedStateNodeId)
   const actors = useStore((s) => s.actors)
@@ -80,6 +117,11 @@ export function SidePanel() {
   const actor = selectedActorId ? actors.get(selectedActorId) : null
   const node =
     actor?.machine && selectedStateNodeId ? findNode(actor.machine.root, selectedStateNodeId) : null
+  const activeIds =
+    actor?.machine && snapshot ? getActiveNodeIds(snapshot.value as any, actor.machine.root) : new Set()
+  const selectedNodeIsActive = node ? activeIds.has(node.id) : false
+  const sortedOnTransitions = node ? sortTransitions(node.on) : []
+  const sortedAlwaysTransitions = node ? sortTransitions(node.always) : []
 
   const dispatch = useCallback(
     (eventType: string) => {
@@ -99,6 +141,41 @@ export function SidePanel() {
       })
     },
     [selectedActorId, payloadJson, dispatch_],
+  )
+
+  const setActiveState = useCallback(() => {
+    if (!selectedActorId || !node) return
+    dispatch_({
+      type: 'XSTATE_SET_ACTIVE_STATE',
+      sessionId: selectedActorId,
+      stateNodeId: node.id,
+    })
+  }, [dispatch_, node, selectedActorId])
+
+  const openTransitionMenu = useCallback(
+    (event: React.MouseEvent, transition: SerializedTransition) => {
+      contextMenu.openMenu(event, [
+        {
+          label: transition.eventType ? 'Send event' : 'Send event',
+          disabled: !transition.eventType,
+          onSelect: () => {
+            if (transition.eventType) dispatch(transition.eventType)
+          },
+        },
+        {
+          label: 'Copy transition JSON',
+          onSelect: () => void copyTextToClipboard(JSON.stringify(transition, null, 2)),
+        },
+        {
+          label: 'Copy event type',
+          disabled: !transition.eventType,
+          onSelect: () => {
+            if (transition.eventType) void copyTextToClipboard(transition.eventType)
+          },
+        },
+      ])
+    },
+    [contextMenu, dispatch],
   )
 
   if (!actor) {
@@ -131,16 +208,46 @@ export function SidePanel() {
           )
         }
       >
-        {node && node.on.length > 0 ? (
+        {node && (
+          <div style={{ marginBottom: 8 }}>
+            <button
+              type="button"
+              onClick={setActiveState}
+              disabled={selectedNodeIsActive}
+              style={{
+                padding: '4px 10px',
+                fontSize: 11,
+                cursor: selectedNodeIsActive ? 'default' : 'pointer',
+                background: selectedNodeIsActive ? '#f5f5f5' : '#722ed1',
+                color: selectedNodeIsActive ? '#8c8c8c' : '#fff',
+                border: 'none',
+                borderRadius: 4,
+              }}
+            >
+              {selectedNodeIsActive ? 'Active' : 'Set active'}
+            </button>
+          </div>
+        )}
+        {node && (sortedOnTransitions.length > 0 || sortedAlwaysTransitions.length > 0) ? (
           <>
-            {node.on.map((t, i) => (
-              <TransitionRow key={i} transition={t} onSend={dispatch} />
+            {sortedOnTransitions.map((t, i) => (
+              <TransitionRow
+                key={`${t.eventType || 'always'}:${t.targets.join(',')}:${t.guard || ''}:${i}`}
+                transition={t}
+                onSend={dispatch}
+                onOpenContextMenu={openTransitionMenu}
+              />
             ))}
-            {node.always.length > 0 && (
+            {sortedAlwaysTransitions.length > 0 && (
               <>
                 <div style={{ fontSize: 10, color: '#aaa', margin: '8px 0 4px' }}>ALWAYS</div>
-                {node.always.map((t, i) => (
-                  <TransitionRow key={i} transition={t} onSend={() => {}} />
+                {sortedAlwaysTransitions.map((t, i) => (
+                  <TransitionRow
+                    key={`${t.eventType || 'always'}:${t.targets.join(',')}:${t.guard || ''}:${i}`}
+                    transition={t}
+                    onSend={() => {}}
+                    onOpenContextMenu={openTransitionMenu}
+                  />
                 ))}
               </>
             )}
@@ -257,16 +364,40 @@ export function SidePanel() {
           {actor.machine?.sourceLocation && (
             <div>
               source:{' '}
-              <a
-                href={`vscode://file/${actor.machine.sourceLocation}`}
-                style={{ color: '#1890ff' }}
+              <button
+                type="button"
+                onContextMenu={(event) => {
+                  contextMenu.openMenu(event, [
+                    {
+                      label: 'Open source location',
+                      onSelect: () => openSourceLocation(actor.machine.sourceLocation),
+                    },
+                    {
+                      label: 'Copy source location',
+                      onSelect: () => void copyTextToClipboard(actor.machine.sourceLocation),
+                    },
+                  ])
+                }}
+                style={{
+                  color: '#1890ff',
+                  padding: 0,
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  font: 'inherit',
+                  textDecoration: 'underline',
+                }}
+                onClick={() => {
+                  openSourceLocation(actor.machine.sourceLocation)
+                }}
               >
                 {actor.machine.sourceLocation}
-              </a>
+              </button>
             </div>
           )}
         </div>
       </AccordionSection>
+      <PanelContextMenu menu={contextMenu.menu} onClose={contextMenu.closeMenu} />
     </div>
   )
 }

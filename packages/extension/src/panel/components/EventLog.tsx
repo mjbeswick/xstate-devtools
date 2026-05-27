@@ -1,7 +1,90 @@
 // packages/extension/src/panel/components/EventLog.tsx
-import { useEffect, useRef, useState } from 'react'
-import { useStore } from '../store.js'
-import { ChevronDown, ChevronUp } from './Icons.js'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { PanelContextMenu, copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
+import { usePanelCollapse } from '../panel-collapse-context.js'
+import { getEventSourceStateNodeId, useStore } from '../store.js'
+import { ClearLog, DisclosureTriangle, EventLog as EventLogIcon, PanelToggle } from './Icons.js'
+
+interface ScrollContainer {
+  scrollTop: number
+  scrollHeight: number
+}
+
+interface SyncEventLogScrollOptions {
+  autoScroll: boolean
+  collapsed: boolean
+  latestEventSeq: number | null
+  previousLatestEventSeq: number | null
+  previousScrollTop: number
+  timeTravelSeq: number | null
+}
+
+export function syncEventLogScroll(
+  container: ScrollContainer | null,
+  {
+    autoScroll,
+    collapsed,
+    latestEventSeq,
+    previousLatestEventSeq,
+    previousScrollTop,
+    timeTravelSeq,
+  }: SyncEventLogScrollOptions,
+) {
+  const hasNewEvents = latestEventSeq !== null && latestEventSeq !== previousLatestEventSeq
+
+  if (!container || collapsed || !hasNewEvents) {
+    return
+  }
+
+  if (!autoScroll || timeTravelSeq !== null) {
+    container.scrollTop = previousScrollTop
+    return
+  }
+
+  container.scrollTop = container.scrollHeight
+}
+
+interface EventFilterToken {
+  negated: boolean
+  value: string
+}
+
+function parseEventFilter(filter: string): EventFilterToken[] {
+  return filter
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .map((token) => {
+      const negated = token.startsWith('-') && token.length > 1
+
+      return {
+        negated,
+        value: (negated ? token.slice(1) : token).toLowerCase(),
+      }
+    })
+    .filter((token) => token.value.length > 0)
+}
+
+export function eventMatchesFilter(eventType: string, filter: string): boolean {
+  const tokens = parseEventFilter(filter)
+
+  if (tokens.length === 0) {
+    return true
+  }
+
+  const normalizedEventType = eventType.toLowerCase()
+  const positiveTokens = tokens.filter((token) => !token.negated)
+
+  if (tokens.some((token) => token.negated && normalizedEventType.includes(token.value))) {
+    return false
+  }
+
+  if (positiveTokens.length === 0) {
+    return true
+  }
+
+  return positiveTokens.every((token) => normalizedEventType.includes(token.value))
+}
 
 function formatTime(ts: number) {
   const d = new Date(ts)
@@ -13,26 +96,137 @@ interface Props {
   onExpand?: () => void
 }
 
+function HeaderIconButton({
+  onClick,
+  title,
+  children,
+}: {
+  onClick: () => void
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 22,
+        height: 22,
+        padding: 0,
+        background: 'transparent',
+        border: 'none',
+        borderRadius: 4,
+        cursor: 'pointer',
+        color: '#666',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = '#eee'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent'
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
 export function EventLog({ collapsed = false, onExpand }: Props = {}) {
+  const contextMenu = usePanelContextMenu()
+  const collapse = usePanelCollapse()
   const events = useStore((s) => s.events)
   const actors = useStore((s) => s.actors)
+  const loggingPaused = useStore((s) => s.loggingPaused)
+  const setLoggingPaused = useStore((s) => s.setLoggingPaused)
+  const clearEvents = useStore((s) => s.clearEvents)
   const timeTravelSeq = useStore((s) => s.timeTravelSeq)
   const timeTravel = useStore((s) => s.timeTravel)
   const selectActor = useStore((s) => s.selectActor)
+  const selectStateNode = useStore((s) => s.selectStateNode)
+  const registeredSnapshots = useStore((s) => s.registeredSnapshots)
 
   const [filter, setFilter] = useState('')
   const [autoScroll, setAutoScroll] = useState(true)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const previousLatestEventSeqRef = useRef<number | null>(null)
+  const previousScrollTopRef = useRef(0)
+  const latestEventSeq = events.at(-1)?.globalSeq ?? null
 
-  useEffect(() => {
-    if (!collapsed && autoScroll && timeTravelSeq === null) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [autoScroll, timeTravelSeq, collapsed])
+  useLayoutEffect(() => {
+    syncEventLogScroll(listRef.current, {
+      autoScroll,
+      collapsed,
+      latestEventSeq,
+      previousLatestEventSeq: previousLatestEventSeqRef.current,
+      previousScrollTop: previousScrollTopRef.current,
+      timeTravelSeq,
+    })
 
-  const filtered = filter
-    ? events.filter((e) => e.event.type.toLowerCase().includes(filter.toLowerCase()))
-    : events
+    previousLatestEventSeqRef.current = latestEventSeq
+  }, [autoScroll, collapsed, latestEventSeq, timeTravelSeq])
+
+  const filtered = filter ? events.filter((e) => eventMatchesFilter(e.event.type, filter)) : events
+
+  const openListContextMenu = (event: React.MouseEvent) => {
+    contextMenu.openMenu(event, [
+      {
+        label: 'Copy visible events JSON',
+        disabled: filtered.length === 0,
+        onSelect: () => {
+          if (filtered.length === 0) return
+          void copyTextToClipboard(JSON.stringify(filtered.map((evt) => evt.event), null, 2))
+        },
+      },
+      {
+        label: events.length === 0 ? 'No events to clear' : 'Clear all events',
+        disabled: events.length === 0,
+        onSelect: clearEvents,
+      },
+    ])
+  }
+
+  const openEventContextMenu = (event: React.MouseEvent, evt: (typeof events)[number]) => {
+    const isCurrent = evt.globalSeq === timeTravelSeq
+
+    contextMenu.openMenu(event, [
+      {
+        label: isCurrent ? 'Back to live' : 'Time travel to event',
+        onSelect: () => {
+          if (isCurrent) {
+            timeTravel(null)
+            return
+          }
+
+          const sourceStateNodeId = getEventSourceStateNodeId(
+            { actors, events, registeredSnapshots },
+            evt,
+          )
+          timeTravel(evt.globalSeq)
+          selectActor(evt.sessionId)
+          selectStateNode(sourceStateNodeId)
+          if (collapse.selectedEventCollapsed) {
+            collapse.toggleSelectedEvent()
+          }
+        },
+      },
+      {
+        label: 'Copy event JSON',
+        onSelect: () => void copyTextToClipboard(JSON.stringify(evt.event, null, 2)),
+      },
+      {
+        label: 'Copy event type',
+        onSelect: () => void copyTextToClipboard(evt.event.type),
+      },
+      {
+        label: 'Copy actor session id',
+        onSelect: () => void copyTextToClipboard(evt.sessionId),
+      },
+    ])
+  }
 
   if (collapsed) {
     return (
@@ -53,9 +247,16 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
         title="Show event log"
       >
         <span style={{ display: 'inline-flex', color: '#666' }}>
-          <ChevronUp size={14} />
+          <DisclosureTriangle
+            size={12}
+            color="#666"
+            style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}
+          />
         </span>
-        <span style={{ fontWeight: 600, fontSize: 11, color: '#666' }}>EVENTS</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <EventLogIcon size={12} color="#666" />
+          <span style={{ fontWeight: 600, fontSize: 11, color: '#666' }}>EVENTS</span>
+        </span>
         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#aaa' }}>{events.length}</span>
       </div>
     )
@@ -76,10 +277,15 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
           flexShrink: 0,
         }}
       >
-        <span style={{ display: 'inline-flex', color: '#666' }}>
-          <ChevronDown size={14} />
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontWeight: 600, fontSize: 11, color: '#666' }}>EVENTS</span>
         </span>
-        <span style={{ fontWeight: 600, fontSize: 11, color: '#666' }}>EVENTS</span>
+        <HeaderIconButton
+          onClick={clearEvents}
+          title={events.length === 0 ? 'No events to clear' : 'Clear all events'}
+        >
+          <ClearLog size={13} color={events.length === 0 ? '#bfbfbf' : '#666'} />
+        </HeaderIconButton>
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
@@ -97,6 +303,16 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
         >
           <input
             type="checkbox"
+            checked={loggingPaused}
+            onChange={(e) => setLoggingPaused(e.target.checked)}
+          />
+          Pause
+        </label>
+        <label
+          style={{ fontSize: 11, color: '#666', display: 'flex', alignItems: 'center', gap: 4 }}
+        >
+          <input
+            type="checkbox"
             checked={autoScroll}
             onChange={(e) => setAutoScroll(e.target.checked)}
           />
@@ -105,22 +321,56 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#aaa' }}>
           {events.length} events
         </span>
+        <HeaderIconButton
+          onClick={collapse.toggleSelectedEvent}
+          title={collapse.selectedEventCollapsed ? 'Show selected event' : 'Hide selected event'}
+        >
+          <PanelToggle side="right" collapsed={collapse.selectedEventCollapsed} />
+        </HeaderIconButton>
       </div>
 
-      <div style={{ flex: 1, overflow: 'auto', fontFamily: 'monospace', fontSize: 11 }}>
+      <div
+        ref={listRef}
+        onContextMenu={openListContextMenu}
+        onScroll={(event) => {
+          previousScrollTopRef.current = event.currentTarget.scrollTop
+        }}
+        style={{
+          flex: 1,
+          overflow: 'auto',
+          overflowAnchor: 'none',
+          fontFamily: 'monospace',
+          fontSize: 11,
+        }}
+      >
         {filtered.map((evt) => {
           const actorLabel = actors.get(evt.sessionId)?.machine?.id ?? evt.sessionId.slice(0, 12)
           const isCurrent = evt.globalSeq === timeTravelSeq
           return (
             <div
               key={evt.globalSeq}
+              onContextMenu={(event) => {
+                openEventContextMenu(event, evt)
+              }}
               onClick={() => {
+                if (isCurrent) {
+                  timeTravel(null)
+                  return
+                }
+                const sourceStateNodeId = getEventSourceStateNodeId(
+                  { actors, events, registeredSnapshots },
+                  evt,
+                )
                 timeTravel(evt.globalSeq)
                 selectActor(evt.sessionId)
+                selectStateNode(sourceStateNodeId)
+                if (collapse.selectedEventCollapsed) {
+                  collapse.toggleSelectedEvent()
+                }
               }}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '90px 120px 1fr 80px',
+                gridTemplateColumns: '90px 120px 1fr',
                 gap: 8,
                 padding: '3px 8px',
                 cursor: 'pointer',
@@ -141,12 +391,12 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
                 {actorLabel}
               </span>
               <span style={{ fontWeight: 600, color: '#003a8c' }}>{evt.event.type}</span>
-              <span style={{ color: '#8c8c8c', textAlign: 'right' }}>seq:{evt.globalSeq}</span>
             </div>
           )
         })}
-        <div ref={bottomRef} />
       </div>
+
+      <PanelContextMenu menu={contextMenu.menu} onClose={contextMenu.closeMenu} />
     </div>
   )
 }

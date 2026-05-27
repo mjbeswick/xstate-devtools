@@ -1,12 +1,14 @@
 // Chrome-DevTools-style stacked accordion section.
 import type React from 'react'
 import { useState } from 'react'
-import { ChevronDown, ChevronRight } from './Icons.js'
+import { DisclosureTriangle } from './Icons.js'
 
 export interface AccordionSectionProps {
   title: React.ReactNode
   /** Inline action buttons rendered on the right of the header. */
   actions?: React.ReactNode
+  /** Whether to render the header's top border. Defaults to true. */
+  showTopBorder?: boolean
   /** Default expanded? Defaults to true. */
   defaultOpen?: boolean
   /** Controlled expanded state — if provided, ignores internal state. */
@@ -18,6 +20,7 @@ export interface AccordionSectionProps {
 export function AccordionSection({
   title,
   actions,
+  showTopBorder = true,
   defaultOpen = true,
   open,
   onOpenChange,
@@ -45,11 +48,11 @@ export function AccordionSection({
           color: '#444',
           cursor: 'pointer',
           userSelect: 'none',
-          borderTop: '1px solid #e8e8e8',
+          borderTop: showTopBorder ? '1px solid #e8e8e8' : 'none',
         }}
       >
         <span style={{ display: 'inline-flex', color: '#888', width: 14 }}>
-          {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          <DisclosureTriangle expanded={isOpen} size={12} color="#888" />
         </span>
         <span style={{ flex: 1 }}>{title}</span>
         {actions && (

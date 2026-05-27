@@ -112,6 +112,11 @@ export type ExtensionToPageMessage =
       sessionId: string
       event: SerializedEvent
     }
+  | {
+      type: 'XSTATE_SET_ACTIVE_STATE'
+      sessionId: string
+      stateNodeId: string
+    }
   /**
    * Sent by the background when a devtools panel connects (or reconnects).
    * The adapter responds by re-broadcasting XSTATE_ACTOR_REGISTERED for every
@@ -119,6 +124,12 @@ export type ExtensionToPageMessage =
    * service worker was killed between page load and panel open.
    */
   | { type: 'XSTATE_PANEL_CONNECTED' }
+
+// panel → service worker (internal)
+export type PanelToBackgroundMessage = {
+  type: 'XSTATE_OPEN_SOURCE'
+  sourceLocation: string
+}
 
 // Marker added to all postMessages so content script can filter
 export type MarkedPageMessage = PageToExtensionMessage & { __xstateDevtools: true }

@@ -78,7 +78,7 @@ const actor = createActor(myMachine, { inspect })
 actor.start()
 ```
 
-In the panel header, toggle **Server adapter** on. Default endpoint: `ws://localhost:9301`. Override with the `XSTATE_DEVTOOLS_PORT` env var.
+The panel auto-connects to the server adapter at `ws://localhost:9301` on startup. To use a custom endpoint, click the **Edit** button next to the server status indicator in the panel header, or set the `XSTATE_DEVTOOLS_PORT` env var.
 
 `ws` must be installed by the consumer (peer dep, optional). The browser entrypoint doesn't import it.
 

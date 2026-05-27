@@ -108,4 +108,63 @@ describe('serializeMachine', () => {
     const result = serializeMachine(machine, 'src/auth.ts:42')
     expect(result.sourceLocation).toBe('src/auth.ts:42')
   })
+
+  it('handles cyclic machine node graphs without recursing forever', () => {
+    const root: any = {
+      id: 'root',
+      key: 'root',
+      type: 'compound',
+      states: {},
+      transitions: new Map(),
+      always: [],
+      entry: [],
+      exit: [],
+      invoke: [],
+    }
+    root.states.self = root
+
+    const result = serializeMachine({ id: 'cyclic', root } as any)
+
+    expect(result.root.id).toBe('root')
+    expect(result.root.states.self.id).toBe('root')
+    expect(result.root.states.self.states).toEqual({})
+  })
+
+  it('caps the number of serialized child states', () => {
+    const states = Object.fromEntries(
+      Array.from({ length: 150 }, (_, index) => [
+        `state${index}`,
+        {
+          id: `machine.state${index}`,
+          key: `state${index}`,
+          type: 'atomic',
+          states: {},
+          transitions: new Map(),
+          always: [],
+          entry: [],
+          exit: [],
+          invoke: [],
+        },
+      ]),
+    )
+
+    const machine = {
+      id: 'bounded',
+      root: {
+        id: 'bounded',
+        key: 'bounded',
+        type: 'compound',
+        states,
+        transitions: new Map(),
+        always: [],
+        entry: [],
+        exit: [],
+        invoke: [],
+      },
+    } as any
+
+    const result = serializeMachine(machine)
+
+    expect(Object.keys(result.root.states)).toHaveLength(100)
+  })
 })

@@ -5,6 +5,12 @@ import type {
   PageToExtensionMessage,
 } from '../../extension/src/shared/types.js'
 import { createInspector, type Transport } from './core.js'
+import {
+  debugLog as baseDebugLog,
+  infoLog as baseInfoLog,
+  warnLog as baseWarnLog,
+} from './logging.js'
+import { sanitize } from './sanitize.js'
 
 export interface ServerAdapterOptions {
   /** Port to listen on. Defaults to env XSTATE_DEVTOOLS_PORT or 9301. */
@@ -43,27 +49,38 @@ function summarizeMessage(message: ExtensionToPageMessage | PageToExtensionMessa
 }
 
 function debugLog(message: string, details?: unknown) {
-  if (details === undefined) {
-    console.debug(`[xstate-devtools:server] ${message}`)
-    return
-  }
-  console.debug(`[xstate-devtools:server] ${message}`, details)
+  baseDebugLog('server', message, details)
 }
 
 function infoLog(message: string, details?: unknown) {
-  if (details === undefined) {
-    console.info(`[xstate-devtools:server] ${message}`)
-    return
-  }
-  console.info(`[xstate-devtools:server] ${message}`, details)
+  baseInfoLog('server', message, details)
 }
 
 function warnLog(message: string, details?: unknown) {
-  if (details === undefined) {
-    console.warn(`[xstate-devtools:server] ${message}`)
-    return
+  baseWarnLog('server', message, details)
+}
+
+function stringifyOutgoingMessage(message: PageToExtensionMessage): string | null {
+  const payload = { ...message, __xstateDevtools: true as const }
+
+  try {
+    return JSON.stringify(payload)
+  } catch (error) {
+    warnLog('failed to stringify adapter message; retrying with sanitized payload', {
+      error,
+      message: summarizeMessage(message),
+    })
   }
-  console.warn(`[xstate-devtools:server] ${message}`, details)
+
+  try {
+    return JSON.stringify(sanitize(payload))
+  } catch (error) {
+    warnLog('dropping adapter message that could not be stringified', {
+      error,
+      message: summarizeMessage(message),
+    })
+    return null
+  }
 }
 
 interface CachedServer {
@@ -210,7 +227,9 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
 
   const transport: Transport = {
     send(message: PageToExtensionMessage) {
-      const payload = JSON.stringify({ ...message, __xstateDevtools: true })
+      const payload = stringifyOutgoingMessage(message)
+      if (payload === null) return
+
       if (!server.activated) {
         // No panel has connected yet — buffer for the first one.
         if (server.buffer.length >= server.bufferSize) server.buffer.shift()

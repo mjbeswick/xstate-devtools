@@ -1,7 +1,14 @@
 // packages/extension/src/panel/components/MachineTree.tsx
 import React from 'react'
-import { getActiveNodeIds } from '../active-nodes.js'
+import { getActiveNodeIds, getActivePaths } from '../active-nodes.js'
+import { PanelContextMenu, copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
+import {
+  buildMachineTreeMatchSet,
+  getMachineTreeHighlightTerm,
+} from '../machine-tree-filter.js'
+import { openSourceLocation } from '../open-source.js'
 import { getDisplaySnapshot, useStore } from '../store.js'
+import { useDispatch } from '../port-context.js'
 
 function findPath(root: SerializedStateNode, id: string): SerializedStateNode[] | null {
   if (root.id === id) return [root]
@@ -12,10 +19,16 @@ function findPath(root: SerializedStateNode, id: string): SerializedStateNode[] 
   return null
 }
 
-import type { SerializedStateNode } from '../../shared/types.js'
+import type { ActorRecord, SerializedStateNode } from '../../shared/types.js'
 import { usePanelCollapse } from '../panel-collapse-context.js'
 import { useServerControls } from '../server-context.js'
-import { ChevronDown, ChevronRight, Close, ExternalLink, PanelToggle } from './Icons.js'
+import { getStateNodeTitle } from '../tree-metadata.js'
+import {
+  Close,
+  DisclosureTriangle,
+  ExternalLink,
+  PanelToggle,
+} from './Icons.js'
 
 function HeaderIconButton({
   onClick,
@@ -55,28 +68,6 @@ function HeaderIconButton({
   )
 }
 
-/** Returns the set of node ids that match `filter` (case-insensitive on key) or have a matching descendant. */
-function buildMatchSet(node: SerializedStateNode, filter: string): Set<string> {
-  const matched = new Set<string>()
-  const lower = filter.toLowerCase()
-
-  function visit(n: SerializedStateNode): boolean {
-    let anyChildMatches = false
-    for (const child of Object.values(n.states)) {
-      if (visit(child)) anyChildMatches = true
-    }
-    const selfMatches = n.key.toLowerCase().includes(lower)
-    if (selfMatches || anyChildMatches) {
-      matched.add(n.id)
-      return true
-    }
-    return false
-  }
-
-  visit(node)
-  return matched
-}
-
 function highlight(text: string, filter: string): React.ReactNode {
   if (!filter) return text
   const lower = text.toLowerCase()
@@ -96,6 +87,7 @@ function StateNodeRow({
   activeIds,
   selectedId,
   onSelect,
+  onOpenContextMenu,
   depth,
   filter,
   matchSet,
@@ -104,6 +96,11 @@ function StateNodeRow({
   activeIds: Set<string>
   selectedId: string | null
   onSelect: (id: string) => void
+  onOpenContextMenu: (
+    event: React.MouseEvent,
+    node: SerializedStateNode,
+    isActive: boolean,
+  ) => void
   depth: number
   filter: string
   matchSet: Set<string> | null
@@ -116,33 +113,40 @@ function StateNodeRow({
   const [userExpanded, setUserExpanded] = React.useState(true)
   const expanded = filterActive ? true : userExpanded
 
-  const typeColor: Record<string, string> = {
-    parallel: '#722ed1',
-    final: '#d4380d',
-    history: '#d48806',
-    atomic: '#595959',
-    compound: '#595959',
+  if (matchSet && !matchSet.has(node.id)) return null
+
+  const handleRowClick = () => {
+    onSelect(node.id)
   }
 
-  if (matchSet && !matchSet.has(node.id)) return null
+  const rowTitle = getStateNodeTitle(node, isActive)
 
   return (
     <>
       <div
         style={{
-          paddingLeft: 8 + depth * 18,
-          paddingTop: 3,
-          paddingBottom: 3,
+          paddingLeft: 4 + depth * 14,
+          paddingTop: 2,
+          paddingBottom: 2,
           display: 'flex',
           alignItems: 'center',
-          gap: 6,
+          gap: 4,
           cursor: 'pointer',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
           background: isSelected ? '#e6f4ff' : isActive ? '#f6ffed' : 'transparent',
           borderLeft: isActive ? '3px solid #52c41a' : '3px solid transparent',
           fontFamily: 'monospace',
           fontSize: 12,
         }}
-        onClick={() => onSelect(node.id)}
+        onClick={handleRowClick}
+        onDoubleClick={() => {
+          if (hasChildren && !filterActive) setUserExpanded((ex) => !ex)
+        }}
+        onContextMenu={(event) => {
+          onOpenContextMenu(event, node, isActive)
+        }}
+        title={rowTitle}
       >
         {hasChildren ? (
           <span
@@ -152,7 +156,7 @@ function StateNodeRow({
             }}
             style={{
               color: '#888',
-              width: 14,
+              width: 10,
               height: 14,
               display: 'inline-flex',
               alignItems: 'center',
@@ -160,22 +164,13 @@ function StateNodeRow({
               cursor: filterActive ? 'default' : 'pointer',
               flexShrink: 0,
             }}
+            title={expanded ? 'Collapse state branch' : 'Expand state branch'}
           >
-            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            <DisclosureTriangle expanded={expanded} size={10} color="#888" />
           </span>
         ) : (
-          <span style={{ width: 14, flexShrink: 0 }} />
+          <span style={{ width: 10, flexShrink: 0 }} />
         )}
-        <span
-          style={{
-            color: typeColor[node.type] ?? '#595959',
-            fontSize: 10,
-            textTransform: 'uppercase',
-            letterSpacing: 1,
-          }}
-        >
-          {node.type.slice(0, 4)}
-        </span>
         <span style={{ fontWeight: isActive ? 700 : 400, color: isActive ? '#237804' : '#333' }}>
           {highlight(node.key, filter)}
         </span>
@@ -194,6 +189,7 @@ function StateNodeRow({
             activeIds={activeIds}
             selectedId={selectedId}
             onSelect={onSelect}
+            onOpenContextMenu={onOpenContextMenu}
             depth={depth + 1}
             filter={filter}
             matchSet={matchSet}
@@ -203,7 +199,78 @@ function StateNodeRow({
   )
 }
 
+function BreadcrumbRow({
+  path,
+  onSelect,
+  dimmed = false,
+}: {
+  path: SerializedStateNode[]
+  onSelect: (id: string) => void
+  dimmed?: boolean
+}) {
+  return (
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        overflow: 'hidden',
+        minWidth: 0,
+        gap: 0,
+      }}
+    >
+      {path.map((n, j) => {
+        const isLeaf = j === path.length - 1
+        return (
+          <React.Fragment key={n.id}>
+            {j > 0 && (
+              <span style={{ color: '#aaa', padding: '0 1px', flexShrink: 0, fontSize: 10 }}>
+                ›
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => onSelect(n.id)}
+              title={n.id}
+              style={{
+                padding: '0 3px',
+                border: 'none',
+                background: 'transparent',
+                borderRadius: 3,
+                cursor: 'pointer',
+                fontFamily: 'monospace',
+                fontSize: 11,
+                color: dimmed
+                  ? isLeaf ? '#52c41a' : '#999'
+                  : isLeaf ? '#0958d9' : '#555',
+                fontWeight: isLeaf ? 600 : 400,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: 140,
+              }}
+            >
+              {n.key}
+            </button>
+          </React.Fragment>
+        )
+      })}
+    </div>
+  )
+}
+
+function getOrderedMatchIds(root: SerializedStateNode, matchSet: Set<string>): string[] {
+  const result: string[] = []
+  function traverse(node: SerializedStateNode) {
+    if (matchSet.has(node.id)) result.push(node.id)
+    for (const child of Object.values(node.states)) traverse(child)
+  }
+  traverse(root)
+  return result
+}
+
 export function MachineTree() {
+  const contextMenu = usePanelContextMenu()
   const selectedActorId = useStore((s) => s.selectedActorId)
   const selectedStateNodeId = useStore((s) => s.selectedStateNodeId)
   const selectStateNode = useStore((s) => s.selectStateNode)
@@ -211,6 +278,7 @@ export function MachineTree() {
   const setTreeFilter = useStore((s) => s.setTreeFilter)
   const actors = useStore((s) => s.actors)
   const portConnected = useStore((s) => s.portConnected)
+  const dispatch = useDispatch()
   const snapshot = useStore((s) =>
     selectedActorId ? getDisplaySnapshot(s, selectedActorId) : null,
   )
@@ -219,6 +287,37 @@ export function MachineTree() {
   const serverControls = useServerControls()
 
   const actor = selectedActorId ? actors.get(selectedActorId) : null
+  const openRowContextMenu = React.useCallback(
+    (
+      event: React.MouseEvent,
+      node: SerializedStateNode,
+      isActive: boolean,
+    ) => {
+      contextMenu.openMenu(event, [
+        {
+          label: 'Select state node',
+          onSelect: () => selectStateNode(node.id),
+        },
+        {
+          label: 'Set active state',
+          disabled: !selectedActorId || isActive,
+          onSelect: () => {
+            if (!selectedActorId) return
+            dispatch({
+              type: 'XSTATE_SET_ACTIVE_STATE',
+              sessionId: selectedActorId,
+              stateNodeId: node.id,
+            })
+          },
+        },
+        {
+          label: 'Copy state node id',
+          onSelect: () => void copyTextToClipboard(node.id),
+        },
+      ])
+    },
+    [contextMenu, dispatch, selectStateNode, selectedActorId],
+  )
 
   const nearestMachineAncestor = React.useMemo(() => {
     if (!actor?.parentSessionId) return null
@@ -247,13 +346,95 @@ export function MachineTree() {
 
   const matchSet = React.useMemo(() => {
     if (!actor?.machine || !treeFilter) return null
-    return buildMatchSet(actor.machine.root, treeFilter)
+    return buildMachineTreeMatchSet(actor.machine.root, actor.machine.id, treeFilter)
   }, [actor?.machine, treeFilter])
+
+  const highlightTerm = React.useMemo(() => getMachineTreeHighlightTerm(treeFilter), [treeFilter])
+
+  // --- Search bar state (cmd+f / ctrl+f) ---
+  const [searchOpen, setSearchOpen] = React.useState(false)
+  const searchInputRef = React.useRef<HTMLInputElement>(null)
+  const [currentMatchIndex, setCurrentMatchIndex] = React.useState(0)
+
+  const orderedMatchIds = React.useMemo(
+    () => (actor?.machine && matchSet ? getOrderedMatchIds(actor.machine.root, matchSet) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [actor?.machine, matchSet],
+  )
+
+  // Reset navigation index when filter text changes
+  React.useEffect(() => {
+    setCurrentMatchIndex(0)
+  }, [treeFilter])
+
+  // Focus the input whenever the search bar opens
+  React.useEffect(() => {
+    if (searchOpen) {
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    } else {
+      setTreeFilter('')
+    }
+  }, [searchOpen, setTreeFilter])
+
+  // Keyboard shortcut: cmd+f / ctrl+f to open; Escape to close
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault()
+        e.stopImmediatePropagation()
+        setSearchOpen(true)
+      } else if (e.key === 'Escape' && searchOpen) {
+        setSearchOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown, { capture: true })
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true })
+  }, [searchOpen])
+
+  const navigateMatch = React.useCallback(
+    (direction: 1 | -1) => {
+      if (orderedMatchIds.length === 0) return
+      const next = (currentMatchIndex + direction + orderedMatchIds.length) % orderedMatchIds.length
+      setCurrentMatchIndex(next)
+      selectStateNode(orderedMatchIds[next])
+    },
+    [currentMatchIndex, orderedMatchIds, selectStateNode],
+  )
+
+  // Breadcrumb path for the selected state node (safe with optional chaining)
+  const breadcrumbPath =
+    selectedStateNodeId && actor?.machine?.root
+      ? findPath(actor.machine.root, selectedStateNodeId)
+      : null
+
+  // Active state paths — used as a fallback breadcrumb when nothing is selected
+  const activePaths = React.useMemo(
+    () =>
+      !selectedStateNodeId && snapshot?.value != null && actor?.machine?.root
+        ? getActivePaths(snapshot.value as any, actor.machine.root)
+        : null,
+    [selectedStateNodeId, snapshot?.value, actor?.machine?.root],
+  )
+
+  // Actor ancestry chain: root ancestor → direct parent of current actor
+  const actorPath = React.useMemo(() => {
+    if (!actor?.parentSessionId) return []
+    const chain: ActorRecord[] = []
+    let currentId: string | undefined = actor.parentSessionId
+    while (currentId) {
+      const a = actors.get(currentId)
+      if (!a) break
+      chain.unshift(a)
+      currentId = a.parentSessionId
+    }
+    return chain
+  }, [actor, actors])
 
   const Header = (
     <div
       style={{
-        padding: '0 6px',
+        padding: '0 4px',
         minHeight: 30,
         boxSizing: 'border-box',
         borderBottom: '1px solid #eee',
@@ -282,8 +463,8 @@ export function MachineTree() {
           display: 'flex',
           alignSelf: 'stretch',
           alignItems: 'center',
-          justifyContent: 'center',
-          gap: 4,
+          justifyContent: 'flex-start',
+          gap: 2,
           overflow: 'hidden',
         }}
       >
@@ -291,9 +472,13 @@ export function MachineTree() {
           <>
             <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{actor.machine.id}</span>
             {actor.machine.sourceLocation && (
-              <a
-                href={`vscode://file/${actor.machine.sourceLocation}`}
+              <button
+                type="button"
                 style={{
+                  padding: 0,
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
                   color: '#1890ff',
                   fontSize: 10,
                   textDecoration: 'none',
@@ -303,70 +488,51 @@ export function MachineTree() {
                   gap: 2,
                 }}
                 title="Open in VS Code"
+                onClick={(event) => {
+                  event.preventDefault()
+                  openSourceLocation(actor.machine.sourceLocation)
+                }}
               >
                 <ExternalLink size={11} /> source
-              </a>
+              </button>
             )}
           </>
         )}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        {serverControls && (
+        {serverControls && serverControls.status !== 'idle' && (
           <>
-            <label
-              title={serverControls.url}
+            <span
+              title={`${serverControls.status} · ${serverControls.url}`}
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
+                display: 'inline-block',
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: serverDot,
+                flexShrink: 0,
+              }}
+            />
+            <button
+              onClick={() => {
+                const nextUrl = window.prompt('Server adapter URL', serverControls.url)
+                if (nextUrl) serverControls.onUrlChange(nextUrl)
+              }}
+              style={{
+                padding: '1px 6px',
                 fontSize: 10,
-                whiteSpace: 'nowrap',
+                lineHeight: 1.4,
+                background: '#fff',
+                color: '#444',
+                border: '1px solid #d9d9d9',
+                borderRadius: 4,
                 cursor: 'pointer',
               }}
+              title={serverControls.url}
             >
-              <input
-                type="checkbox"
-                checked={serverControls.enabled}
-                onChange={(e) => serverControls.onToggle(e.target.checked)}
-                style={{ margin: 0 }}
-              />
-              <span>Server</span>
-            </label>
-            {serverControls.enabled && (
-              <>
-                <span
-                  title={`${serverControls.status} · ${serverControls.url}`}
-                  style={{
-                    display: 'inline-block',
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: serverDot,
-                    flexShrink: 0,
-                  }}
-                />
-                <button
-                  onClick={() => {
-                    const nextUrl = window.prompt('Server adapter URL', serverControls.url)
-                    if (nextUrl) serverControls.onUrlChange(nextUrl)
-                  }}
-                  style={{
-                    padding: '1px 6px',
-                    fontSize: 10,
-                    lineHeight: 1.4,
-                    background: '#fff',
-                    color: '#444',
-                    border: '1px solid #d9d9d9',
-                    borderRadius: 4,
-                    cursor: 'pointer',
-                  }}
-                  title={serverControls.url}
-                >
-                  Edit
-                </button>
-              </>
-            )}
+              Edit
+            </button>
           </>
         )}
         <span
@@ -381,7 +547,7 @@ export function MachineTree() {
             whiteSpace: 'nowrap',
           }}
         >
-          {portConnected ? '● Connected' : '○ Not connected'}
+          {portConnected ? '● Bridge connected' : '○ Bridge disconnected'}
         </span>
         <HeaderIconButton
           onClick={collapse.toggleRight}
@@ -396,37 +562,138 @@ export function MachineTree() {
   const Footer = (
     <div
       style={{
-        padding: '4px 6px',
-        borderTop: '1px solid #eee',
-        background: '#fafafa',
+        padding: '0 4px',
+        minHeight: 26,
+        borderTop: '1px solid #d0d7de',
+        background: '#f6f8fa',
         flexShrink: 0,
         display: 'flex',
         alignItems: 'center',
-        gap: 6,
+        gap: 2,
+        fontSize: 11,
+        boxSizing: 'border-box',
       }}
     >
-      {actor?.machine && (
+      {searchOpen && actor?.machine ? (
+        // Chrome DevTools-style find bar
         <>
+          <HeaderIconButton
+            onClick={() => setSearchOpen(false)}
+            title="Close find (Escape)"
+          >
+            <Close size={12} />
+          </HeaderIconButton>
           <input
+            ref={searchInputRef}
             value={treeFilter}
             onChange={(e) => setTreeFilter(e.target.value)}
-            placeholder="Search states…"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setSearchOpen(false)
+              } else if (e.key === 'Enter') {
+                navigateMatch(e.shiftKey ? -1 : 1)
+              }
+            }}
+            placeholder="Find state node"
             style={{
               flex: '1 1 auto',
               minWidth: 60,
               padding: '2px 6px',
               fontSize: 11,
               fontFamily: 'inherit',
-              border: '1px solid #d9d9d9',
-              borderRadius: 4,
+              border: '1px solid #c6c6c6',
+              borderRadius: 3,
+              outline: 'none',
+              height: 20,
+              boxSizing: 'border-box',
+              background: '#fff',
             }}
           />
           {treeFilter && (
-            <HeaderIconButton onClick={() => setTreeFilter('')} title="Clear search">
-              <Close size={14} />
-            </HeaderIconButton>
+            <span
+              style={{
+                fontSize: 10,
+                color: orderedMatchIds.length > 0 ? '#444' : '#cf1322',
+                whiteSpace: 'nowrap',
+                padding: '0 6px',
+                flexShrink: 0,
+              }}
+            >
+              {orderedMatchIds.length > 0
+                ? `${currentMatchIndex + 1} of ${orderedMatchIds.length}`
+                : 'No results'}
+            </span>
           )}
+          <HeaderIconButton onClick={() => navigateMatch(-1)} title="Previous match (Shift+Enter)">
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor" aria-hidden>
+              <path d="M5.5 3L9.5 8.5H1.5L5.5 3Z" />
+            </svg>
+          </HeaderIconButton>
+          <HeaderIconButton onClick={() => navigateMatch(1)} title="Next match (Enter)">
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor" aria-hidden>
+              <path d="M5.5 8L1.5 2.5H9.5L5.5 8Z" />
+            </svg>
+          </HeaderIconButton>
         </>
+      ) : breadcrumbPath || (activePaths && activePaths.length > 0) ? (
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            overflow: 'hidden',
+            minWidth: 0,
+            gap: 0,
+          }}
+        >
+          {/* Actor ancestry segments */}
+          {actorPath.map((a) => {
+            const label = a.displayName ?? a.machine?.id ?? a.sessionId.slice(0, 8)
+            return (
+              <React.Fragment key={a.sessionId}>
+                <button
+                  type="button"
+                  onClick={() => selectActor(a.sessionId)}
+                  title={a.sessionId}
+                  style={{
+                    padding: '0 3px',
+                    border: 'none',
+                    background: 'transparent',
+                    borderRadius: 3,
+                    cursor: 'pointer',
+                    fontSize: 11,
+                    color: '#888',
+                    fontWeight: 400,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: 120,
+                  }}
+                >
+                  {label}
+                </button>
+                <span style={{ color: '#bbb', padding: '0 1px', flexShrink: 0, fontSize: 10 }}>
+                  ›
+                </span>
+              </React.Fragment>
+            )
+          })}
+          {/* State path */}
+          {breadcrumbPath ? (
+            <BreadcrumbRow path={breadcrumbPath} onSelect={selectStateNode} />
+          ) : (
+            activePaths?.map((path, pi) => (
+              <React.Fragment key={pi}>
+                {pi > 0 && (
+                  <span style={{ color: '#ccc', padding: '0 3px', flexShrink: 0, fontSize: 10 }}>|</span>
+                )}
+                <BreadcrumbRow path={path} onSelect={selectStateNode} dimmed />
+              </React.Fragment>
+            ))
+          )}
+        </div>
+      ) : (
+        <span style={{ flex: 1 }} />
       )}
       <span style={{ marginLeft: 'auto' }} />
       <HeaderIconButton
@@ -487,6 +754,10 @@ export function MachineTree() {
   }
 
   if (!actor.machine) {
+    const noMachineReason = actor.displayName
+      ? `It is a service actor named "${actor.displayName}" rather than a machine-backed actor.`
+      : 'It is a service actor without a machine-backed state tree.'
+
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {Header}
@@ -501,18 +772,17 @@ export function MachineTree() {
             gap: 10,
           }}
         >
-          <div>
-            This actor does not expose a machine definition.
-            {actor.displayName && (
-              <>
-                {' '}
-                <code style={{ fontSize: 11 }}>{actor.displayName}</code>
-              </>
-            )}
-          </div>
-          <div style={{ color: '#8c8c8c' }}>
-            Promise, callback, and other service actors can receive events, but they do not have a
-            state tree to inspect.
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontWeight: 500 }}>
+              This actor does not expose a machine definition.
+            </div>
+            <div style={{ color: '#8c8c8c', lineHeight: 1.5 }}>
+              {noMachineReason}
+            </div>
+            <div style={{ color: '#8c8c8c', lineHeight: 1.5 }}>
+              Promise, callback, and other service actors can receive events, but they do not have
+              a state tree to inspect.
+            </div>
           </div>
           {nearestMachineAncestor && (
             <div>
@@ -542,56 +812,11 @@ export function MachineTree() {
     ? getActiveNodeIds(snapshot.value as any, actor.machine.root)
     : new Set<string>()
 
-  const breadcrumbPath = selectedStateNodeId
-    ? findPath(actor.machine.root, selectedStateNodeId)
-    : null
-
   const noMatches = matchSet !== null && matchSet.size === 0
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {Header}
-      {breadcrumbPath && (
-        <div
-          style={{
-            padding: '4px 10px',
-            borderBottom: '1px solid #eee',
-            background: '#fff',
-            fontSize: 11,
-            color: '#555',
-            display: 'flex',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 2,
-          }}
-        >
-          {breadcrumbPath.map((n, j) => {
-            const isLeaf = j === breadcrumbPath.length - 1
-            return (
-              <React.Fragment key={n.id}>
-                {j > 0 && <span style={{ color: '#bbb' }}>›</span>}
-                <button
-                  onClick={() => selectStateNode(n.id)}
-                  title={n.id}
-                  style={{
-                    padding: '0 4px',
-                    border: 'none',
-                    background: 'transparent',
-                    borderRadius: 3,
-                    cursor: 'pointer',
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    color: isLeaf ? '#0958d9' : '#555',
-                    fontWeight: isLeaf ? 600 : 400,
-                  }}
-                >
-                  {n.key}
-                </button>
-              </React.Fragment>
-            )
-          })}
-        </div>
-      )}
       <div style={{ flex: 1, overflow: 'auto' }}>
         {noMatches ? (
           <div style={{ padding: 16, color: '#aaa', fontSize: 12 }}>
@@ -603,12 +828,14 @@ export function MachineTree() {
             activeIds={activeIds}
             selectedId={selectedStateNodeId}
             onSelect={selectStateNode}
+            onOpenContextMenu={openRowContextMenu}
             depth={0}
-            filter={treeFilter}
+            filter={highlightTerm}
             matchSet={matchSet}
           />
         )}
       </div>
+      <PanelContextMenu menu={contextMenu.menu} onClose={contextMenu.closeMenu} />
       {Footer}
     </div>
   )
