@@ -25,9 +25,9 @@ describe('shouldResetBrowserStateOnFirstMessage', () => {
   })
 
   it('does not reset when navigation already delivered the explicit clear signal', () => {
-    expect(
-      shouldResetBrowserStateOnFirstMessage({ type: 'XSTATE_PAGE_NAVIGATED' }, 3, true),
-    ).toBe(false)
+    expect(shouldResetBrowserStateOnFirstMessage({ type: 'XSTATE_PAGE_NAVIGATED' }, 3, true)).toBe(
+      false,
+    )
   })
 
   it('does not reset when there is no stale actor state to clear', () => {

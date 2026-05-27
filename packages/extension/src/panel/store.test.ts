@@ -144,7 +144,8 @@ describe('getInitialTreeFilter', () => {
   it('restores a persisted tree filter', () => {
     expect(
       getInitialTreeFilter({
-        getItem: (key: string) => (key === 'xstate-devtools.treeFilter' ? 'machine:cart -error' : null),
+        getItem: (key: string) =>
+          key === 'xstate-devtools.treeFilter' ? 'machine:cart -error' : null,
       }),
     ).toBe('machine:cart -error')
   })
@@ -415,10 +416,7 @@ describe('handleMessage', () => {
 
     useStore.getState().setTreeFilter('machine:checkout -error')
 
-    expect(setItem).toHaveBeenCalledWith(
-      'xstate-devtools.treeFilter',
-      'machine:checkout -error',
-    )
+    expect(setItem).toHaveBeenCalledWith('xstate-devtools.treeFilter', 'machine:checkout -error')
     expect(useStore.getState().treeFilter).toBe('machine:checkout -error')
 
     vi.unstubAllGlobals()

@@ -1,8 +1,8 @@
 // packages/extension/src/panel/components/ActorList.tsx
 import type React from 'react'
 import { useEffect, useMemo, useState } from 'react'
-import { PanelContextMenu, copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
-import { openSourceLocation } from '../open-source.js'
+import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
+import { canOpenSourceLocation, openSourceLocation } from '../open-source.js'
 import { useStore } from '../store.js'
 import { getActorNodePresentation } from '../tree-metadata.js'
 import { DisclosureTriangle } from './Icons.js'
@@ -81,6 +81,7 @@ export function ActorList() {
     const hasChildren = children.length > 0
     const open = isExpanded(sessionId, hasChildren, depth)
     const actorInfo = getActorNodePresentation(actor, children.length)
+    const canOpenSource = canOpenSourceLocation(actor.machine?.sourceLocation)
 
     return (
       <div key={sessionId}>
@@ -88,6 +89,35 @@ export function ActorList() {
           onClick={() => handleRowClick(sessionId)}
           onDoubleClick={() => {
             if (hasChildren) toggleExpanded(sessionId)
+          }}
+          onMouseDown={(event) => {
+            if (event.button !== 2) return
+            contextMenu.openMenu(event, [
+              {
+                label: 'Select actor',
+                onSelect: () => selectActor(sessionId),
+              },
+              {
+                label: 'Open source location',
+                disabled: !canOpenSource,
+                onSelect: () => {
+                  if (canOpenSource && actor.machine?.sourceLocation) {
+                    openSourceLocation(actor.machine.sourceLocation)
+                  }
+                },
+              },
+              {
+                label: 'Copy session id',
+                onSelect: () => void copyTextToClipboard(sessionId),
+              },
+              {
+                label: open ? 'Collapse actor branch' : 'Expand actor branch',
+                disabled: !hasChildren,
+                onSelect: () => {
+                  if (hasChildren) toggleExpanded(sessionId)
+                },
+              },
+            ])
           }}
           onContextMenu={(event) => {
             contextMenu.openMenu(event, [
@@ -97,9 +127,11 @@ export function ActorList() {
               },
               {
                 label: 'Open source location',
-                disabled: !actor.machine?.sourceLocation,
+                disabled: !canOpenSource,
                 onSelect: () => {
-                  if (actor.machine?.sourceLocation) openSourceLocation(actor.machine.sourceLocation)
+                  if (canOpenSource && actor.machine?.sourceLocation) {
+                    openSourceLocation(actor.machine.sourceLocation)
+                  }
                 },
               },
               {
@@ -206,7 +238,6 @@ export function ActorList() {
         </label>
       </div>
       {roots.map((sid) => renderActor(sid, 0))}
-      <PanelContextMenu menu={contextMenu.menu} onClose={contextMenu.closeMenu} />
     </div>
   )
 }

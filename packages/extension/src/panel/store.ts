@@ -23,9 +23,7 @@ export function getInitialLoggingPaused(
   }
 }
 
-export function getInitialTreeFilter(
-  storage: Pick<Storage, 'getItem'> | null | undefined,
-): string {
+export function getInitialTreeFilter(storage: Pick<Storage, 'getItem'> | null | undefined): string {
   try {
     return storage?.getItem(TREE_FILTER_KEY) ?? ''
   } catch {
@@ -157,14 +155,19 @@ export function getEventSourceStateNodeId(
     return null
   }
 
-  const targetActiveIds = getActiveNodeIds(eventRecord.snapshotAfter.value as any, actor.machine.root)
+  const targetActiveIds = getActiveNodeIds(
+    eventRecord.snapshotAfter.value as any,
+    actor.machine.root,
+  )
 
   let fallbackNodeId: string | null = null
 
   for (const path of sourcePaths) {
     for (let i = path.length - 1; i >= 0; i--) {
       const node = path[i]
-      const matchingTransitions = node.on.filter((transition) => transition.eventType === eventRecord.event.type)
+      const matchingTransitions = node.on.filter(
+        (transition) => transition.eventType === eventRecord.event.type,
+      )
       if (matchingTransitions.length === 0) {
         continue
       }
@@ -191,7 +194,9 @@ export const useStore = create<InspectorStore>((set, _get) => ({
   registeredSnapshots: new Map(),
   events: [],
   loggingPaused: getInitialLoggingPaused(typeof localStorage === 'undefined' ? null : localStorage),
-  hideStoppedActors: getInitialHideStoppedActors(typeof localStorage === 'undefined' ? null : localStorage),
+  hideStoppedActors: getInitialHideStoppedActors(
+    typeof localStorage === 'undefined' ? null : localStorage,
+  ),
   selectedActorId: null,
   selectedStateNodeId: null,
   timeTravelSeq: null,

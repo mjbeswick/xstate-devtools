@@ -17,5 +17,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.14"
+  },
+  "dependencies": {
+    "playwright": "^1.60.0"
   }
 }

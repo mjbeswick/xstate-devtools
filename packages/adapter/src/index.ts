@@ -3,7 +3,7 @@ import type {
   ExtensionToPageMessage,
   PageToExtensionMessage,
 } from '../../extension/src/shared/types.js'
-import { createInspector, type Transport } from './core.js'
+import { createInspector, type InspectorOptions, type Transport } from './core.js'
 import { debugLog, infoLog, warnLog } from './logging.js'
 
 declare global {
@@ -14,7 +14,7 @@ declare global {
   }
 }
 
-export function createAdapter() {
+export function createAdapter(options: InspectorOptions = {}) {
   if (typeof window === 'undefined') {
     // Non-browser env (SSR/SSG/server) — return a no-op so importing this module is safe.
     infoLog('web:adapter', 'createAdapter called without window; returning no-op adapter')
@@ -69,5 +69,5 @@ export function createAdapter() {
     },
   }
 
-  return createInspector(transport, 'web')
+  return createInspector(transport, 'web', options)
 }

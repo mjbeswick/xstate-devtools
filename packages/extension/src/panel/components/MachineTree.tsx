@@ -1,12 +1,9 @@
 // packages/extension/src/panel/components/MachineTree.tsx
 import React from 'react'
 import { getActiveNodeIds, getActivePaths } from '../active-nodes.js'
-import { PanelContextMenu, copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
-import {
-  buildMachineTreeMatchSet,
-  getMachineTreeHighlightTerm,
-} from '../machine-tree-filter.js'
-import { openSourceLocation } from '../open-source.js'
+import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
+import { buildMachineTreeMatchSet, getMachineTreeHighlightTerm } from '../machine-tree-filter.js'
+import { canOpenSourceLocation, openSourceLocation } from '../open-source.js'
 import { getDisplaySnapshot, useStore } from '../store.js'
 import { useDispatch } from '../port-context.js'
 
@@ -19,16 +16,16 @@ function findPath(root: SerializedStateNode, id: string): SerializedStateNode[] 
   return null
 }
 
-import type { ActorRecord, SerializedStateNode } from '../../shared/types.js'
+import type {
+  ActorRecord,
+  NativePanelMenuActionMessage,
+  NativePanelMenuSetMessage,
+  SerializedStateNode,
+} from '../../shared/types.js'
 import { usePanelCollapse } from '../panel-collapse-context.js'
 import { useServerControls } from '../server-context.js'
 import { getStateNodeTitle } from '../tree-metadata.js'
-import {
-  Close,
-  DisclosureTriangle,
-  ExternalLink,
-  PanelToggle,
-} from './Icons.js'
+import { Close, DisclosureTriangle, ExternalLink, PanelToggle } from './Icons.js'
 
 function HeaderIconButton({
   onClick,
@@ -96,11 +93,7 @@ function StateNodeRow({
   activeIds: Set<string>
   selectedId: string | null
   onSelect: (id: string) => void
-  onOpenContextMenu: (
-    event: React.MouseEvent,
-    node: SerializedStateNode,
-    isActive: boolean,
-  ) => void
+  onOpenContextMenu: (event: React.MouseEvent, node: SerializedStateNode, isActive: boolean) => void
   depth: number
   filter: string
   matchSet: Set<string> | null
@@ -142,6 +135,10 @@ function StateNodeRow({
         onClick={handleRowClick}
         onDoubleClick={() => {
           if (hasChildren && !filterActive) setUserExpanded((ex) => !ex)
+        }}
+        onMouseDown={(event) => {
+          if (event.button !== 2) return
+          onOpenContextMenu(event, node, isActive)
         }}
         onContextMenu={(event) => {
           onOpenContextMenu(event, node, isActive)
@@ -240,9 +237,7 @@ function BreadcrumbRow({
                 cursor: 'pointer',
                 fontFamily: 'monospace',
                 fontSize: 11,
-                color: dimmed
-                  ? isLeaf ? '#52c41a' : '#999'
-                  : isLeaf ? '#0958d9' : '#555',
+                color: dimmed ? (isLeaf ? '#52c41a' : '#999') : isLeaf ? '#0958d9' : '#555',
                 fontWeight: isLeaf ? 600 : 400,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
@@ -287,12 +282,9 @@ export function MachineTree() {
   const serverControls = useServerControls()
 
   const actor = selectedActorId ? actors.get(selectedActorId) : null
+
   const openRowContextMenu = React.useCallback(
-    (
-      event: React.MouseEvent,
-      node: SerializedStateNode,
-      isActive: boolean,
-    ) => {
+    (event: React.MouseEvent, node: SerializedStateNode, isActive: boolean) => {
       contextMenu.openMenu(event, [
         {
           label: 'Select state node',
@@ -316,7 +308,7 @@ export function MachineTree() {
         },
       ])
     },
-    [contextMenu, dispatch, selectStateNode, selectedActorId],
+    [contextMenu, selectStateNode, selectedActorId, dispatch],
   )
 
   const nearestMachineAncestor = React.useMemo(() => {
@@ -471,31 +463,42 @@ export function MachineTree() {
         {actor?.machine && (
           <>
             <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{actor.machine.id}</span>
-            {actor.machine.sourceLocation && (
-              <button
-                type="button"
-                style={{
-                  padding: 0,
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#1890ff',
-                  fontSize: 10,
-                  textDecoration: 'none',
-                  whiteSpace: 'nowrap',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 2,
-                }}
-                title="Open in VS Code"
-                onClick={(event) => {
-                  event.preventDefault()
-                  openSourceLocation(actor.machine.sourceLocation)
-                }}
-              >
-                <ExternalLink size={11} /> source
-              </button>
-            )}
+            {actor.machine.sourceLocation &&
+              (() => {
+                const canOpenSource = canOpenSourceLocation(actor.machine.sourceLocation)
+                return (
+                  <button
+                    type="button"
+                    style={{
+                      padding: 0,
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: canOpenSource ? 'pointer' : 'default',
+                      color: canOpenSource ? '#1890ff' : '#999',
+                      fontSize: 10,
+                      textDecoration: canOpenSource ? 'none' : 'none',
+                      whiteSpace: 'nowrap',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 2,
+                    }}
+                    title={
+                      canOpenSource
+                        ? 'Open in VS Code'
+                        : `Source not openable: ${actor.machine.sourceLocation}`
+                    }
+                    onClick={(event) => {
+                      event.preventDefault()
+                      if (canOpenSource) {
+                        openSourceLocation(actor.machine.sourceLocation)
+                      }
+                    }}
+                  >
+                    {canOpenSource ? <ExternalLink size={11} /> : null}
+                    {canOpenSource ? 'source' : 'source (unavailable)'}
+                  </button>
+                )
+              })()}
           </>
         )}
       </div>
@@ -577,10 +580,7 @@ export function MachineTree() {
       {searchOpen && actor?.machine ? (
         // Chrome DevTools-style find bar
         <>
-          <HeaderIconButton
-            onClick={() => setSearchOpen(false)}
-            title="Close find (Escape)"
-          >
+          <HeaderIconButton onClick={() => setSearchOpen(false)} title="Close find (Escape)">
             <Close size={12} />
           </HeaderIconButton>
           <input
@@ -685,7 +685,9 @@ export function MachineTree() {
             activePaths?.map((path, pi) => (
               <React.Fragment key={pi}>
                 {pi > 0 && (
-                  <span style={{ color: '#ccc', padding: '0 3px', flexShrink: 0, fontSize: 10 }}>|</span>
+                  <span style={{ color: '#ccc', padding: '0 3px', flexShrink: 0, fontSize: 10 }}>
+                    |
+                  </span>
                 )}
                 <BreadcrumbRow path={path} onSelect={selectStateNode} dimmed />
               </React.Fragment>
@@ -773,15 +775,11 @@ export function MachineTree() {
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ fontWeight: 500 }}>
-              This actor does not expose a machine definition.
-            </div>
+            <div style={{ fontWeight: 500 }}>This actor does not expose a machine definition.</div>
+            <div style={{ color: '#8c8c8c', lineHeight: 1.5 }}>{noMachineReason}</div>
             <div style={{ color: '#8c8c8c', lineHeight: 1.5 }}>
-              {noMachineReason}
-            </div>
-            <div style={{ color: '#8c8c8c', lineHeight: 1.5 }}>
-              Promise, callback, and other service actors can receive events, but they do not have
-              a state tree to inspect.
+              Promise, callback, and other service actors can receive events, but they do not have a
+              state tree to inspect.
             </div>
           </div>
           {nearestMachineAncestor && (
@@ -835,7 +833,6 @@ export function MachineTree() {
           />
         )}
       </div>
-      <PanelContextMenu menu={contextMenu.menu} onClose={contextMenu.closeMenu} />
       {Footer}
     </div>
   )

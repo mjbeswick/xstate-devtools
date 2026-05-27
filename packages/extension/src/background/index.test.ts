@@ -33,13 +33,11 @@ function createPort(name: string, tabId?: number) {
 
 describe('background reload handling', () => {
   const runtimeOnConnect = createEvent<(port: chrome.runtime.Port) => void>()
-  const runtimeOnMessage = createEvent<
-    (message: unknown, sender: chrome.runtime.MessageSender) => void
-  >()
+  const runtimeOnMessage =
+    createEvent<(message: unknown, sender: chrome.runtime.MessageSender) => void>()
   const tabsOnRemoved = createEvent<(tabId: number) => void>()
-  const tabsOnUpdated = createEvent<
-    (tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => void
-  >()
+  const tabsOnUpdated =
+    createEvent<(tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => void>()
   const tabsSendMessage = vi.fn()
 
   beforeEach(async () => {
@@ -127,5 +125,26 @@ describe('background reload handling', () => {
       { type: 'XSTATE_PANEL_CONNECTED', __xstateDevtools: true },
       expect.any(Function),
     )
+  })
+
+  it('forwards XSTATE_SET_ACTIVE_STATE from panel to content script port', () => {
+    const panelPort = createPort('xstate-panel-7')
+    const contentPort = createPort('xstate-content', 7)
+
+    runtimeOnConnect.emit(panelPort as unknown as chrome.runtime.Port)
+    runtimeOnConnect.emit(contentPort as unknown as chrome.runtime.Port)
+
+    const activationMessage = {
+      type: 'XSTATE_SET_ACTIVE_STATE' as const,
+      sessionId: 'web:actor-1',
+      stateNodeId: 'machine.running',
+    }
+
+    panelPort.onMessage.emit(activationMessage)
+
+    expect(contentPort.postMessage).toHaveBeenCalledWith({
+      ...activationMessage,
+      __xstateDevtools: true,
+    })
   })
 })

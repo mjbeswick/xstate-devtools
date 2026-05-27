@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 
 export interface PanelContextMenuItem {
   label: string
@@ -11,9 +11,6 @@ export interface PanelContextMenuState {
   y: number
   items: PanelContextMenuItem[]
 }
-
-const MENU_WIDTH = 220
-const MENU_GUTTER = 8
 
 export async function copyTextToClipboard(text: string): Promise<boolean> {
   try {
@@ -41,140 +38,143 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
   }
 }
 
-export function usePanelContextMenu() {
-  const [menu, setMenu] = useState<PanelContextMenuState | null>(null)
+type Subscriber = (state: PanelContextMenuState | null) => void
+const subscribers = new Set<Subscriber>()
 
+function setMenuState(state: PanelContextMenuState | null) {
+  for (const sub of subscribers) {
+    sub(state)
+  }
+}
+
+export function usePanelContextMenu() {
   const closeMenu = useCallback(() => {
-    setMenu(null)
+    setMenuState(null)
   }, [])
 
-  const openMenu = useCallback(
-    (event: React.MouseEvent, items: PanelContextMenuItem[]) => {
-      event.preventDefault()
-      event.stopPropagation()
-      setMenu({
-        x: event.clientX,
-        y: event.clientY,
-        items,
-      })
-    },
-    [],
-  )
+  const openMenu = useCallback((event: React.MouseEvent, items: PanelContextMenuItem[]) => {
+    event.preventDefault()
+    event.stopPropagation()
 
-  useEffect(() => {
-    if (!menu) return undefined
+    // Calculate position so it doesn't run off screen
+    let x = event.clientX
+    let y = event.clientY
 
-    const handleDismiss = () => closeMenu()
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeMenu()
-    }
-
-    window.addEventListener('contextmenu', handleDismiss)
-    window.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('scroll', handleDismiss, true)
-
-    return () => {
-      window.removeEventListener('contextmenu', handleDismiss)
-      window.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('scroll', handleDismiss, true)
-    }
-  }, [closeMenu, menu])
-
-  return { menu, openMenu, closeMenu }
-}
-
-function getMenuPosition(menu: PanelContextMenuState) {
-  if (typeof window === 'undefined') {
-    return { left: menu.x, top: menu.y }
-  }
-
-  const left = Math.min(menu.x, window.innerWidth - MENU_WIDTH - MENU_GUTTER)
-  const top = Math.min(menu.y, window.innerHeight - MENU_GUTTER)
+    setMenuState({ x, y, items })
+  }, [])
 
   return {
-    left: Math.max(MENU_GUTTER, left),
-    top: Math.max(MENU_GUTTER, top),
+    openMenu,
+    closeMenu,
   }
 }
 
-export function PanelContextMenu({
-  menu,
-  onClose,
-}: {
-  menu: PanelContextMenuState | null
-  onClose: () => void
-}) {
-  if (!menu) return null
+export function shouldCloseMenuOnScrollEvent(event: Event): boolean {
+  // Ignore programmatic scroll updates (for example event log auto-scroll).
+  return event.isTrusted
+}
 
-  const position = getMenuPosition(menu)
+export function PanelContextMenu() {
+  const [menu, setMenu] = useState<PanelContextMenuState | null>(null)
+
+  useEffect(() => {
+    subscribers.add(setMenu)
+    return () => {
+      subscribers.delete(setMenu)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!menu) return
+
+    const handleWindowClick = () => setMenuState(null)
+    const handleWindowScroll = (event: Event) => {
+      if (shouldCloseMenuOnScrollEvent(event)) {
+        setMenuState(null)
+      }
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuState(null)
+    }
+
+    window.addEventListener('click', handleWindowClick)
+    window.addEventListener('scroll', handleWindowScroll, { capture: true })
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('click', handleWindowClick)
+      window.removeEventListener('scroll', handleWindowScroll, { capture: true })
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [menu])
+
+  const menuRef = React.useRef<HTMLDivElement>(null)
+  const [adjustedPos, setAdjustedPos] = useState({ x: menu?.x ?? 0, y: menu?.y ?? 0 })
+
+  useEffect(() => {
+    if (menuRef.current && menu) {
+      const rect = menuRef.current.getBoundingClientRect()
+      let newX = menu.x
+      let newY = menu.y
+
+      if (newX + rect.width > window.innerWidth) {
+        newX = window.innerWidth - rect.width - 4
+      }
+      if (newY + rect.height > window.innerHeight) {
+        newY = window.innerHeight - rect.height - 4
+      }
+
+      setAdjustedPos({ x: newX, y: newY })
+    }
+  }, [menu?.x, menu?.y, menu])
+
+  if (!menu) return null
 
   return (
     <div
+      ref={menuRef}
       style={{
         position: 'fixed',
-        inset: 0,
-        zIndex: 1000,
+        top: adjustedPos.y,
+        left: adjustedPos.x,
+        background: '#fff',
+        border: '1px solid #d9d9d9',
+        borderRadius: 4,
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+        padding: '4px 0',
+        zIndex: 9999,
+        minWidth: 160,
+        fontFamily: 'sans-serif',
+        fontSize: 12,
+        color: '#333',
       }}
+      onContextMenu={(e) => e.preventDefault()}
     >
-      <div
-        aria-hidden="true"
-        onClick={onClose}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'transparent',
-        }}
-      />
-      <div
-        role="menu"
-        onContextMenu={(event) => event.preventDefault()}
-        style={{
-          position: 'absolute',
-          left: position.left,
-          top: position.top,
-          minWidth: MENU_WIDTH,
-          maxWidth: 280,
-          padding: 4,
-          background: '#fff',
-          border: '1px solid #d9d9d9',
-          borderRadius: 6,
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
-          overflow: 'hidden',
-        }}
-      >
-        {menu.items.map((item) => (
-          <button
-            key={item.label}
-            type="button"
-            role="menuitem"
-            disabled={item.disabled}
-            onClick={() => {
-              if (item.disabled) return
-              void Promise.resolve(item.onSelect()).finally(onClose)
-            }}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '6px 10px',
-              border: 'none',
-              borderRadius: 4,
-              background: 'transparent',
-              textAlign: 'left',
-              fontSize: 11,
-              cursor: item.disabled ? 'default' : 'pointer',
-              color: item.disabled ? '#bfbfbf' : '#262626',
-            }}
-            onMouseEnter={(event) => {
-              if (!item.disabled) event.currentTarget.style.background = '#f5f5f5'
-            }}
-            onMouseLeave={(event) => {
-              event.currentTarget.style.background = 'transparent'
-            }}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      {menu.items.map((item, index) => (
+        <div
+          key={index}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (item.disabled) return
+            void Promise.resolve(item.onSelect())
+            setMenuState(null)
+          }}
+          onMouseEnter={(e) => {
+            if (!item.disabled) e.currentTarget.style.background = '#f5f5f5'
+          }}
+          onMouseLeave={(e) => {
+            if (!item.disabled) e.currentTarget.style.background = 'transparent'
+          }}
+          style={{
+            padding: '5px 12px',
+            cursor: item.disabled ? 'default' : 'pointer',
+            color: item.disabled ? '#aaa' : 'inherit',
+            background: 'transparent',
+          }}
+        >
+          {item.label}
+        </div>
+      ))}
     </div>
   )
 }

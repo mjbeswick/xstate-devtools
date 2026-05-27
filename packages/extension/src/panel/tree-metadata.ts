@@ -33,9 +33,10 @@ export function getActorNodePresentation(actor: ActorRecord, childCount: number)
     ? `Child of actor ${actor.parentSessionId}.`
     : 'Root actor.'
 
-  const children = childCount > 0
-    ? `Contains ${childCount} child ${pluralize(childCount, 'actor')}.`
-    : 'No child actors.'
+  const children =
+    childCount > 0
+      ? `Contains ${childCount} child ${pluralize(childCount, 'actor')}.`
+      : 'No child actors.'
 
   const status =
     actor.status === 'active'
@@ -61,15 +62,18 @@ export function getStateNodeTitle(node: SerializedStateNode, isActive: boolean) 
   const invokeCount = node.invoke.length
 
   const activity = isActive ? 'Currently active.' : 'Currently inactive.'
-  const children = childCount > 0
-    ? `Contains ${childCount} child ${pluralize(childCount, 'state')}.`
-    : 'No child states.'
-  const transitions = transitionCount > 0
-    ? `Has ${transitionCount} outgoing ${pluralize(transitionCount, 'transition')}.`
-    : 'No outgoing transitions.'
-  const invokes = invokeCount > 0
-    ? `Invokes ${invokeCount} ${pluralize(invokeCount, 'service')}.`
-    : 'Does not invoke services.'
+  const children =
+    childCount > 0
+      ? `Contains ${childCount} child ${pluralize(childCount, 'state')}.`
+      : 'No child states.'
+  const transitions =
+    transitionCount > 0
+      ? `Has ${transitionCount} outgoing ${pluralize(transitionCount, 'transition')}.`
+      : 'No outgoing transitions.'
+  const invokes =
+    invokeCount > 0
+      ? `Invokes ${invokeCount} ${pluralize(invokeCount, 'service')}.`
+      : 'Does not invoke services.'
 
   return `${typeLabel} "${node.key}". ${activity} ${children} ${transitions} ${invokes}`
 }

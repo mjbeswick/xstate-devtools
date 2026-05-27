@@ -2,9 +2,16 @@
 
 import { debugLog, infoLog, summarizeMessage } from '../shared/debug.js'
 import type {
+  EventLogNativeMenuAction,
+  EventLogNativeMenuContext,
+  EventLogNativeMenuActionMessage,
+  EventLogPanelToBackgroundMessage,
   ExtensionToPageMessage,
   MarkedExtensionMessage,
   MarkedPageMessage,
+  NativePanelMenuActionMessage,
+  NativePanelMenuItem,
+  NativePanelMenuSetMessage,
   PageToExtensionMessage,
   PanelToBackgroundMessage,
 } from '../shared/types.js'
@@ -18,6 +25,26 @@ const contentPorts = new Map<number, chrome.runtime.Port>()
 // tabId → buffered messages (panel may not be open yet)
 const pendingMessages = new Map<number, MarkedPageMessage[]>()
 const MAX_PENDING = 200
+const NATIVE_MENU_ROOT_ID = 'xstate-devtools.native'
+const NATIVE_MENU_COPY_VISIBLE_EVENTS_ID = 'xstate-devtools.copy-visible-events-json'
+const NATIVE_MENU_CLEAR_EVENTS_ID = 'xstate-devtools.clear-all-events'
+const NATIVE_MENU_TIME_TRAVEL_ID = 'xstate-devtools.time-travel-toggle-event'
+const NATIVE_MENU_COPY_EVENT_JSON_ID = 'xstate-devtools.copy-event-json'
+const NATIVE_MENU_COPY_EVENT_TYPE_ID = 'xstate-devtools.copy-event-type'
+const NATIVE_MENU_COPY_ACTOR_SESSION_ID = 'xstate-devtools.copy-actor-session-id'
+const NATIVE_MENU_CUSTOM_SEPARATOR_ID = 'xstate-devtools.custom-separator'
+const NATIVE_MENU_CUSTOM_SLOT_PREFIX = 'xstate-devtools.custom-slot-'
+const MAX_NATIVE_MENU_CUSTOM_SLOTS = 8
+
+let latestEventLogContext: {
+  inspectedTabId: number
+  context: EventLogNativeMenuContext
+} | null = null
+
+let latestNativePanelMenu: {
+  inspectedTabId: number
+  items: NativePanelMenuItem[]
+} | null = null
 
 const PAGE_MESSAGE_TYPES = new Set([
   'XSTATE_ACTOR_REGISTERED',
@@ -52,6 +79,202 @@ function asPanelToBackgroundMessage(data: unknown): PanelToBackgroundMessage | n
     type,
     sourceLocation,
   }
+}
+
+function asEventLogPanelContextMessage(data: unknown): EventLogPanelToBackgroundMessage | null {
+  if (!data || typeof data !== 'object') return null
+  const type = (data as { type?: unknown }).type
+  const inspectedTabId = (data as { inspectedTabId?: unknown }).inspectedTabId
+  const context = (data as { context?: unknown }).context
+
+  if (type !== 'XSTATE_EVENT_LOG_SET_NATIVE_MENU_CONTEXT') return null
+  if (typeof inspectedTabId !== 'number' || !Number.isFinite(inspectedTabId)) return null
+  if (!context || typeof context !== 'object') return null
+
+  const scope = (context as { scope?: unknown }).scope
+  const eventGlobalSeq = (context as { eventGlobalSeq?: unknown }).eventGlobalSeq
+  const sessionId = (context as { sessionId?: unknown }).sessionId
+
+  if (scope !== 'list' && scope !== 'event') return null
+  if (eventGlobalSeq !== undefined && typeof eventGlobalSeq !== 'number') return null
+  if (sessionId !== undefined && typeof sessionId !== 'string') return null
+
+  return {
+    type,
+    inspectedTabId,
+    context: {
+      scope,
+      eventGlobalSeq,
+      sessionId,
+    },
+  }
+}
+
+function asNativePanelMenuSetMessage(data: unknown): NativePanelMenuSetMessage | null {
+  if (!data || typeof data !== 'object') return null
+  const type = (data as { type?: unknown }).type
+  const inspectedTabId = (data as { inspectedTabId?: unknown }).inspectedTabId
+  const items = (data as { items?: unknown }).items
+
+  if (type !== 'XSTATE_NATIVE_PANEL_MENU_SET') return null
+  if (typeof inspectedTabId !== 'number' || !Number.isFinite(inspectedTabId)) return null
+  if (!Array.isArray(items)) return null
+
+  const normalizedItems: NativePanelMenuItem[] = []
+  for (const item of items) {
+    if (!item || typeof item !== 'object') return null
+    const id = (item as { id?: unknown }).id
+    const label = (item as { label?: unknown }).label
+    const disabled = (item as { disabled?: unknown }).disabled
+
+    if (typeof id !== 'string' || !id) return null
+    if (typeof label !== 'string' || !label) return null
+    if (disabled !== undefined && typeof disabled !== 'boolean') return null
+
+    normalizedItems.push({ id, label, disabled })
+  }
+
+  return {
+    type,
+    inspectedTabId,
+    items: normalizedItems,
+  }
+}
+
+function getCustomSlotMenuId(index: number): string {
+  return `${NATIVE_MENU_CUSTOM_SLOT_PREFIX}${index}`
+}
+
+function getCustomSlotIndex(menuItemId: unknown): number | null {
+  if (typeof menuItemId !== 'string') return null
+  if (!menuItemId.startsWith(NATIVE_MENU_CUSTOM_SLOT_PREFIX)) return null
+
+  const suffix = menuItemId.slice(NATIVE_MENU_CUSTOM_SLOT_PREFIX.length)
+  const index = Number.parseInt(suffix, 10)
+  if (!Number.isFinite(index) || index < 0 || index >= MAX_NATIVE_MENU_CUSTOM_SLOTS) return null
+  return index
+}
+
+function updateNativePanelMenuItems(items: NativePanelMenuItem[]): void {
+  if (!chrome.contextMenus) {
+    return
+  }
+
+  const visibleCount = Math.min(items.length, MAX_NATIVE_MENU_CUSTOM_SLOTS)
+
+  chrome.contextMenus.update(NATIVE_MENU_CUSTOM_SEPARATOR_ID, { visible: visibleCount > 0 })
+
+  for (let index = 0; index < MAX_NATIVE_MENU_CUSTOM_SLOTS; index += 1) {
+    const slotId = getCustomSlotMenuId(index)
+    const item = index < visibleCount ? items[index] : null
+
+    chrome.contextMenus.update(slotId, {
+      title: item?.label ?? '',
+      enabled: item ? !item.disabled : false,
+      visible: item !== null,
+    })
+  }
+}
+
+function getNativeMenuAction(menuItemId: unknown): EventLogNativeMenuAction | null {
+  switch (menuItemId) {
+    case NATIVE_MENU_COPY_VISIBLE_EVENTS_ID:
+      return 'copy-visible-events-json'
+    case NATIVE_MENU_CLEAR_EVENTS_ID:
+      return 'clear-all-events'
+    case NATIVE_MENU_TIME_TRAVEL_ID:
+      return 'time-travel-toggle-event'
+    case NATIVE_MENU_COPY_EVENT_JSON_ID:
+      return 'copy-event-json'
+    case NATIVE_MENU_COPY_EVENT_TYPE_ID:
+      return 'copy-event-type'
+    case NATIVE_MENU_COPY_ACTOR_SESSION_ID:
+      return 'copy-actor-session-id'
+    default:
+      return null
+  }
+}
+
+function createNativeContextMenus() {
+  if (!chrome.contextMenus) {
+    return
+  }
+
+  chrome.contextMenus.removeAll(() => {
+    const menuError = chrome.runtime.lastError
+    if (menuError) {
+      infoLog('background', 'failed to clear existing native menus', { error: menuError.message })
+      return
+    }
+
+    const contexts: chrome.contextMenus.ContextType[] = ['all']
+
+    chrome.contextMenus.create({
+      id: NATIVE_MENU_ROOT_ID,
+      title: 'XState DevTools',
+      contexts,
+    })
+
+    chrome.contextMenus.create({
+      id: NATIVE_MENU_COPY_VISIBLE_EVENTS_ID,
+      parentId: NATIVE_MENU_ROOT_ID,
+      title: 'Copy visible events JSON',
+      contexts,
+    })
+
+    chrome.contextMenus.create({
+      id: NATIVE_MENU_CLEAR_EVENTS_ID,
+      parentId: NATIVE_MENU_ROOT_ID,
+      title: 'Clear all events',
+      contexts,
+    })
+
+    chrome.contextMenus.create({
+      id: NATIVE_MENU_TIME_TRAVEL_ID,
+      parentId: NATIVE_MENU_ROOT_ID,
+      title: 'Time travel to event / Back to live',
+      contexts,
+    })
+
+    chrome.contextMenus.create({
+      id: NATIVE_MENU_COPY_EVENT_JSON_ID,
+      parentId: NATIVE_MENU_ROOT_ID,
+      title: 'Copy event JSON',
+      contexts,
+    })
+
+    chrome.contextMenus.create({
+      id: NATIVE_MENU_COPY_EVENT_TYPE_ID,
+      parentId: NATIVE_MENU_ROOT_ID,
+      title: 'Copy event type',
+      contexts,
+    })
+
+    chrome.contextMenus.create({
+      id: NATIVE_MENU_COPY_ACTOR_SESSION_ID,
+      parentId: NATIVE_MENU_ROOT_ID,
+      title: 'Copy actor session id',
+      contexts,
+    })
+
+    chrome.contextMenus.create({
+      id: NATIVE_MENU_CUSTOM_SEPARATOR_ID,
+      parentId: NATIVE_MENU_ROOT_ID,
+      type: 'separator',
+      visible: false,
+      contexts,
+    })
+
+    for (let index = 0; index < MAX_NATIVE_MENU_CUSTOM_SLOTS; index += 1) {
+      chrome.contextMenus.create({
+        id: getCustomSlotMenuId(index),
+        parentId: NATIVE_MENU_ROOT_ID,
+        title: `Custom action ${index + 1}`,
+        visible: false,
+        contexts,
+      })
+    }
+  })
 }
 
 /** Forward a page message to the panel, or buffer it if the panel is not open. */
@@ -129,6 +352,19 @@ function normalizeFilePath(filePath: string): string | null {
   const trimmed = filePath.trim()
   if (!trimmed) return null
 
+  const normalizedPlaceholder = trimmed.toLowerCase()
+  const slashlessPlaceholder = normalizedPlaceholder.replace(/^[./\\]+/, '')
+  if (
+    slashlessPlaceholder === '<anonymous>' ||
+    slashlessPlaceholder === 'anonymous' ||
+    slashlessPlaceholder === '(anonymous)' ||
+    slashlessPlaceholder === 'eval' ||
+    slashlessPlaceholder === '<eval>' ||
+    slashlessPlaceholder === '[native code]'
+  ) {
+    return null
+  }
+
   if (/^[a-zA-Z]:[\\/]/.test(trimmed)) {
     return trimmed.replace(/\\/g, '/')
   }
@@ -146,7 +382,8 @@ function normalizeFilePath(filePath: string): string | null {
         return pathname.slice('/@fs'.length)
       }
 
-      return pathname || null
+      // Non-file URLs without /@fs/ are browser paths, not local filesystem paths.
+      return null
     } catch {
       return null
     }
@@ -192,9 +429,7 @@ function getSourceHref(sourceLocation: string): string | null {
 
   const encodedPath = encodeURI(parsed.filePath)
   const pathPrefix = parsed.filePath.startsWith('/') ? '' : '/'
-  const suffix = parsed.line
-    ? `:${parsed.line}${parsed.column ? `:${parsed.column}` : ''}`
-    : ''
+  const suffix = parsed.line ? `:${parsed.line}${parsed.column ? `:${parsed.column}` : ''}` : ''
 
   return `vscode://file${pathPrefix}${encodedPath}${suffix}`
 }
@@ -274,6 +509,11 @@ chrome.runtime.onConnect.addListener((port: chrome.runtime.Port) => {
 
   const tabId = parseInt(match[1], 10)
   panelPorts.set(tabId, port)
+
+  // Re-register native menus when the panel connects. This guards against
+  // cases where the service worker started without menu state.
+  createNativeContextMenus()
+
   infoLog('background', 'panel connected', { tabId, portName: port.name })
 
   // Flush buffered messages to the newly connected panel
@@ -299,7 +539,7 @@ chrome.runtime.onConnect.addListener((port: chrome.runtime.Port) => {
   // Panel → content script (dispatch events) or other panel-specific messages
   port.onMessage.addListener((message: unknown) => {
     const obj = message as { type?: string; sourceLocation?: string }
-    
+
     // Handle XSTATE_OPEN_SOURCE from panel
     if (obj.type === 'XSTATE_OPEN_SOURCE' && typeof obj.sourceLocation === 'string') {
       debugLog('background', 'opening source location from panel', {
@@ -311,8 +551,27 @@ chrome.runtime.onConnect.addListener((port: chrome.runtime.Port) => {
     }
 
     // Handle dispatch messages to content script
+    const nativeContextUpdate = asEventLogPanelContextMessage(message)
+    if (nativeContextUpdate) {
+      latestEventLogContext = {
+        inspectedTabId: nativeContextUpdate.inspectedTabId,
+        context: nativeContextUpdate.context,
+      }
+      return
+    }
+
+    const nativePanelMenuUpdate = asNativePanelMenuSetMessage(message)
+    if (nativePanelMenuUpdate) {
+      latestNativePanelMenu = {
+        inspectedTabId: nativePanelMenuUpdate.inspectedTabId,
+        items: nativePanelMenuUpdate.items,
+      }
+      updateNativePanelMenuItems(nativePanelMenuUpdate.items)
+      return
+    }
+
     const dispatch = asDispatchMessage(message)
-    if (dispatch?.type === 'XSTATE_DISPATCH') {
+    if (dispatch) {
       debugLog('background', 'forwarding dispatch from panel to tab', {
         tabId,
         message: summarizeMessage(dispatch),
@@ -326,6 +585,47 @@ chrome.runtime.onConnect.addListener((port: chrome.runtime.Port) => {
     }
   })
 })
+
+createNativeContextMenus()
+
+if (chrome.contextMenus) {
+  chrome.runtime.onInstalled.addListener(() => {
+    createNativeContextMenus()
+  })
+
+  chrome.contextMenus.onClicked.addListener((info) => {
+    const customSlotIndex = getCustomSlotIndex(info.menuItemId)
+    if (customSlotIndex !== null && latestNativePanelMenu) {
+      const selectedItem = latestNativePanelMenu.items[customSlotIndex]
+      if (!selectedItem || selectedItem.disabled) {
+        return
+      }
+
+      const customActionMessage: NativePanelMenuActionMessage = {
+        type: 'XSTATE_NATIVE_PANEL_MENU_ACTION',
+        inspectedTabId: latestNativePanelMenu.inspectedTabId,
+        itemId: selectedItem.id,
+      }
+
+      chrome.runtime.sendMessage(customActionMessage, () => void chrome.runtime.lastError)
+      return
+    }
+
+    const action = getNativeMenuAction(info.menuItemId)
+    if (!action || !latestEventLogContext) {
+      return
+    }
+
+    const message: EventLogNativeMenuActionMessage = {
+      type: 'XSTATE_EVENT_LOG_NATIVE_MENU_ACTION',
+      inspectedTabId: latestEventLogContext.inspectedTabId,
+      action,
+      context: latestEventLogContext.context,
+    }
+
+    chrome.runtime.sendMessage(message, () => void chrome.runtime.lastError)
+  })
+}
 
 // Clean up when tab is closed or navigated
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -363,34 +663,32 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 // Fallback: content script → panel via chrome.runtime.sendMessage.
 // Used during the ~250 ms reconnect window when the persistent port is not yet
 // re-established after a service-worker restart.
-chrome.runtime.onMessage.addListener(
-  (message: unknown, sender: chrome.runtime.MessageSender) => {
-    const panelMessage = asPanelToBackgroundMessage(message)
-    if (panelMessage) {
-      infoLog('background', 'opening source location from runtime message', {
-        sourceLocation: panelMessage.sourceLocation,
-      })
-      openSourceLocation(panelMessage.sourceLocation)
-      return
+chrome.runtime.onMessage.addListener((message: unknown, sender: chrome.runtime.MessageSender) => {
+  const panelMessage = asPanelToBackgroundMessage(message)
+  if (panelMessage) {
+    infoLog('background', 'opening source location from runtime message', {
+      sourceLocation: panelMessage.sourceLocation,
+    })
+    openSourceLocation(panelMessage.sourceLocation)
+    return
+  }
+
+  const normalized = asPageMessage(message)
+  if (!normalized) return
+  const tabId = sender.tab?.id
+  if (tabId == null) return
+
+  if (normalized.type === 'XSTATE_ADAPTER_READY') {
+    if (panelPorts.has(tabId)) {
+      infoLog(
+        'background',
+        'adapter ready (sendMessage fallback); sending PANEL_CONNECTED for resync',
+        { tabId },
+      )
+      sendPanelConnected(tabId)
     }
+    return
+  }
 
-    const normalized = asPageMessage(message)
-    if (!normalized) return
-    const tabId = sender.tab?.id
-    if (tabId == null) return
-
-    if (normalized.type === 'XSTATE_ADAPTER_READY') {
-      if (panelPorts.has(tabId)) {
-        infoLog(
-          'background',
-          'adapter ready (sendMessage fallback); sending PANEL_CONNECTED for resync',
-          { tabId },
-        )
-        sendPanelConnected(tabId)
-      }
-      return
-    }
-
-    forwardToPanel(tabId, normalized)
-  },
-)
+  forwardToPanel(tabId, normalized)
+})

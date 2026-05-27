@@ -7,6 +7,7 @@ import type {
   PageToExtensionMessage,
 } from '../shared/types.js'
 import { Layout } from './components/Layout.js'
+import { PanelContextMenu } from './PanelContextMenu.js'
 import { DispatchContext } from './port-context.js'
 import { ServerControlsContext } from './server-context.js'
 import { setBackgroundPort } from './open-source.js'
@@ -392,6 +393,7 @@ export function App() {
         }}
       >
         <Layout />
+        <PanelContextMenu />
       </ServerControlsContext.Provider>
     </DispatchContext.Provider>
   )

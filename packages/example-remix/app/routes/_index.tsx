@@ -3,6 +3,8 @@ import { json } from '@remix-run/node'
 import { useFetcher, useLoaderData } from '@remix-run/react'
 import { AuthForm } from '../components/AuthForm.js'
 import { MediaPlayer } from '../components/MediaPlayer.js'
+import { NotificationsPanel } from '../components/NotificationsPanel.js'
+import { SearchPanel } from '../components/SearchPanel.js'
 import { ShoppingCart } from '../components/ShoppingCart.js'
 
 export async function loader(_args: LoaderFunctionArgs) {
@@ -64,6 +66,8 @@ export default function Index() {
         <AuthForm />
         <ShoppingCart />
         <MediaPlayer />
+        <NotificationsPanel />
+        <SearchPanel />
       </div>
     </div>
   )

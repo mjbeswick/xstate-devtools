@@ -1,8 +1,9 @@
 // packages/extension/src/panel/components/EventLog.tsx
-import { useLayoutEffect, useRef, useState } from 'react'
-import { PanelContextMenu, copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
 import { usePanelCollapse } from '../panel-collapse-context.js'
 import { getEventSourceStateNodeId, useStore } from '../store.js'
+import type {} from '../../shared/types.js'
 import { ClearLog, DisclosureTriangle, EventLog as EventLogIcon, PanelToggle } from './Icons.js'
 
 interface ScrollContainer {
@@ -171,61 +172,28 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
 
   const filtered = filter ? events.filter((e) => eventMatchesFilter(e.event.type, filter)) : events
 
-  const openListContextMenu = (event: React.MouseEvent) => {
-    contextMenu.openMenu(event, [
-      {
-        label: 'Copy visible events JSON',
-        disabled: filtered.length === 0,
-        onSelect: () => {
-          if (filtered.length === 0) return
-          void copyTextToClipboard(JSON.stringify(filtered.map((evt) => evt.event), null, 2))
-        },
-      },
-      {
-        label: events.length === 0 ? 'No events to clear' : 'Clear all events',
-        disabled: events.length === 0,
-        onSelect: clearEvents,
-      },
-    ])
-  }
-
-  const openEventContextMenu = (event: React.MouseEvent, evt: (typeof events)[number]) => {
+  const selectLogEvent = (
+    evt: (typeof filtered)[number],
+    options: { toggleIfCurrent: boolean },
+  ) => {
     const isCurrent = evt.globalSeq === timeTravelSeq
 
-    contextMenu.openMenu(event, [
-      {
-        label: isCurrent ? 'Back to live' : 'Time travel to event',
-        onSelect: () => {
-          if (isCurrent) {
-            timeTravel(null)
-            return
-          }
+    if (isCurrent && options.toggleIfCurrent) {
+      timeTravel(null)
+      return
+    }
 
-          const sourceStateNodeId = getEventSourceStateNodeId(
-            { actors, events, registeredSnapshots },
-            evt,
-          )
-          timeTravel(evt.globalSeq)
-          selectActor(evt.sessionId)
-          selectStateNode(sourceStateNodeId)
-          if (collapse.selectedEventCollapsed) {
-            collapse.toggleSelectedEvent()
-          }
-        },
-      },
-      {
-        label: 'Copy event JSON',
-        onSelect: () => void copyTextToClipboard(JSON.stringify(evt.event, null, 2)),
-      },
-      {
-        label: 'Copy event type',
-        onSelect: () => void copyTextToClipboard(evt.event.type),
-      },
-      {
-        label: 'Copy actor session id',
-        onSelect: () => void copyTextToClipboard(evt.sessionId),
-      },
-    ])
+    const sourceStateNodeId = getEventSourceStateNodeId(
+      { actors, events, registeredSnapshots },
+      evt,
+    )
+
+    timeTravel(evt.globalSeq)
+    selectActor(evt.sessionId)
+    selectStateNode(sourceStateNodeId)
+    if (collapse.selectedEventCollapsed) {
+      collapse.toggleSelectedEvent()
+    }
   }
 
   if (collapsed) {
@@ -331,7 +299,27 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
 
       <div
         ref={listRef}
-        onContextMenu={openListContextMenu}
+        onContextMenu={(event) => {
+          contextMenu.openMenu(event, [
+            {
+              label: 'Copy visible events JSON',
+              disabled: filtered.length === 0,
+              onSelect: () =>
+                void copyTextToClipboard(
+                  JSON.stringify(
+                    filtered.map((evt) => evt.event),
+                    null,
+                    2,
+                  ),
+                ),
+            },
+            {
+              label: 'Clear all events',
+              disabled: events.length === 0,
+              onSelect: () => clearEvents(),
+            },
+          ])
+        }}
         onScroll={(event) => {
           previousScrollTopRef.current = event.currentTarget.scrollTop
         }}
@@ -341,6 +329,7 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
           overflowAnchor: 'none',
           fontFamily: 'monospace',
           fontSize: 11,
+          userSelect: 'none',
         }}
       >
         {filtered.map((evt) => {
@@ -349,24 +338,46 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
           return (
             <div
               key={evt.globalSeq}
-              onContextMenu={(event) => {
-                openEventContextMenu(event, evt)
+              onClick={(event) => {
+                // Left click should select it
+                selectLogEvent(evt, { toggleIfCurrent: false })
               }}
-              onClick={() => {
-                if (isCurrent) {
-                  timeTravel(null)
-                  return
-                }
-                const sourceStateNodeId = getEventSourceStateNodeId(
-                  { actors, events, registeredSnapshots },
-                  evt,
-                )
-                timeTravel(evt.globalSeq)
-                selectActor(evt.sessionId)
-                selectStateNode(sourceStateNodeId)
-                if (collapse.selectedEventCollapsed) {
-                  collapse.toggleSelectedEvent()
-                }
+              onContextMenu={(event) => {
+                contextMenu.openMenu(event, [
+                  {
+                    label: isCurrent ? 'Back to live' : 'Time travel to event',
+                    onSelect: () => selectLogEvent(evt, { toggleIfCurrent: true }),
+                  },
+                  {
+                    label: 'Copy event JSON',
+                    onSelect: () => void copyTextToClipboard(JSON.stringify(evt.event, null, 2)),
+                  },
+                  {
+                    label: 'Copy event type',
+                    onSelect: () => void copyTextToClipboard(evt.event.type),
+                  },
+                  {
+                    label: 'Copy actor session id',
+                    onSelect: () => void copyTextToClipboard(evt.sessionId),
+                  },
+                  {
+                    label: 'Copy visible events JSON',
+                    disabled: filtered.length === 0,
+                    onSelect: () =>
+                      void copyTextToClipboard(
+                        JSON.stringify(
+                          filtered.map((evt) => evt.event),
+                          null,
+                          2,
+                        ),
+                      ),
+                  },
+                  {
+                    label: 'Clear all events',
+                    disabled: events.length === 0,
+                    onSelect: () => clearEvents(),
+                  },
+                ])
               }}
               style={{
                 display: 'grid',
@@ -395,8 +406,6 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
           )
         })}
       </div>
-
-      <PanelContextMenu menu={contextMenu.menu} onClose={contextMenu.closeMenu} />
     </div>
   )
 }

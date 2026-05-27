@@ -25,7 +25,14 @@ function svgProps({ size = 16, color = 'currentColor', style }: IconProps) {
 export function ChevronDown(p: IconProps = {}) {
   const { size = 16, color = 'currentColor', style } = p
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style} aria-hidden="true">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      style={style}
+      aria-hidden="true"
+    >
       <polygon points="6,9 18,9 12,16" fill={color} />
     </svg>
   )
@@ -33,7 +40,14 @@ export function ChevronDown(p: IconProps = {}) {
 export function ChevronRight(p: IconProps = {}) {
   const { size = 16, color = 'currentColor', style } = p
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style} aria-hidden="true">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      style={style}
+      aria-hidden="true"
+    >
       <polygon points="9,6 16,12 9,18" fill={color} />
     </svg>
   )
@@ -41,7 +55,14 @@ export function ChevronRight(p: IconProps = {}) {
 export function ChevronLeft(p: IconProps = {}) {
   const { size = 16, color = 'currentColor', style } = p
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style} aria-hidden="true">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      style={style}
+      aria-hidden="true"
+    >
       <polygon points="15,6 8,12 15,18" fill={color} />
     </svg>
   )
@@ -49,7 +70,14 @@ export function ChevronLeft(p: IconProps = {}) {
 export function ChevronUp(p: IconProps = {}) {
   const { size = 16, color = 'currentColor', style } = p
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style} aria-hidden="true">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      style={style}
+      aria-hidden="true"
+    >
       <polygon points="6,15 18,15 12,8" fill={color} />
     </svg>
   )

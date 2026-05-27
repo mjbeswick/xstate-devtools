@@ -41,19 +41,14 @@ describe('parseMachineTreeFilter', () => {
 describe('buildMachineTreeMatchSet', () => {
   it('matches state names by default', () => {
     expect(new Set(buildMachineTreeMatchSet(machineRoot, 'checkoutMachine', 'idle'))).toEqual(
-      new Set([
-      'checkout',
-      'checkout.idle',
-      ]),
+      new Set(['checkout', 'checkout.idle']),
     )
   })
 
   it('matches the full tree when filtering by machine only', () => {
     expect(
       new Set(buildMachineTreeMatchSet(machineRoot, 'checkoutMachine', 'machine:checkout')),
-    ).toEqual(
-      new Set(['checkout.idle', 'checkout.loading', 'checkout.error', 'checkout']),
-    )
+    ).toEqual(new Set(['checkout.idle', 'checkout.loading', 'checkout.error', 'checkout']))
   })
 
   it('supports combined machine and state filters', () => {
@@ -71,7 +66,9 @@ describe('buildMachineTreeMatchSet', () => {
   })
 
   it('excludes the whole tree when the machine is negated', () => {
-    expect(buildMachineTreeMatchSet(machineRoot, 'checkoutMachine', '-machine:checkout').size).toBe(0)
+    expect(buildMachineTreeMatchSet(machineRoot, 'checkoutMachine', '-machine:checkout').size).toBe(
+      0,
+    )
   })
 })
 

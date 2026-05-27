@@ -32,9 +32,8 @@ describe('adapter logging', () => {
 
     debugLog('web:adapter', 'debug message', { enabled: true })
 
-    expect(debugSpy).toHaveBeenCalledWith(
-      '[xstate-devtools:web:adapter] debug message',
-      { enabled: true },
-    )
+    expect(debugSpy).toHaveBeenCalledWith('[xstate-devtools:web:adapter] debug message', {
+      enabled: true,
+    })
   })
 })

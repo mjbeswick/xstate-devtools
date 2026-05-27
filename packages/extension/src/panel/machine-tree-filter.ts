@@ -65,7 +65,11 @@ function tokenMatches(token: FilterToken, machineId: string, node: SerializedSta
   }
 }
 
-function nodePassesTokens(tokens: FilterToken[], machineId: string, node: SerializedStateNode): boolean {
+function nodePassesTokens(
+  tokens: FilterToken[],
+  machineId: string,
+  node: SerializedStateNode,
+): boolean {
   const positiveTokens = tokens.filter((token) => !token.negated)
   const negativeTokens = tokens.filter((token) => token.negated)
 
@@ -89,7 +93,13 @@ export function buildMachineTreeMatchSet(
   }
 
   function visit(node: SerializedStateNode): boolean {
-    if (!nodePassesTokens(tokens.filter((token) => token.negated), machineId, node)) {
+    if (
+      !nodePassesTokens(
+        tokens.filter((token) => token.negated),
+        machineId,
+        node,
+      )
+    ) {
       return false
     }
 

@@ -4,6 +4,7 @@ import type { AnyActorRef } from 'xstate'
 import type {
   ExtensionToPageMessage,
   PageToExtensionMessage,
+  SerializedMachine,
   SerializedSnapshot,
 } from '../../extension/src/shared/types.js'
 import {
@@ -15,6 +16,15 @@ import { sanitize } from './sanitize.js'
 import { serializeMachine } from './serialize.js'
 
 export type Source = 'web' | 'srv'
+
+export interface InspectorOptions {
+  /**
+   * Absolute filesystem root for the web app. When provided, web stack frames
+   * like http://localhost:5173/app/... are remapped to <webSourceRoot>/app/...
+   * so VS Code source links can open local files.
+   */
+  webSourceRoot?: string
+}
 
 export interface Transport {
   /** Send a protocol message outbound (toward the panel). */
@@ -95,13 +105,131 @@ function warnLog(source: Source, message: string, details?: unknown) {
   baseWarnLog(`${source}:adapter`, message, details)
 }
 
-function getSourceLocation(): string | undefined {
+function isLibraryStackFrame(line: string): boolean {
+  const normalized = line.replace(/\\/g, '/').toLowerCase()
+  return (
+    normalized.includes('/node_modules/xstate/') ||
+    normalized.includes('/node_modules/@xstate/') ||
+    normalized.includes('/@xstate-devtools/adapter/') ||
+    normalized.includes('/packages/adapter/')
+  )
+}
+
+function normalizeStackFrame(line: string): string {
+  return line.trim().replace(/^at\s+/, '')
+}
+
+function extractStackFrameLocation(frame: string): string {
+  return frame.match(/\((.*)\)$/)?.[1] ?? frame
+}
+
+function isAnonymousOrEvalLocation(location: string): boolean {
+  const normalized = location
+    .trim()
+    .toLowerCase()
+    .replace(/^[./\\]+/, '')
+
+  return (
+    normalized === '<anonymous>' ||
+    normalized === 'anonymous' ||
+    normalized === '(anonymous)' ||
+    normalized === 'eval' ||
+    normalized === '<eval>' ||
+    normalized === '[native code]'
+  )
+}
+
+function hasFilesystemBackedPath(location: string): boolean {
+  const trimmed = location.trim()
+  if (!trimmed) return false
+
+  const match = trimmed.match(/^(.*?)(?::\d+)?(?::\d+)?$/)
+  const rawPath = (match?.[1] ?? trimmed).trim()
+  if (!rawPath || isAnonymousOrEvalLocation(rawPath)) return false
+
+  if (/^[a-zA-Z]:[\\/]/.test(rawPath)) return true
+  if (rawPath.startsWith('/') || rawPath.startsWith('./') || rawPath.startsWith('../')) return true
+
+  if (/^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(rawPath)) {
+    try {
+      const url = new URL(rawPath)
+      if (url.protocol === 'file:') return true
+      return url.pathname.startsWith('/@fs/')
+    } catch {
+      return false
+    }
+  }
+
+  return false
+}
+
+function remapWebUrlLocationToFsPath(
+  location: string,
+  source: Source,
+  options?: InspectorOptions,
+): string {
+  if (source !== 'web' || !options?.webSourceRoot) return location
+
+  const match = location.trim().match(/^(.*?)(?::(\d+))?(?::(\d+))?$/)
+  if (!match) return location
+
+  const [, rawPath, line, column] = match
+  if (!rawPath || !/^https?:\/\//.test(rawPath)) return location
+
   try {
-    const lines = new Error().stack?.split('\n') ?? []
-    const callerLine = lines.find(
-      (l, i) => i > 3 && !l.includes('xstate') && !l.includes('adapter'),
+    const url = new URL(rawPath)
+    const pathname = decodeURIComponent(url.pathname)
+    if (!pathname.startsWith('/app/')) return location
+
+    const root = options.webSourceRoot.replace(/\/+$/, '')
+    const filePath = `${root}${pathname}`
+    const suffix = line ? `:${line}${column ? `:${column}` : ''}` : ''
+    return `${filePath}${suffix}`
+  } catch {
+    return location
+  }
+}
+
+export function getSourceLocationFromStack(
+  stack?: string,
+  source: Source = 'web',
+  options?: InspectorOptions,
+): string | undefined {
+  const lines = stack?.split('\n') ?? []
+
+  for (let i = 0; i < lines.length; i += 1) {
+    if (i <= 2) continue
+
+    const line = lines[i]
+    if (isLibraryStackFrame(line)) continue
+
+    const normalizedFrame = normalizeStackFrame(line)
+    const location = remapWebUrlLocationToFsPath(
+      extractStackFrameLocation(normalizedFrame),
+      source,
+      options,
     )
-    return callerLine?.trim().replace(/^at\s+/, '')
+
+    if (!hasFilesystemBackedPath(location)) continue
+
+    const wrapped = normalizedFrame.match(/\((.*)\)$/)
+    if (wrapped) {
+      return normalizedFrame.replace(wrapped[1], location)
+    }
+
+    return location
+  }
+
+  return undefined
+}
+
+function getSourceLocation(source: Source, options?: InspectorOptions): string | undefined {
+  try {
+    const oldLimit = Error.stackTraceLimit
+    Error.stackTraceLimit = 50
+    const stack = new Error().stack
+    Error.stackTraceLimit = oldLimit
+    return getSourceLocationFromStack(stack, source, options)
   } catch {
     return undefined
   }
@@ -253,7 +381,11 @@ function buildTargetStateValue(
 function setActiveState(actorRef: AnyActorRef, stateNodeId: string): void {
   const mutableActorRef = actorRef as MutableActorRef
   const machine = mutableActorRef.logic
-  if (!machine?.getStateNodeById || !machine.resolveState || typeof mutableActorRef.update !== 'function') {
+  if (
+    !machine?.getStateNodeById ||
+    !machine.resolveState ||
+    typeof mutableActorRef.update !== 'function'
+  ) {
     throw new Error('Actor does not expose machine state mutation internals')
   }
 
@@ -297,8 +429,13 @@ function nextSeq(): number {
   return next
 }
 
-export function createInspector(transport: Transport, source: Source) {
+export function createInspector(
+  transport: Transport,
+  source: Source,
+  options: InspectorOptions = {},
+) {
   const actorRefs = new Map<string, AnyActorRef>()
+  const actorMachines = new Map<string, SerializedMachine | null>()
   const prefix = `${source}:`
   const tag = (sessionId: string) => prefix + sessionId
   const tagOptional = (id: string | undefined) => (id ? prefix + id : undefined)
@@ -320,6 +457,7 @@ export function createInspector(transport: Transport, source: Source) {
       debugLog(source, 'actor stopped; notifying transport', summarizeMessage(message))
       transport.send(message)
       actorRefs.delete(actorRef.sessionId)
+      actorMachines.delete(actorRef.sessionId)
     }
   }
 
@@ -331,8 +469,7 @@ export function createInspector(transport: Transport, source: Source) {
       // service worker was killed between page load and panel open.
       infoLog(source, 'panel connected; resyncing actors', { actorCount: actorRefs.size })
       actorRefs.forEach((actorRef, sessionId) => {
-        const actorLogic = (actorRef as { logic?: unknown }).logic as any
-        const machine = actorLogic?.root ? serializeMachine(actorLogic, getSourceLocation()) : null
+        const machine = actorMachines.get(sessionId) ?? null
         const resyncMessage: PageToExtensionMessage = {
           type: 'XSTATE_ACTOR_REGISTERED',
           sessionId: tag(sessionId),
@@ -379,7 +516,11 @@ export function createInspector(transport: Transport, source: Source) {
     if (message.type === 'XSTATE_SET_ACTIVE_STATE') {
       const local = stripIfMine(message.sessionId)
       if (local === null) {
-        debugLog(source, 'ignoring state activation for different source', summarizeMessage(message))
+        debugLog(
+          source,
+          'ignoring state activation for different source',
+          summarizeMessage(message),
+        )
         return
       }
 
@@ -395,6 +536,19 @@ export function createInspector(transport: Transport, source: Source) {
       try {
         debugLog(source, 'setting active state on actor', summarizeMessage(message))
         setActiveState(ref, message.stateNodeId)
+        const snapshotMessage: PageToExtensionMessage = {
+          type: 'XSTATE_SNAPSHOT',
+          sessionId: tag(local),
+          snapshot: safeSerializeSnapshot(ref),
+          timestamp: Date.now(),
+          globalSeq: nextSeq(),
+        }
+        debugLog(
+          source,
+          'sending snapshot after state activation',
+          summarizeMessage(snapshotMessage),
+        )
+        transport.send(snapshotMessage)
       } catch (error) {
         warnLog(source, 'failed to set active state', {
           error,
@@ -418,7 +572,10 @@ export function createInspector(transport: Transport, source: Source) {
       actorRefs.set(sessionId, actorRef)
 
       const actorLogic = (actorRef as { logic?: unknown }).logic as any
-      const machine = actorLogic?.root ? serializeMachine(actorLogic, getSourceLocation()) : null
+      const machine = actorLogic?.root
+        ? serializeMachine(actorLogic, getSourceLocation(source, options))
+        : null
+      actorMachines.set(sessionId, machine)
 
       const message: PageToExtensionMessage = {
         type: 'XSTATE_ACTOR_REGISTERED',
@@ -472,6 +629,7 @@ export function createInspector(transport: Transport, source: Source) {
     infoLog(source, 'disposing inspector', { actorCount: actorRefs.size })
     unsubscribe()
     actorRefs.clear()
+    actorMachines.clear()
   }
 
   return { inspect, dispose }

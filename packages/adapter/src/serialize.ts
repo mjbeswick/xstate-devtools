@@ -40,7 +40,10 @@ function serializeTransitionList(transitions: any[]): SerializedTransition[] {
     eventType: t.eventType ?? '',
     targets: (t.target ?? []).map((n: any) => n?.id ?? String(n)).filter(Boolean),
     guard: serializeGuard(t.guard),
-    actions: (t.actions ?? []).slice(0, MAX_ACTIONS_PER_TRANSITION).map(serializeAction).filter(Boolean),
+    actions: (t.actions ?? [])
+      .slice(0, MAX_ACTIONS_PER_TRANSITION)
+      .map(serializeAction)
+      .filter(Boolean),
   }))
 }
 

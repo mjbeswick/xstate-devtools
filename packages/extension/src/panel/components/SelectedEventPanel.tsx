@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { PanelContextMenu, copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
+import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
 import { getSelectedEvent, useStore } from '../store.js'
 import { AccordionSection } from './Accordion.js'
 import { JsonView } from './JsonView.js'
@@ -25,6 +25,20 @@ export function SelectedEventPanel() {
   return (
     <div
       ref={containerRef}
+      onMouseDown={(event) => {
+        if (event.button !== 2) return
+        if (!selectedEvent) return
+        contextMenu.openMenu(event, [
+          {
+            label: 'Copy selected event JSON',
+            onSelect: () => void copyTextToClipboard(JSON.stringify(selectedEvent.event, null, 2)),
+          },
+          {
+            label: 'Copy selected event type',
+            onSelect: () => void copyTextToClipboard(selectedEvent.event.type),
+          },
+        ])
+      }}
       onContextMenu={(event) => {
         if (!selectedEvent) return
         contextMenu.openMenu(event, [
@@ -59,7 +73,6 @@ export function SelectedEventPanel() {
           </div>
         )}
       </AccordionSection>
-      <PanelContextMenu menu={contextMenu.menu} onClose={contextMenu.closeMenu} />
     </div>
   )
 }

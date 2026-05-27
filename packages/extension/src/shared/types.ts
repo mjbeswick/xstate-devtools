@@ -131,6 +131,97 @@ export type PanelToBackgroundMessage = {
   sourceLocation: string
 }
 
+export interface EventLogNativeMenuContext {
+  scope: 'list' | 'event'
+  eventGlobalSeq?: number
+  sessionId?: string
+}
+
+export type EventLogNativeMenuAction =
+  | 'copy-visible-events-json'
+  | 'clear-all-events'
+  | 'time-travel-toggle-event'
+  | 'copy-event-json'
+  | 'copy-event-type'
+  | 'copy-actor-session-id'
+
+export interface EventLogNativeMenuActionMessage {
+  type: 'XSTATE_EVENT_LOG_NATIVE_MENU_ACTION'
+  inspectedTabId: number
+  action: EventLogNativeMenuAction
+  context: EventLogNativeMenuContext
+}
+
+export type EventLogPanelToBackgroundMessage = {
+  type: 'XSTATE_EVENT_LOG_SET_NATIVE_MENU_CONTEXT'
+  inspectedTabId: number
+  context: EventLogNativeMenuContext
+}
+
+export interface NativePanelMenuItem {
+  id: string
+  label: string
+  disabled?: boolean
+}
+
+export type NativePanelMenuSetMessage = {
+  type: 'XSTATE_NATIVE_PANEL_MENU_SET'
+  inspectedTabId: number
+  items: NativePanelMenuItem[]
+}
+
+export interface NativePanelMenuActionMessage {
+  type: 'XSTATE_NATIVE_PANEL_MENU_ACTION'
+  inspectedTabId: number
+  itemId: string
+}
+
+export interface NativeMenuContext {
+  target: 'event-log' | 'machine-tree' | 'side-panel'
+  scope?: 'list' | 'event'
+  eventGlobalSeq?: number
+  sessionId?: string
+  stateNodeId?: string
+  isActive?: boolean
+  transition?: SerializedTransition
+  sourceLocation?: string
+}
+
+export type NativeMenuAction =
+  | 'copy-visible-events-json'
+  | 'clear-all-events'
+  | 'time-travel-toggle-event'
+  | 'copy-event-json'
+  | 'copy-event-type'
+  | 'copy-actor-session-id'
+  | 'machine-tree-select-state-node'
+  | 'machine-tree-set-active-state'
+  | 'machine-tree-copy-state-node-id'
+  | 'side-panel-send-event'
+  | 'side-panel-copy-transition-json'
+  | 'side-panel-copy-transition-event-type'
+  | 'side-panel-open-source-location'
+  | 'side-panel-copy-source-location'
+
+export interface SetNativeMenuContextMessage {
+  type: 'XSTATE_SET_NATIVE_MENU_CONTEXT'
+  inspectedTabId: number
+  context: NativeMenuContext
+}
+
+export interface NativeMenuActionMessage {
+  type: 'XSTATE_NATIVE_MENU_ACTION'
+  inspectedTabId: number
+  action: NativeMenuAction
+  context: NativeMenuContext
+}
+
+export type PanelToBackgroundBridgeMessage =
+  | PanelToBackgroundMessage
+  | EventLogPanelToBackgroundMessage
+  | NativePanelMenuSetMessage
+  | SetNativeMenuContextMessage
+
 // Marker added to all postMessages so content script can filter
 export type MarkedPageMessage = PageToExtensionMessage & { __xstateDevtools: true }
 export type MarkedExtensionMessage = ExtensionToPageMessage & { __xstateDevtools: true }

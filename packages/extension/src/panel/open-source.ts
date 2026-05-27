@@ -2,6 +2,19 @@ function normalizeFilePath(filePath: string): string | null {
   const trimmed = filePath.trim()
   if (!trimmed) return null
 
+  const normalizedPlaceholder = trimmed.toLowerCase()
+  const slashlessPlaceholder = normalizedPlaceholder.replace(/^[./\\]+/, '')
+  if (
+    slashlessPlaceholder === '<anonymous>' ||
+    slashlessPlaceholder === 'anonymous' ||
+    slashlessPlaceholder === '(anonymous)' ||
+    slashlessPlaceholder === 'eval' ||
+    slashlessPlaceholder === '<eval>' ||
+    slashlessPlaceholder === '[native code]'
+  ) {
+    return null
+  }
+
   if (/^[a-zA-Z]:[\\/]/.test(trimmed)) {
     return trimmed.replace(/\\/g, '/')
   }
@@ -19,7 +32,8 @@ function normalizeFilePath(filePath: string): string | null {
         return pathname.slice('/@fs'.length)
       }
 
-      return pathname || null
+      // Non-file URLs without /@fs/ are browser paths, not local filesystem paths.
+      return null
     } catch {
       return null
     }
@@ -68,11 +82,14 @@ export function getSourceHref(sourceLocation: string): string | null {
 
   const encodedPath = encodeURI(parsed.filePath)
   const pathPrefix = parsed.filePath.startsWith('/') ? '' : '/'
-  const suffix = parsed.line
-    ? `:${parsed.line}${parsed.column ? `:${parsed.column}` : ''}`
-    : ''
+  const suffix = parsed.line ? `:${parsed.line}${parsed.column ? `:${parsed.column}` : ''}` : ''
 
   return `vscode://file${pathPrefix}${encodedPath}${suffix}`
+}
+
+export function canOpenSourceLocation(sourceLocation: string | undefined): boolean {
+  if (!sourceLocation) return false
+  return getSourceHref(sourceLocation) !== null
 }
 
 let _backgroundPort: chrome.runtime.Port | null = null

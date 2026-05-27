@@ -1,9 +1,14 @@
 // packages/extension/src/panel/components/SidePanel.tsx
-import { useCallback, useState } from 'react'
-import type { SerializedStateNode, SerializedTransition } from '../../shared/types.js'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type {
+  NativePanelMenuActionMessage,
+  NativePanelMenuSetMessage,
+  SerializedStateNode,
+  SerializedTransition,
+} from '../../shared/types.js'
 import { getActiveNodeIds } from '../active-nodes.js'
-import { PanelContextMenu, copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
-import { openSourceLocation } from '../open-source.js'
+import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
+import { canOpenSourceLocation, openSourceLocation } from '../open-source.js'
 import { useDispatch } from '../port-context.js'
 import { getDisplaySnapshot, useStore } from '../store.js'
 import { AccordionSection } from './Accordion.js'
@@ -46,6 +51,10 @@ function TransitionRow({
 }) {
   return (
     <div
+      onMouseDown={(event) => {
+        if (event.button !== 2) return
+        onOpenContextMenu(event, transition)
+      }}
       onContextMenu={(event) => onOpenContextMenu(event, transition)}
       style={{
         padding: '5px 0',
@@ -118,7 +127,10 @@ export function SidePanel() {
   const node =
     actor?.machine && selectedStateNodeId ? findNode(actor.machine.root, selectedStateNodeId) : null
   const activeIds =
-    actor?.machine && snapshot ? getActiveNodeIds(snapshot.value as any, actor.machine.root) : new Set()
+    actor?.machine && snapshot
+      ? getActiveNodeIds(snapshot.value as any, actor.machine.root)
+      : new Set()
+  const canOpenSource = canOpenSourceLocation(actor?.machine?.sourceLocation)
   const selectedNodeIsActive = node ? activeIds.has(node.id) : false
   const sortedOnTransitions = node ? sortTransitions(node.on) : []
   const sortedAlwaysTransitions = node ? sortTransitions(node.always) : []
@@ -156,26 +168,35 @@ export function SidePanel() {
     (event: React.MouseEvent, transition: SerializedTransition) => {
       contextMenu.openMenu(event, [
         {
-          label: transition.eventType ? 'Send event' : 'Send event',
-          disabled: !transition.eventType,
+          label: 'Send event',
+          disabled: !transition.eventType || !canSendEvents,
           onSelect: () => {
             if (transition.eventType) dispatch(transition.eventType)
           },
         },
         {
-          label: 'Copy transition JSON',
-          onSelect: () => void copyTextToClipboard(JSON.stringify(transition, null, 2)),
+          label: 'Log event type to console',
+          disabled: !transition.eventType,
+          onSelect: () => {
+            if (!transition.eventType) return
+            chrome.devtools.inspectedWindow.eval(
+              'console.log("XState DevTools:',
+              // Escaping quotes for eval payload
+              transition.eventType.replace(/"/g, '"'),
+              '")',
+            )
+          },
         },
         {
           label: 'Copy event type',
           disabled: !transition.eventType,
           onSelect: () => {
-            if (transition.eventType) void copyTextToClipboard(transition.eventType)
+            if (transition.eventType) copyTextToClipboard(transition.eventType)
           },
         },
       ])
     },
-    [contextMenu, dispatch],
+    [dispatch, contextMenu],
   )
 
   if (!actor) {
@@ -366,11 +387,31 @@ export function SidePanel() {
               source:{' '}
               <button
                 type="button"
+                onMouseDown={(event) => {
+                  if (event.button !== 2) return
+
+                  contextMenu.openMenu(event, [
+                    {
+                      label: 'Open source location',
+                      disabled: !canOpenSource,
+                      onSelect: () => {
+                        if (canOpenSource) openSourceLocation(actor.machine.sourceLocation)
+                      },
+                    },
+                    {
+                      label: 'Copy source location',
+                      onSelect: () => void copyTextToClipboard(actor.machine.sourceLocation),
+                    },
+                  ])
+                }}
                 onContextMenu={(event) => {
                   contextMenu.openMenu(event, [
                     {
                       label: 'Open source location',
-                      onSelect: () => openSourceLocation(actor.machine.sourceLocation),
+                      disabled: !canOpenSource,
+                      onSelect: () => {
+                        if (canOpenSource) openSourceLocation(actor.machine.sourceLocation)
+                      },
                     },
                     {
                       label: 'Copy source location',
@@ -379,16 +420,16 @@ export function SidePanel() {
                   ])
                 }}
                 style={{
-                  color: '#1890ff',
+                  color: canOpenSource ? '#1890ff' : '#999',
                   padding: 0,
                   background: 'transparent',
                   border: 'none',
-                  cursor: 'pointer',
+                  cursor: canOpenSource ? 'pointer' : 'default',
                   font: 'inherit',
-                  textDecoration: 'underline',
+                  textDecoration: canOpenSource ? 'underline' : 'none',
                 }}
                 onClick={() => {
-                  openSourceLocation(actor.machine.sourceLocation)
+                  if (canOpenSource) openSourceLocation(actor.machine.sourceLocation)
                 }}
               >
                 {actor.machine.sourceLocation}
@@ -397,7 +438,6 @@ export function SidePanel() {
           )}
         </div>
       </AccordionSection>
-      <PanelContextMenu menu={contextMenu.menu} onClose={contextMenu.closeMenu} />
     </div>
   )
 }
