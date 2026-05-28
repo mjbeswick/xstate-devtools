@@ -181,21 +181,32 @@ export function App() {
       return DEFAULT_SERVER_URL
     }
   })
+  const [urlResolved, setUrlResolved] = useState(false)
 
   // Attempt to auto-discover server URL from the inspected page via meta tag
   // or window variable injected by the adapter/server.
   useEffect(() => {
-    const code = `
-      document.querySelector("meta[name=\\"xstate-devtools-url\\"]")?.content ||
-      window.__XSTATE_DEVTOOLS_SERVER_URL__
-    `
-    chrome.devtools.inspectedWindow.eval(code, (result, err) => {
-      if (!err && typeof result === 'string' && result) {
-        infoLog('panel', 'auto-discovered server URL from page meta/window', result)
-        setServerUrl(result)
-      }
-    })
-  }, []) // Also re-check upon page navigation
+    const checkUrl = () => {
+      const code = `
+        document.querySelector("meta[name=\\"xstate-devtools-url\\"]")?.content ||
+        window.__XSTATE_DEVTOOLS_SERVER_URL__
+      `
+      chrome.devtools.inspectedWindow.eval(code, (result, err) => {
+        if (!err && typeof result === 'string' && result) {
+          infoLog('panel', 'auto-discovered server URL from page meta/window', result)
+          setServerUrl(result)
+        }
+        setUrlResolved(true)
+      })
+    }
+
+    checkUrl()
+    chrome.devtools.network.onNavigated.addListener(checkUrl)
+
+    return () => {
+      chrome.devtools.network.onNavigated.removeListener(checkUrl)
+    }
+  }, [])
 
   const [serverStatus, setServerStatus] = useState<
     'idle' | 'connecting' | 'open' | 'closed' | 'error'
@@ -312,6 +323,8 @@ export function App() {
 
   // Server transport — WebSocket to user-supplied endpoint (always enabled)
   useEffect(() => {
+    if (!urlResolved) return
+
     let ws: WebSocket
     let reconnectTimer: number | null = null
     let cancelled = false
@@ -374,7 +387,7 @@ export function App() {
       ws?.close()
       wsRef.current = null
     }
-  }, [serverUrl, ingest])
+  }, [serverUrl, urlResolved, ingest])
 
   const dispatch = useCallback((message: ExtensionToPageMessage) => {
     // Broadcast to all transports — receivers ignore unknown sessionIds.
