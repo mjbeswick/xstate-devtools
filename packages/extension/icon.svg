@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="24" fill="#1f1147"/>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="5" markerHeight="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c4b5fd"/>
+    </marker>
+  </defs>
+  <g fill="none" stroke="#c4b5fd" stroke-width="4" marker-end="url(#a)">
+    <path d="M48,40 L80,40"/>
+    <path d="M88,52 L88,76"/>
+    <path d="M76,88 L52,88"/>
+  </g>
+  <circle cx="36" cy="40" r="14" fill="#a78bfa"/>
+  <circle cx="92" cy="40" r="14" fill="none" stroke="#c4b5fd" stroke-width="4"/>
+  <circle cx="92" cy="88" r="14" fill="none" stroke="#c4b5fd" stroke-width="4"/>
+  <circle cx="36" cy="88" r="14" fill="none" stroke="#c4b5fd" stroke-width="4"/>
+</svg>
