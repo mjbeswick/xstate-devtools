@@ -569,35 +569,13 @@ export function createInspector(
     if (inspectionEvent.type === '@xstate.actor') {
       const actorRef: AnyActorRef = inspectionEvent.actorRef
       const sessionId: string = actorRef.sessionId
-      actorRefs.set(sessionId, actorRef)
 
-      // Eagerly remove the actor from both maps when it stops so we don't
-      // accumulate strong references to every short-lived actor indefinitely.
-      // Without this, actors that stop silently (no further snapshot/event) are
-      // only removed by checkAndNotifyStop — which never fires for them.
-      try {
-        actorRef.subscribe({
-          complete: () => {
-            if (actorRefs.has(sessionId)) {
-              actorRefs.delete(sessionId)
-              actorMachines.delete(sessionId)
-              const stopMsg: PageToExtensionMessage = {
-                type: 'XSTATE_ACTOR_STOPPED',
-                sessionId: tag(sessionId),
-              }
-              debugLog(source, 'actor completed; notifying transport', summarizeMessage(stopMsg))
-              transport.send(stopMsg)
-            }
-          },
-          error: () => {
-            actorRefs.delete(sessionId)
-            actorMachines.delete(sessionId)
-          },
-        })
-      } catch {
-        // subscribe is best-effort; older actor implementations may not support it
-      }
-
+      // Serialize machine and populate both Maps BEFORE subscribing so that
+      // the Maps are fully consistent if complete()/error() ever fire
+      // synchronously during subscribe() (e.g. an actor that starts in a
+      // final state).  Populating after subscribe introduced a race where
+      // actorMachines.delete() in the callback was a no-op and the subsequent
+      // actorMachines.set() would leak the entry permanently.
       const actorLogic = (actorRef as { logic?: unknown }).logic as any
       const machine = actorLogic?.root
         ? serializeMachine(
@@ -605,7 +583,30 @@ export function createInspector(
             actorLogic.config?.__xstateDevtoolsSource ?? getSourceLocation(source, options),
           )
         : null
+      actorRefs.set(sessionId, actorRef)
       actorMachines.set(sessionId, machine)
+
+      // Eagerly remove the actor from both maps when it stops so we don't
+      // accumulate strong references to every short-lived actor indefinitely.
+      // Without this, actors that stop silently (no further snapshot/event) are
+      // only removed by checkAndNotifyStop — which never fires for them.
+      const notifyStop = () => {
+        if (actorRefs.has(sessionId)) {
+          actorRefs.delete(sessionId)
+          actorMachines.delete(sessionId)
+          const stopMsg: PageToExtensionMessage = {
+            type: 'XSTATE_ACTOR_STOPPED',
+            sessionId: tag(sessionId),
+          }
+          debugLog(source, 'actor stopped; notifying transport', summarizeMessage(stopMsg))
+          transport.send(stopMsg)
+        }
+      }
+      try {
+        actorRef.subscribe({ complete: notifyStop, error: notifyStop })
+      } catch {
+        // subscribe is best-effort; older actor implementations may not support it
+      }
 
       const message: PageToExtensionMessage = {
         type: 'XSTATE_ACTOR_REGISTERED',
