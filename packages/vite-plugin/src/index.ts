@@ -8,8 +8,8 @@
  *   export default defineConfig({ plugins: [xstateDevtoolsPlugin()] })
  */
 
-import { createServer } from 'net'
-import path from 'path'
+import { createServer } from 'node:net'
+import path from 'node:path'
 import type { Plugin } from 'vite'
 
 function getAvailablePort(start: number): Promise<number> {

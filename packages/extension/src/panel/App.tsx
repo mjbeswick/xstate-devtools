@@ -195,13 +195,13 @@ export function App() {
         setServerUrl(result)
       }
     })
-  }, [reconnectKey]) // Also re-check upon page navigation
+  }, []) // Also re-check upon page navigation
 
   const [serverStatus, setServerStatus] = useState<
     'idle' | 'connecting' | 'open' | 'closed' | 'error'
   >('connecting')
   const [portConnected, setPortConnected] = useState(false)
-  const [browserMsgCount, setBrowserMsgCount] = useState(0)
+  const [_browserMsgCount, setBrowserMsgCount] = useState(0)
 
   // Log connection state changes to console so they are visible without enabling verbose DevTools logging
   useEffect(() => {

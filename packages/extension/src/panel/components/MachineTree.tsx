@@ -16,12 +16,7 @@ function findPath(root: SerializedStateNode, id: string): SerializedStateNode[] 
   return null
 }
 
-import type {
-  ActorRecord,
-  NativePanelMenuActionMessage,
-  NativePanelMenuSetMessage,
-  SerializedStateNode,
-} from '../../shared/types.js'
+import type { ActorRecord, SerializedStateNode } from '../../shared/types.js'
 import { usePanelCollapse } from '../panel-collapse-context.js'
 import { useServerControls } from '../server-context.js'
 import { getStateNodeTitle } from '../tree-metadata.js'
@@ -326,6 +321,13 @@ export function MachineTree() {
           label: 'Copy state node id',
           onSelect: () => void copyTextToClipboard(node.id),
         },
+        {
+          label: 'Go to definition',
+          disabled: !canOpenSourceLocation(node.sourceLocation),
+          onSelect: () => {
+            if (node.sourceLocation) openSourceLocation(node.sourceLocation)
+          },
+        },
       ])
     },
     [contextMenu, selectStateNode, selectedActorId, dispatch],
@@ -377,7 +379,7 @@ export function MachineTree() {
   // Reset navigation index when filter text changes
   React.useEffect(() => {
     setCurrentMatchIndex(0)
-  }, [treeFilter])
+  }, [])
 
   // Focus the input whenever the search bar opens
   React.useEffect(() => {
@@ -525,19 +527,17 @@ export function MachineTree() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         {serverControls && serverControls.status !== 'idle' && (
-          <>
-            <span
-              title={`${serverControls.status} · ${serverControls.url}`}
-              style={{
-                display: 'inline-block',
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: serverDot,
-                flexShrink: 0,
-              }}
-            />
-          </>
+          <span
+            title={`${serverControls.status} · ${serverControls.url}`}
+            style={{
+              display: 'inline-block',
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: serverDot,
+              flexShrink: 0,
+            }}
+          />
         )}
         <span
           style={{

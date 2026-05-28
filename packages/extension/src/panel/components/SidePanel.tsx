@@ -1,11 +1,6 @@
 // packages/extension/src/panel/components/SidePanel.tsx
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type {
-  NativePanelMenuActionMessage,
-  NativePanelMenuSetMessage,
-  SerializedStateNode,
-  SerializedTransition,
-} from '../../shared/types.js'
+import { useCallback, useState } from 'react'
+import type { SerializedStateNode, SerializedTransition } from '../../shared/types.js'
 import { getActiveNodeIds } from '../active-nodes.js'
 import { canOpenSourceLocation, getSourceHref, openSourceLocation } from '../open-source.js'
 import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'

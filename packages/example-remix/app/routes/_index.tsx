@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from '@remix-run/node'
 import { json } from '@remix-run/node'
-import { useFetcher, useLoaderData } from '@remix-run/react'
+import { useFetcher, useLoaderData, useRevalidator } from '@remix-run/react'
+import { useEffect } from 'react'
 import { AuthForm } from '../components/AuthForm.js'
 import { MediaPlayer } from '../components/MediaPlayer.js'
 import { NotificationsPanel } from '../components/NotificationsPanel.js'
@@ -14,6 +15,7 @@ export async function loader(_args: LoaderFunctionArgs) {
     state: typeof snapshot.value === 'string' ? snapshot.value : JSON.stringify(snapshot.value),
     ticks: snapshot.context.ticks,
     jobsProcessed: snapshot.context.jobsProcessed,
+    failedJobs: snapshot.context.failedJobs,
     lastJobId: snapshot.context.lastJobId,
   })
 }
@@ -27,6 +29,14 @@ export async function action() {
 export default function Index() {
   const data = useLoaderData<typeof loader>()
   const fetcher = useFetcher<typeof action>()
+  const revalidator = useRevalidator()
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      revalidator.revalidate()
+    }, 1000)
+    return () => clearInterval(id)
+  }, [revalidator])
 
   return (
     <div>
@@ -49,7 +59,7 @@ export default function Index() {
         <strong>Server-side orchestrator</strong> (running in Node)
         <div style={{ fontSize: 12, color: '#555', marginTop: 6 }}>
           state: <code>{data.state}</code> · ticks: <strong>{data.ticks}</strong> · jobs:{' '}
-          <strong>{data.jobsProcessed}</strong>
+          <strong>{data.jobsProcessed}</strong> · failed: <strong>{data.failedJobs}</strong>
           {data.lastJobId && (
             <>
               {' '}

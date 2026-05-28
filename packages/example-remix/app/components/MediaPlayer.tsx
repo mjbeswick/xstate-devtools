@@ -33,27 +33,51 @@ export function MediaPlayer() {
       )}
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-        <button onClick={() => send({ type: 'LOAD', src: 'example.mp4', duration: 120 })}>
+        <button
+          type="button"
+          onClick={() => send({ type: 'LOAD', src: 'example.mp4', duration: 120 })}
+        >
           Load
         </button>
-        <button onClick={() => send({ type: 'PLAY' })}>Play</button>
-        <button onClick={() => send({ type: 'PAUSE' })}>Pause</button>
-        <button onClick={() => send({ type: 'PAUSE_AUTO' })}>Pause (auto-buffer)</button>
-        <button onClick={() => send({ type: 'STOP' })}>Stop</button>
+        <button type="button" onClick={() => send({ type: 'PLAY' })}>
+          Play
+        </button>
+        <button type="button" onClick={() => send({ type: 'PAUSE' })}>
+          Pause
+        </button>
+        <button type="button" onClick={() => send({ type: 'PAUSE_AUTO' })}>
+          Pause (auto-buffer)
+        </button>
+        <button type="button" onClick={() => send({ type: 'STOP' })}>
+          Stop
+        </button>
       </div>
 
       {state.matches({ active: 'playing' }) && (
         <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #eee' }}>
           <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Playback controls:</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button onClick={() => send({ type: 'SEEK_START' })}>Start scrubbing</button>
-            <button onClick={() => send({ type: 'SEEK_END' })}>End scrubbing</button>
-            <button onClick={() => send({ type: 'SEEK', position: state.context.position + 10 })}>
+            <button type="button" onClick={() => send({ type: 'SEEK_START' })}>
+              Start scrubbing
+            </button>
+            <button type="button" onClick={() => send({ type: 'SEEK_END' })}>
+              End scrubbing
+            </button>
+            <button
+              type="button"
+              onClick={() => send({ type: 'SEEK', position: state.context.position + 10 })}
+            >
               Seek +10s
             </button>
-            <button onClick={() => send({ type: 'RATE_FAST' })}>2× speed</button>
-            <button onClick={() => send({ type: 'RATE_NORMAL' })}>1× speed</button>
-            <button onClick={() => send({ type: 'VOLUME', level: 50 })}>Vol 50%</button>
+            <button type="button" onClick={() => send({ type: 'RATE_FAST' })}>
+              2× speed
+            </button>
+            <button type="button" onClick={() => send({ type: 'RATE_NORMAL' })}>
+              1× speed
+            </button>
+            <button type="button" onClick={() => send({ type: 'VOLUME', level: 50 })}>
+              Vol 50%
+            </button>
           </div>
         </div>
       )}

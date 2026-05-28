@@ -2,6 +2,19 @@
 
 Chrome DevTools extension for inspecting XState v5 machines at runtime — both browser-side and Node.js-side actors — with time travel and event dispatch.
 
+## The problem
+
+Debugging XState machines with `console.log` or the Network tab is painful. You see raw JSON snapshots and event payloads with no sense of the machine's shape, and you can't tell which states are currently active, which transitions are possible, or how you got here.
+
+Standard DevTools know nothing about state machine topology. When an actor lives on the server, you have zero visibility into it from the browser at all.
+
+XState DevTools solves this by embedding a purpose-built panel directly in Chrome DevTools that understands XState's actor model:
+
+- Visualises the full machine tree with active states highlighted
+- Shows every event as it happens and lets you rewind to any point in time
+- Bridges server-side Node actors over WebSocket so they appear alongside browser actors in the same panel
+- Links each state definition back to the exact line in your editor
+
 ![XState DevTools panel](docs/screenshot.png)
 
 ## What you get

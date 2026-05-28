@@ -1,5 +1,5 @@
 // packages/extension/src/panel/components/EventLog.tsx
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type {} from '../../shared/types.js'
 import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
 import { usePanelCollapse } from '../panel-collapse-context.js'
@@ -338,7 +338,7 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
           return (
             <div
               key={evt.globalSeq}
-              onClick={(event) => {
+              onClick={(_event) => {
                 // Left click should select it
                 selectLogEvent(evt, { toggleIfCurrent: false })
               }}

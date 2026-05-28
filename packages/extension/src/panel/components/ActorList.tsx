@@ -56,7 +56,7 @@ export function ActorList() {
     setExpanded((current) => ({ ...nextExpanded, ...current }))
   }, [selectedActorId, actors])
 
-  function isExpanded(sessionId: string, hasChildren: boolean, depth: number) {
+  function isExpanded(sessionId: string, hasChildren: boolean, _depth: number) {
     if (!hasChildren) return false
     return expanded[sessionId] ?? true
   }
