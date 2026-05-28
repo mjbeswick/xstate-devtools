@@ -119,40 +119,49 @@ export const authMachine = setup({
       on: { LOGOUT: { target: 'idle', actions: 'clearCredentials' } },
       states: {
         active: {
+          description: 'The app is active and showing a page.',
           initial: 'home',
           states: {
             home: {
+              description: 'User is on the home feed.',
               on: {
                 VIEW_PROFILE: 'profile',
                 VIEW_SETTINGS: 'settings',
               },
             },
             profile: {
+              description: 'User is viewing their profile.',
               on: {
                 VIEW_HOME: 'home',
                 VIEW_SETTINGS: 'settings',
               },
             },
             settings: {
+              description: 'User is in the settings dashboard.',
               initial: 'general',
               on: { VIEW_HOME: 'home', VIEW_PROFILE: 'profile' },
               states: {
                 general: {
+                  description: 'Showing general settings.',
                   on: { TAB_SECURITY: 'security', TAB_BILLING: 'billing' },
                 },
                 security: {
+                  description: 'Showing security-related settings.',
                   initial: 'overview',
                   on: { TAB_GENERAL: 'general', TAB_BILLING: 'billing' },
                   states: {
                     overview: {
+                      description: 'Security overview page.',
                       on: { TOGGLE_2FA: 'twoFactor' },
                     },
                     twoFactor: {
+                      description: 'Two-factor authentication configuration.',
                       on: { TOGGLE_2FA: 'overview' },
                     },
                   },
                 },
                 billing: {
+                  description: 'Showing billing and subscription details.',
                   on: { TAB_GENERAL: 'general', TAB_SECURITY: 'security' },
                 },
               },

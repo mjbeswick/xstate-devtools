@@ -87,9 +87,11 @@ export const cartMachine = setup({
               on: { OPEN_PAYMENT: 'choosingPayment' },
             },
             choosingPayment: {
+              description: 'User is picking a payment method.',
               initial: 'card',
               states: {
                 card: {
+                  description: 'Credit card payment selected.',
                   on: {
                     PICK_PAYPAL: 'paypal',
                     CONFIRM_PAYMENT: {
@@ -99,6 +101,7 @@ export const cartMachine = setup({
                   },
                 },
                 paypal: {
+                  description: 'PayPal payment selected.',
                   on: {
                     PICK_CARD: 'card',
                     CONFIRM_PAYMENT: {

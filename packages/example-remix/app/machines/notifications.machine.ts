@@ -38,12 +38,14 @@ export const notificationsMachine = setup({
       },
     },
     requesting: {
+      description: 'Prompting the user for notification permissions.',
       on: {
         GRANT: { target: 'enabled', actions: 'grantPermission' },
         DENY: { target: 'disabled', actions: 'denyPermission' },
       },
     },
     enabled: {
+      description: 'Notifications are active and permission is granted.',
       on: {
         PUSH_MESSAGE: { actions: 'addUnread' },
         MARK_ALL_READ: { actions: 'clearUnread' },
@@ -51,6 +53,7 @@ export const notificationsMachine = setup({
       },
     },
     disabled: {
+      description: 'Notifications are disabled or permission was denied.',
       on: {
         REQUEST_PERMISSION: 'requesting',
       },
