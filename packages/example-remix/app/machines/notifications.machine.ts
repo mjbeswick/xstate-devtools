@@ -32,6 +32,7 @@ export const notificationsMachine = setup({
   },
   states: {
     off: {
+      description: 'Notifications have not been set up yet.',
       on: {
         REQUEST_PERMISSION: 'requesting',
       },

@@ -63,6 +63,7 @@ export const authMachine = setup({
   context: { email: '', password: '', token: null, error: null, mfaCode: '' },
   states: {
     idle: {
+      description: 'Waiting for the user to enter their email and password.',
       on: {
         SUBMIT: {
           target: 'authenticating',
@@ -72,9 +73,11 @@ export const authMachine = setup({
       },
     },
     authenticating: {
+      description: 'Verifying the user\'s credentials with the server.',
       initial: 'submittingCredentials',
       states: {
         submittingCredentials: {
+          description: 'Sending email and password to the login service.',
           invoke: {
             id: 'login',
             src: 'loginService',
@@ -90,11 +93,13 @@ export const authMachine = setup({
           },
         },
         awaitingMfa: {
+          description: 'Credentials accepted — waiting for the user to enter their 6-digit MFA code.',
           on: {
             MFA_SUBMIT: { target: 'verifyingMfa', actions: 'setMfaCode' },
           },
         },
         verifyingMfa: {
+          description: 'Validating the MFA code with the server.',
           invoke: {
             id: 'mfa',
             src: 'verifyMfa',
@@ -109,6 +114,7 @@ export const authMachine = setup({
       },
     },
     authenticated: {
+      description: 'User is logged in and can navigate the app.',
       initial: 'active',
       on: { LOGOUT: { target: 'idle', actions: 'clearCredentials' } },
       states: {
@@ -156,6 +162,7 @@ export const authMachine = setup({
       },
     },
     failed: {
+      description: 'Login failed — shows an error message and allows the user to retry.',
       on: {
         RETRY: 'idle',
         SUBMIT: {

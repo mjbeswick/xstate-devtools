@@ -27,6 +27,8 @@ export interface SerializedStateNode {
   entry: string[] // action names
   exit: string[] // action names
   invoke: SerializedInvoke[]
+  sourceLocation?: string // injected by xstateDevtoolsPlugin
+  description?: string
 }
 
 export interface SerializedMachine {

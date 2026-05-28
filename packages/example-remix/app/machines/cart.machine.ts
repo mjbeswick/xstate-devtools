@@ -54,9 +54,11 @@ export const cartMachine = setup({
   context: { items: [], promoCode: null, paymentMethod: null },
   states: {
     inventory: {
+      description: 'Manages the list of items the user has added to their cart.',
       initial: 'browsing',
       states: {
         browsing: {
+          description: 'User can add or remove items freely.',
           on: {
             ADD_ITEM: { actions: 'addItem' },
             REMOVE_ITEM: { actions: 'removeItem' },
@@ -65,12 +67,15 @@ export const cartMachine = setup({
       },
     },
     checkout: {
+      description: 'Parallel region handling the full checkout flow from cart review to order confirmation.',
       initial: 'idle',
       states: {
         idle: {
+          description: 'Checkout has not started yet.',
           on: { START_CHECKOUT: { target: 'details', guard: 'hasItems' } },
         },
         details: {
+          description: 'User is reviewing cart contents and selecting a payment method.',
           initial: 'reviewing',
           on: {
             APPLY_PROMO: { actions: 'applyPromo' },
@@ -78,6 +83,7 @@ export const cartMachine = setup({
           },
           states: {
             reviewing: {
+              description: 'Showing the cart summary; user can open payment picker.',
               on: { OPEN_PAYMENT: 'choosingPayment' },
             },
             choosingPayment: {
@@ -106,17 +112,21 @@ export const cartMachine = setup({
           },
         },
         processing: {
+          description: 'Order is being submitted — charging the payment method then confirming.',
           initial: 'charging',
           states: {
             charging: {
+              description: 'Charging the selected payment method.',
               after: { 800: 'confirming' },
             },
             confirming: {
+              description: 'Payment accepted — finalising the order.',
               after: { 700: '#cart.checkout.confirmed' },
             },
           },
         },
         confirmed: {
+          description: 'Order placed successfully. User can reset to start a new cart.',
           on: { RESET: { target: 'idle', actions: 'resetCart' } },
         },
       },

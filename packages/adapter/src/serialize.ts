@@ -131,6 +131,8 @@ function serializeNode(node: any, state: SerializeState): SerializedStateNode {
     entry: (node.entry ?? []).slice(0, MAX_ENTRY_EXIT_ACTIONS).map(serializeAction).filter(Boolean),
     exit: (node.exit ?? []).slice(0, MAX_ENTRY_EXIT_ACTIONS).map(serializeAction).filter(Boolean),
     invoke: serializeInvokes(node),
+    sourceLocation: node.config?.__xstateDevtoolsSource ?? undefined,
+    description: node.config?.description ?? undefined,
   }
 }
 

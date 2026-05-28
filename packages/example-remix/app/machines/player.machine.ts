@@ -69,9 +69,11 @@ export const playerMachine = setup({
   context: { src: null, position: 0, duration: 0, bufferProgress: 0, volume: 80, rate: 1 },
   states: {
     idle: {
+      description: 'No media loaded. Waiting for a LOAD event.',
       on: { LOAD: { target: 'buffering', actions: 'loadSrc' } },
     },
     buffering: {
+      description: 'Media is loading and filling the buffer before playback can start.',
       invoke: {
         id: 'buffer',
         src: 'bufferActor',
@@ -84,6 +86,7 @@ export const playerMachine = setup({
       },
     },
     active: {
+      description: 'Media is loaded and the player is in use (playing or paused).',
       initial: 'playing',
       on: {
         VOLUME: { actions: 'updateVolume' },
@@ -91,6 +94,7 @@ export const playerMachine = setup({
       },
       states: {
         playing: {
+          description: 'Audio/video is actively playing.',
           initial: 'normal',
           on: {
             PAUSE: '#player.active.paused.manual',
@@ -98,6 +102,7 @@ export const playerMachine = setup({
           },
           states: {
             normal: {
+              description: 'Playing at normal speed.',
               on: {
                 SEEK_START: 'scrubbing',
                 RATE_FAST: { target: 'fastForward', actions: 'setRateFast' },
@@ -105,12 +110,14 @@ export const playerMachine = setup({
               },
             },
             scrubbing: {
+              description: 'User is dragging the seek bar to a new position.',
               on: {
                 SEEK: { actions: 'updatePosition' },
                 SEEK_END: 'normal',
               },
             },
             fastForward: {
+              description: 'Playing at 2× speed.',
               on: {
                 RATE_NORMAL: { target: 'normal', actions: 'setRateNormal' },
                 SEEK: { actions: 'updatePosition' },
@@ -119,13 +126,16 @@ export const playerMachine = setup({
           },
         },
         paused: {
+          description: 'Playback is paused, either by the user or because the buffer ran dry.',
           initial: 'manual',
           on: { PLAY: 'playing' },
           states: {
             manual: {
+              description: 'User deliberately paused playback.',
               on: { SEEK: { actions: 'updatePosition' } },
             },
             autoBuffer: {
+              description: 'Playback paused automatically while waiting for the buffer to refill.',
               on: { SEEK: { actions: 'updatePosition' } },
             },
           },

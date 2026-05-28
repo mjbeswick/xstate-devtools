@@ -171,6 +171,24 @@ function StateNodeRow({
         <span style={{ fontWeight: isActive ? 700 : 400, color: isActive ? '#237804' : '#333' }}>
           {highlight(node.key, filter)}
         </span>
+        {node.description && (
+          <span
+            style={{
+              color: '#888',
+              fontSize: 11,
+              fontFamily: 'sans-serif',
+              fontWeight: 400,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              minWidth: 0,
+              flexShrink: 1,
+            }}
+            title={node.description}
+          >
+            — {node.description}
+          </span>
+        )}
         {node.invoke.length > 0 && (
           <span title="has invoked services" style={{ color: '#096dd9', fontSize: 10 }}>
             ⚙

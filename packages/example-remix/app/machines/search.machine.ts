@@ -46,6 +46,7 @@ export const searchMachine = setup({
   },
   states: {
     idle: {
+      description: 'No search in progress. User can type a query or submit one.',
       on: {
         INPUT: { actions: 'setInput' },
         SEARCH: 'loading',
@@ -53,6 +54,7 @@ export const searchMachine = setup({
       },
     },
     loading: {
+      description: 'Search request is in-flight. Waiting for results from the server.',
       invoke: {
         id: 'search.request',
         src: 'fakeSearch',
@@ -71,6 +73,7 @@ export const searchMachine = setup({
       },
     },
     ready: {
+      description: 'Search completed. Showing results to the user.',
       on: {
         INPUT: { actions: 'setInput' },
         SEARCH: 'loading',
@@ -78,6 +81,7 @@ export const searchMachine = setup({
       },
     },
     failed: {
+      description: 'Search request failed. An error message is displayed; user can retry.',
       on: {
         INPUT: { target: 'idle', actions: 'setInput' },
         SEARCH: 'loading',

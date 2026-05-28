@@ -573,7 +573,10 @@ export function createInspector(
 
       const actorLogic = (actorRef as { logic?: unknown }).logic as any
       const machine = actorLogic?.root
-        ? serializeMachine(actorLogic, getSourceLocation(source, options))
+        ? serializeMachine(
+            actorLogic,
+            actorLogic.config?.__xstateDevtoolsSource ?? getSourceLocation(source, options),
+          )
         : null
       actorMachines.set(sessionId, machine)
 
