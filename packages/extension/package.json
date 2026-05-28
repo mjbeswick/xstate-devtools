@@ -1,13 +1,14 @@
 {
   "name": "@xstate-devtools/extension",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "test": "vitest run",
-    "watch": "vite build --watch"
+    "watch": "vite build --watch",
+    "package": "npm run build && cd dist && zip -r ../extension.zip *"
   },
   "dependencies": {
     "react": "^18.3.0",
