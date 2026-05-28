@@ -7,20 +7,21 @@ Chrome DevTools extension for inspecting XState v5 machines at runtime — both 
 ## What you get
 
 - **Actor list** with parent → child hierarchy
-- **Machine tree** with active-state highlighting and source-link to your editor
+- **Machine tree** with active-state highlighting, inline state descriptions, and source-link to your editor
 - **Active-state breadcrumb** under the title (selected node only)
 - **Side panel** with stacked accordion sections: Transitions, Send event, Context (interactive JSON viewer), Status, Actor info
 - **Event log** with filter, click-to-time-travel, and live "back to live"
 - **Server-side bridge** — a single `createServerAdapter()` call exposes Node actors to the panel via WebSocket
+- **Vite plugin** — injects source locations at build time so the panel links directly to machine and state definitions
 - **Resizable, collapsible** three-column + drawer layout (Chrome DevTools style)
 
 ## Repo layout
 
 ```
 packages/
-├── adapter/                 # createAdapter() (browser) + createServerAdapter() (Node)
+├── adapter/                 # createAdapter() (browser) + createServerAdapter() (Node) + vite-plugin
 ├── extension/               # Chrome MV3 extension — service worker, content scripts, panel
-└── example-remix/           # demo app: 3 client machines + 1 server orchestrator
+└── example-remix/           # demo app: 5 client machines + 1 server orchestrator
 ```
 
 ## Quick start
@@ -82,6 +83,40 @@ The panel auto-connects to the server adapter at `ws://localhost:9301` on startu
 
 `ws` must be installed by the consumer (peer dep, optional). The browser entrypoint doesn't import it.
 
+### Vite plugin — source links & state descriptions
+
+Add `xstateDevtoolsPlugin()` to your Vite config to enable **click-to-source** navigation from the panel directly to your machine and state definitions in VS Code:
+
+```ts
+// vite.config.ts
+import { xstateDevtoolsPlugin } from '@xstate-devtools/vite-plugin'
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+  plugins: [xstateDevtoolsPlugin()],
+})
+```
+
+The plugin runs a source transform at build time that injects `__xstateDevtoolsSource` into every `createMachine({…})` config and into every state definition object in your `states: {}` blocks. Without the plugin, the panel falls back to stack-based detection (which finds the component calling `useMachine`, not the machine definition file).
+
+#### State descriptions
+
+XState v5 supports an optional `description` string on any state node config. When present, the devtools panel renders it inline after the state name in the machine tree:
+
+```ts
+createMachine({
+  states: {
+    idle: {
+      description: 'Waiting for the user to submit their credentials.',
+      on: { SUBMIT: 'loading' },
+    },
+    loading: {
+      description: 'Login request in-flight.',
+    },
+  },
+})
+```
+
 ## Architecture
 
 ```
@@ -118,7 +153,8 @@ Defined in `packages/extension/src/shared/types.ts`. Same protocol on both trans
 
 - Bounded event history (500 events) — older events are evicted; time travel clamps to the oldest retained event
 - Server adapter requires `ws` to be installed by the consumer (not bundled)
-- Machine source-link uses `vscode://file/...` — works in VS Code; other editors need a custom URL handler
+- Source links use `vscode://file/…` — works in VS Code; other editors need a custom URL handler
+- The Vite plugin uses static source transforms; dynamically constructed machines won't have source locations injected
 
 ## Scripts
 
@@ -131,3 +167,4 @@ npm run dev --workspace=packages/example-remix
 ## License
 
 MIT
+

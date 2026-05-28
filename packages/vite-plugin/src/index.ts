@@ -4,7 +4,7 @@
  * panel to link directly to machine and state definitions in your editor.
  *
  * Usage (vite.config.ts):
- *   import { xstateDevtoolsPlugin } from '@xstate-devtools/adapter/vite-plugin'
+ *   import { xstateDevtoolsPlugin } from '@xstate-devtools/vite-plugin'
  *   export default defineConfig({ plugins: [xstateDevtoolsPlugin()] })
  */
 
