@@ -5,7 +5,7 @@ import { buildMachineTreeMatchSet, getMachineTreeHighlightTerm } from '../machin
 import { canOpenSourceLocation, openSourceLocation } from '../open-source.js'
 import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
 import { useDispatch } from '../port-context.js'
-import { getDisplaySnapshot, useStore } from '../store.js'
+import { getDisplaySnapshot, getSelectedEvent, getSnapshotBeforeEvent, useStore } from '../store.js'
 
 function findPath(root: SerializedStateNode, id: string): SerializedStateNode[] | null {
   if (root.id === id) return [root]
@@ -77,6 +77,7 @@ function highlight(text: string, filter: string): React.ReactNode {
 function StateNodeRow({
   node,
   activeIds,
+  previousActiveIds,
   selectedId,
   onSelect,
   onOpenContextMenu,
@@ -86,6 +87,7 @@ function StateNodeRow({
 }: {
   node: SerializedStateNode
   activeIds: Set<string>
+  previousActiveIds: Set<string>
   selectedId: string | null
   onSelect: (id: string) => void
   onOpenContextMenu: (event: React.MouseEvent, node: SerializedStateNode, isActive: boolean) => void
@@ -94,6 +96,9 @@ function StateNodeRow({
   matchSet: Set<string> | null
 }) {
   const isActive = activeIds.has(node.id)
+  const hasExited = previousActiveIds.size > 0 && previousActiveIds.has(node.id) && !isActive
+  const hasEntered = previousActiveIds.size > 0 && !previousActiveIds.has(node.id) && isActive
+  const hasChanged = hasExited || hasEntered
   const isSelected = node.id === selectedId
   const hasChildren = Object.keys(node.states).length > 0
   const filterActive = filter.length > 0
@@ -123,7 +128,7 @@ function StateNodeRow({
           userSelect: 'none',
           WebkitUserSelect: 'none',
           background: isSelected ? '#e6f4ff' : isActive ? '#f6ffed' : 'transparent',
-          borderLeft: isActive ? '3px solid #52c41a' : '3px solid transparent',
+          borderLeft: isActive ? '3px solid #52c41a' : hasExited ? '3px solid #d0d7de' : '3px solid transparent',
           fontFamily: 'monospace',
           fontSize: 12,
         }}
@@ -163,7 +168,7 @@ function StateNodeRow({
         ) : (
           <span style={{ width: 10, flexShrink: 0 }} />
         )}
-        <span style={{ fontWeight: isActive ? 700 : 400, color: isActive ? '#237804' : '#333' }}>
+        <span style={{ fontWeight: isActive || hasChanged ? 700 : 400, color: isActive ? '#237804' : '#333' }}>
           {highlight(node.key, filter)}
         </span>
         {node.description && (
@@ -198,6 +203,7 @@ function StateNodeRow({
             key={child.id}
             node={child}
             activeIds={activeIds}
+            previousActiveIds={previousActiveIds}
             selectedId={selectedId}
             onSelect={onSelect}
             onOpenContextMenu={onOpenContextMenu}
@@ -291,6 +297,11 @@ export function MachineTree() {
   const snapshot = useStore((s) =>
     selectedActorId ? getDisplaySnapshot(s, selectedActorId) : null,
   )
+
+  const snapshotBefore = useStore((s) => {
+    const event = getSelectedEvent(s)
+    return event ? getSnapshotBeforeEvent(s, event) : null
+  })
 
   const collapse = usePanelCollapse()
   const serverControls = useServerControls()
@@ -797,6 +808,10 @@ export function MachineTree() {
     ? getActiveNodeIds(snapshot.value as any, actor.machine.root)
     : new Set<string>()
 
+  const previousActiveIds = snapshotBefore
+    ? getActiveNodeIds(snapshotBefore.value as any, actor.machine.root)
+    : new Set<string>()
+
   const noMatches = matchSet !== null && matchSet.size === 0
 
   return (
@@ -811,6 +826,7 @@ export function MachineTree() {
           <StateNodeRow
             node={actor.machine.root}
             activeIds={activeIds}
+            previousActiveIds={previousActiveIds}
             selectedId={selectedStateNodeId}
             onSelect={selectStateNode}
             onOpenContextMenu={openRowContextMenu}

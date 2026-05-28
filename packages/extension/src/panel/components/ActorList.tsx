@@ -14,6 +14,7 @@ export function ActorList() {
   const selectActor = useStore((s) => s.selectActor)
   const hideStoppedActors = useStore((s) => s.hideStoppedActors)
   const setHideStoppedActors = useStore((s) => s.setHideStoppedActors)
+  const timeTravelSeq = useStore((s) => s.timeTravelSeq)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   // Build parent→children map
@@ -21,7 +22,10 @@ export function ActorList() {
     const map = new Map<string | undefined, string[]>()
     const rootIds: string[] = []
     for (const actor of actors.values()) {
-      if (hideStoppedActors && actor.status === 'stopped') continue
+      // In time-travel mode, only show actors that existed at the selected point
+      if (timeTravelSeq !== null && actor.registeredAtSeq > timeTravelSeq) continue
+      // Apply stopped filter only in live mode — we can't reconstruct historical stop times
+      if (timeTravelSeq === null && hideStoppedActors && actor.status === 'stopped') continue
 
       const parent = actor.parentSessionId
       if (!map.has(parent)) map.set(parent, [])
@@ -36,7 +40,7 @@ export function ActorList() {
       }
     }
     return { childrenOf: map, roots: rootIds }
-  }, [actors, hideStoppedActors])
+  }, [actors, hideStoppedActors, timeTravelSeq])
 
   useEffect(() => {
     if (!selectedActorId) return
@@ -76,7 +80,8 @@ export function ActorList() {
     const actor = actors.get(sessionId)
     if (!actor) return null
     const isSelected = sessionId === selectedActorId
-    const isStopped = actor.status === 'stopped'
+    // In time-travel mode all visible actors were alive at that point; don't dim any as stopped
+    const isStopped = timeTravelSeq === null && actor.status === 'stopped'
     const children = childrenOf.get(sessionId) ?? []
     const hasChildren = children.length > 0
     const open = isExpanded(sessionId, hasChildren, depth)

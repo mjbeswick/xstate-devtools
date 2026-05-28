@@ -119,7 +119,7 @@ export function getSelectedEvent(
   return null
 }
 
-function getSnapshotBeforeEvent(
+export function getSnapshotBeforeEvent(
   state: Pick<InspectorStore, 'events' | 'registeredSnapshots'>,
   eventRecord: EventRecord,
 ): SerializedSnapshot | null {

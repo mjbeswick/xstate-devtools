@@ -571,6 +571,33 @@ export function createInspector(
       const sessionId: string = actorRef.sessionId
       actorRefs.set(sessionId, actorRef)
 
+      // Eagerly remove the actor from both maps when it stops so we don't
+      // accumulate strong references to every short-lived actor indefinitely.
+      // Without this, actors that stop silently (no further snapshot/event) are
+      // only removed by checkAndNotifyStop — which never fires for them.
+      try {
+        actorRef.subscribe({
+          complete: () => {
+            if (actorRefs.has(sessionId)) {
+              actorRefs.delete(sessionId)
+              actorMachines.delete(sessionId)
+              const stopMsg: PageToExtensionMessage = {
+                type: 'XSTATE_ACTOR_STOPPED',
+                sessionId: tag(sessionId),
+              }
+              debugLog(source, 'actor completed; notifying transport', summarizeMessage(stopMsg))
+              transport.send(stopMsg)
+            }
+          },
+          error: () => {
+            actorRefs.delete(sessionId)
+            actorMachines.delete(sessionId)
+          },
+        })
+      } catch {
+        // subscribe is best-effort; older actor implementations may not support it
+      }
+
       const actorLogic = (actorRef as { logic?: unknown }).logic as any
       const machine = actorLogic?.root
         ? serializeMachine(
