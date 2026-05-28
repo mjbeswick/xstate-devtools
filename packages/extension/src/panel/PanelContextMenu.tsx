@@ -57,8 +57,8 @@ export function usePanelContextMenu() {
     event.stopPropagation()
 
     // Calculate position so it doesn't run off screen
-    let x = event.clientX
-    let y = event.clientY
+    const x = event.clientX
+    const y = event.clientY
 
     setMenuState({ x, y, items })
   }, [])

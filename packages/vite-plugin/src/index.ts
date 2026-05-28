@@ -8,7 +8,29 @@
  *   export default defineConfig({ plugins: [xstateDevtoolsPlugin()] })
  */
 
+import { createServer } from 'net'
+import path from 'path'
 import type { Plugin } from 'vite'
+
+function getAvailablePort(start: number): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer()
+    server.unref()
+    server.on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        resolve(getAvailablePort(start + 1))
+      } else {
+        reject(err)
+      }
+    })
+    server.listen(start, '127.0.0.1', () => {
+      const port = (server.address() as any).port
+      server.close(() => {
+        resolve(port)
+      })
+    })
+  })
+}
 
 /**
  * Replace the content of string literals and comments with spaces while
@@ -290,6 +312,37 @@ export function xstateDevtoolsPlugin(): Plugin {
   return {
     name: '@xstate-devtools/source-transform',
     enforce: 'pre',
+    async config() {
+      if (!process.env.XSTATE_DEVTOOLS_PORT) {
+        process.env.XSTATE_DEVTOOLS_PORT = String(await getAvailablePort(9301))
+      }
+    },
+    configureServer(server) {
+      server.middlewares.use('/.well-known/appspecific/com.chrome.devtools.json', (_req, res) => {
+        res.setHeader('Content-Type', 'application/json')
+        res.end(
+          JSON.stringify({
+            workspace: {
+              root: process.cwd(),
+              uuid: path.basename(process.cwd()),
+            },
+          }),
+        )
+      })
+    },
+    transformIndexHtml() {
+      const port = process.env.XSTATE_DEVTOOLS_PORT || '9301'
+      return [
+        {
+          tag: 'meta',
+          injectTo: 'head',
+          attrs: {
+            name: 'xstate-devtools-url',
+            content: `ws://localhost:${port}`,
+          },
+        },
+      ]
+    },
     transform(code, id) {
       const filePath = id.split('?')[0]
       if (filePath.includes('/node_modules/')) return null

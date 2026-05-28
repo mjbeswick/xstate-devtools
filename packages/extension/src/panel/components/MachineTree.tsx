@@ -1,11 +1,11 @@
 // packages/extension/src/panel/components/MachineTree.tsx
 import React from 'react'
 import { getActiveNodeIds, getActivePaths } from '../active-nodes.js'
-import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
 import { buildMachineTreeMatchSet, getMachineTreeHighlightTerm } from '../machine-tree-filter.js'
 import { canOpenSourceLocation, openSourceLocation } from '../open-source.js'
-import { getDisplaySnapshot, useStore } from '../store.js'
+import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
 import { useDispatch } from '../port-context.js'
+import { getDisplaySnapshot, useStore } from '../store.js'
 
 function findPath(root: SerializedStateNode, id: string): SerializedStateNode[] | null {
   if (root.id === id) return [root]
@@ -175,18 +175,20 @@ function StateNodeRow({
           <span
             style={{
               color: '#888',
-              fontSize: 11,
+              fontSize: 12,
               fontFamily: 'sans-serif',
               fontWeight: 400,
+              fontStyle: 'italic',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
               minWidth: 0,
               flexShrink: 1,
+              marginLeft: 8,
             }}
             title={node.description}
           >
-            — {node.description}
+            {node.description}
           </span>
         )}
         {node.invoke.length > 0 && (
@@ -535,25 +537,6 @@ export function MachineTree() {
                 flexShrink: 0,
               }}
             />
-            <button
-              onClick={() => {
-                const nextUrl = window.prompt('Server adapter URL', serverControls.url)
-                if (nextUrl) serverControls.onUrlChange(nextUrl)
-              }}
-              style={{
-                padding: '1px 6px',
-                fontSize: 10,
-                lineHeight: 1.4,
-                background: '#fff',
-                color: '#444',
-                border: '1px solid #d9d9d9',
-                borderRadius: 4,
-                cursor: 'pointer',
-              }}
-              title={serverControls.url}
-            >
-              Edit
-            </button>
           </>
         )}
         <span

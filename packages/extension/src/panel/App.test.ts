@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   getBrowserTransportStatus,
   registerBrowserReconnectFailure,
-  shouldResetPanelAfterNavigation,
   shouldResetBrowserStateOnFirstMessage,
+  shouldResetPanelAfterNavigation,
 } from './App.js'
 
 describe('shouldResetBrowserStateOnFirstMessage', () => {

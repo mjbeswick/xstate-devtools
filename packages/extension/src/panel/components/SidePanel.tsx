@@ -7,8 +7,8 @@ import type {
   SerializedTransition,
 } from '../../shared/types.js'
 import { getActiveNodeIds } from '../active-nodes.js'
-import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
 import { canOpenSourceLocation, getSourceHref, openSourceLocation } from '../open-source.js'
+import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
 import { useDispatch } from '../port-context.js'
 import { getDisplaySnapshot, useStore } from '../store.js'
 import { AccordionSection } from './Accordion.js'

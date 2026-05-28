@@ -7,10 +7,10 @@ import type {
   PageToExtensionMessage,
 } from '../shared/types.js'
 import { Layout } from './components/Layout.js'
+import { setBackgroundPort } from './open-source.js'
 import { PanelContextMenu } from './PanelContextMenu.js'
 import { DispatchContext } from './port-context.js'
 import { ServerControlsContext } from './server-context.js'
-import { setBackgroundPort } from './open-source.js'
 import { useStore } from './store.js'
 
 const SERVER_URL_KEY = 'xstate-devtools.serverUrl'
@@ -181,6 +181,22 @@ export function App() {
       return DEFAULT_SERVER_URL
     }
   })
+
+  // Attempt to auto-discover server URL from the inspected page via meta tag
+  // or window variable injected by the adapter/server.
+  useEffect(() => {
+    const code = `
+      document.querySelector("meta[name=\\"xstate-devtools-url\\"]")?.content ||
+      window.__XSTATE_DEVTOOLS_SERVER_URL__
+    `
+    chrome.devtools.inspectedWindow.eval(code, (result, err) => {
+      if (!err && typeof result === 'string' && result) {
+        infoLog('panel', 'auto-discovered server URL from page meta/window', result)
+        setServerUrl(result)
+      }
+    })
+  }, [reconnectKey]) // Also re-check upon page navigation
+
   const [serverStatus, setServerStatus] = useState<
     'idle' | 'connecting' | 'open' | 'closed' | 'error'
   >('connecting')

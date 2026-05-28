@@ -3,8 +3,8 @@
 import { debugLog, infoLog, summarizeMessage } from '../shared/debug.js'
 import type {
   EventLogNativeMenuAction,
-  EventLogNativeMenuContext,
   EventLogNativeMenuActionMessage,
+  EventLogNativeMenuContext,
   EventLogPanelToBackgroundMessage,
   ExtensionToPageMessage,
   MarkedExtensionMessage,

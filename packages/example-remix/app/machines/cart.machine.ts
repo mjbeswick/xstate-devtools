@@ -67,7 +67,8 @@ export const cartMachine = setup({
       },
     },
     checkout: {
-      description: 'Parallel region handling the full checkout flow from cart review to order confirmation.',
+      description:
+        'Parallel region handling the full checkout flow from cart review to order confirmation.',
       initial: 'idle',
       states: {
         idle: {

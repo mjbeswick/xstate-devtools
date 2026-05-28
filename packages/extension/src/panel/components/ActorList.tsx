@@ -1,8 +1,8 @@
 // packages/extension/src/panel/components/ActorList.tsx
 import type React from 'react'
 import { useEffect, useMemo, useState } from 'react'
-import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
 import { canOpenSourceLocation, openSourceLocation } from '../open-source.js'
+import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
 import { useStore } from '../store.js'
 import { getActorNodePresentation } from '../tree-metadata.js'
 import { DisclosureTriangle } from './Icons.js'

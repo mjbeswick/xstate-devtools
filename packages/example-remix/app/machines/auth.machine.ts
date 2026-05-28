@@ -73,7 +73,7 @@ export const authMachine = setup({
       },
     },
     authenticating: {
-      description: 'Verifying the user\'s credentials with the server.',
+      description: "Verifying the user's credentials with the server.",
       initial: 'submittingCredentials',
       states: {
         submittingCredentials: {
@@ -93,7 +93,8 @@ export const authMachine = setup({
           },
         },
         awaitingMfa: {
-          description: 'Credentials accepted — waiting for the user to enter their 6-digit MFA code.',
+          description:
+            'Credentials accepted — waiting for the user to enter their 6-digit MFA code.',
           on: {
             MFA_SUBMIT: { target: 'verifyingMfa', actions: 'setMfaCode' },
           },

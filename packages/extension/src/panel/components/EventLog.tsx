@@ -1,9 +1,9 @@
 // packages/extension/src/panel/components/EventLog.tsx
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type {} from '../../shared/types.js'
 import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
 import { usePanelCollapse } from '../panel-collapse-context.js'
 import { getEventSourceStateNodeId, useStore } from '../store.js'
-import type {} from '../../shared/types.js'
 import { ClearLog, DisclosureTriangle, EventLog as EventLogIcon, PanelToggle } from './Icons.js'
 
 interface ScrollContainer {

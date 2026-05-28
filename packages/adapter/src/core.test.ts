@@ -182,7 +182,9 @@ describe('getSourceLocationFromStack', () => {
       getSourceLocationFromStack(stack, 'web', {
         webSourceRoot: '/Users/me/xstate-devtools/packages/example-remix',
       }),
-    ).toBe('MediaPlayer (/Users/me/xstate-devtools/packages/example-remix/app/components/MediaPlayer.tsx:6:43)')
+    ).toBe(
+      'MediaPlayer (/Users/me/xstate-devtools/packages/example-remix/app/components/MediaPlayer.tsx:6:43)',
+    )
   })
 
   it('returns undefined for vite pre-bundled stack without webSourceRoot', () => {
