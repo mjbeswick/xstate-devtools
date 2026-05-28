@@ -525,19 +525,6 @@ export function MachineTree() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        {serverControls && serverControls.status !== 'idle' && (
-          <span
-            title={`${serverControls.status} · ${serverControls.url}`}
-            style={{
-              display: 'inline-block',
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: serverDot,
-              flexShrink: 0,
-            }}
-          />
-        )}
         <span
           style={{
             fontSize: 10,
