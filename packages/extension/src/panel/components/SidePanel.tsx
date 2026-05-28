@@ -8,7 +8,7 @@ import type {
 } from '../../shared/types.js'
 import { getActiveNodeIds } from '../active-nodes.js'
 import { copyTextToClipboard, usePanelContextMenu } from '../PanelContextMenu.js'
-import { canOpenSourceLocation, openSourceLocation } from '../open-source.js'
+import { canOpenSourceLocation, getSourceHref, openSourceLocation } from '../open-source.js'
 import { useDispatch } from '../port-context.js'
 import { getDisplaySnapshot, useStore } from '../store.js'
 import { AccordionSection } from './Accordion.js'
@@ -385,55 +385,51 @@ export function SidePanel() {
           {actor.machine?.sourceLocation && (
             <div>
               source:{' '}
-              <button
-                type="button"
-                onMouseDown={(event) => {
-                  if (event.button !== 2) return
+              {canOpenSource ? (
+                <a
+                  href={getSourceHref(actor.machine.sourceLocation) ?? undefined}
+                  onMouseDown={(event) => {
+                    if (event.button !== 2) return
 
-                  contextMenu.openMenu(event, [
-                    {
-                      label: 'Open source location',
-                      disabled: !canOpenSource,
-                      onSelect: () => {
-                        if (canOpenSource) openSourceLocation(actor.machine.sourceLocation)
+                    contextMenu.openMenu(event, [
+                      {
+                        label: 'Open source location',
+                        onSelect: () => openSourceLocation(actor.machine.sourceLocation),
                       },
-                    },
-                    {
-                      label: 'Copy source location',
-                      onSelect: () => void copyTextToClipboard(actor.machine.sourceLocation),
-                    },
-                  ])
-                }}
-                onContextMenu={(event) => {
-                  contextMenu.openMenu(event, [
-                    {
-                      label: 'Open source location',
-                      disabled: !canOpenSource,
-                      onSelect: () => {
-                        if (canOpenSource) openSourceLocation(actor.machine.sourceLocation)
+                      {
+                        label: 'Copy source location',
+                        onSelect: () => void copyTextToClipboard(actor.machine.sourceLocation),
                       },
-                    },
-                    {
-                      label: 'Copy source location',
-                      onSelect: () => void copyTextToClipboard(actor.machine.sourceLocation),
-                    },
-                  ])
-                }}
-                style={{
-                  color: canOpenSource ? '#1890ff' : '#999',
-                  padding: 0,
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: canOpenSource ? 'pointer' : 'default',
-                  font: 'inherit',
-                  textDecoration: canOpenSource ? 'underline' : 'none',
-                }}
-                onClick={() => {
-                  if (canOpenSource) openSourceLocation(actor.machine.sourceLocation)
-                }}
-              >
-                {actor.machine.sourceLocation}
-              </button>
+                    ])
+                  }}
+                  onContextMenu={(event) => {
+                    contextMenu.openMenu(event, [
+                      {
+                        label: 'Open source location',
+                        onSelect: () => openSourceLocation(actor.machine.sourceLocation),
+                      },
+                      {
+                        label: 'Copy source location',
+                        onSelect: () => void copyTextToClipboard(actor.machine.sourceLocation),
+                      },
+                    ])
+                  }}
+                  style={{
+                    color: '#1890ff',
+                    padding: 0,
+                    font: 'inherit',
+                    textDecoration: 'underline',
+                  }}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    openSourceLocation(actor.machine.sourceLocation)
+                  }}
+                >
+                  {actor.machine.sourceLocation}
+                </a>
+              ) : (
+                <span style={{ color: '#999' }}>{actor.machine.sourceLocation}</span>
+              )}
             </div>
           )}
         </div>
