@@ -169,7 +169,7 @@ function StateNodeRow({
         {node.description && (
           <span
             style={{
-              color: '#888',
+              color: 'rgb(153, 153, 153)',
               fontSize: 12,
               fontFamily: 'sans-serif',
               fontWeight: 400,
@@ -179,7 +179,6 @@ function StateNodeRow({
               whiteSpace: 'nowrap',
               minWidth: 0,
               flexShrink: 1,
-              marginLeft: 8,
             }}
             title={node.description}
           >
