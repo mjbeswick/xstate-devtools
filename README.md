@@ -28,14 +28,16 @@ XState DevTools solves this by embedding a purpose-built panel directly in Chrom
 - **Vite plugin** — injects source locations at build time so the panel links directly to machine and state definitions
 - **Resizable, collapsible** three-column + drawer layout (Chrome DevTools style)
 
-## Repo layout
+For a more detailed breakdown of these features, read the [Extension Features & Usage Guide](docs/EXTENSION_FEATURES.md).
 
-```
-packages/
-├── adapter/                 # createAdapter() (browser) + createServerAdapter() (Node) + vite-plugin
-├── extension/               # Chrome MV3 extension — service worker, content scripts, panel
-└── example-remix/           # demo app: 5 client machines + 1 server orchestrator
-```
+## Packages
+
+- **`@xstate-devtools/adapter`**: Exposes the `createAdapter()` function to bridge browser-side XState actors to the extension.
+- **`@xstate-devtools/adapter/server`**: Exposes the `createServerAdapter()` function to bridge Node.js actors via WebSocket.
+- **`@xstate-devtools/vite-plugin`**: Exposes the `xstateDevtoolsPlugin()` which enables click-to-source file navigation from the devtools pane.
+- **`extension`**: The architecture running the Chrome MV3 DevTools panel itself.
+
+For an exhaustive explanation of the exported functions and configuration options, please refer to the [API Reference](docs/API_REFERENCE.md).
 
 ## Quick start
 
@@ -145,16 +147,6 @@ createMachine({
 - Panel rewrites `globalSeq` to a monotonic counter on ingest, so time travel works across both transports.
 - Server adapter buffers up to 200 messages until the first panel connects, so actors registered at boot are still visible to a panel that connects late.
 - Server adapter and its WS server are cached on `globalThis` to survive Vite/Remix HMR re-evaluation.
-
-## Wire protocol
-
-Defined in `packages/extension/src/shared/types.ts`. Same protocol on both transports:
-
-- `XSTATE_ACTOR_REGISTERED` — new actor with serialized machine + initial snapshot
-- `XSTATE_SNAPSHOT` — snapshot tick (no event)
-- `XSTATE_EVENT` — event dispatched + resulting snapshot
-- `XSTATE_ACTOR_STOPPED` — actor terminated
-- `XSTATE_DISPATCH` — panel → adapter, send an event to a specific actor
 
 ## Time travel
 
