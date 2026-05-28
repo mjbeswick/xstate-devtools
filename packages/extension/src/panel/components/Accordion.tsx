@@ -15,6 +15,8 @@ export interface AccordionSectionProps {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   children?: React.ReactNode
+  /** Unique key for saving the expanded state to localStorage. */
+  storageKey?: string
 }
 
 export function AccordionSection({
@@ -25,11 +27,25 @@ export function AccordionSection({
   open,
   onOpenChange,
   children,
+  storageKey,
 }: AccordionSectionProps) {
-  const [internalOpen, setInternalOpen] = useState(defaultOpen)
+  const [internalOpen, setInternalOpen] = useState(() => {
+    if (storageKey) {
+      const saved = localStorage.getItem(`xstate-devtools:accordion:${storageKey}`)
+      if (saved !== null) {
+        return saved === 'true'
+      }
+    }
+    return defaultOpen
+  })
   const isOpen = open ?? internalOpen
   const setOpen = (v: boolean) => {
-    if (open === undefined) setInternalOpen(v)
+    if (open === undefined) {
+      setInternalOpen(v)
+      if (storageKey) {
+        localStorage.setItem(`xstate-devtools:accordion:${storageKey}`, String(v))
+      }
+    }
     onOpenChange?.(v)
   }
 

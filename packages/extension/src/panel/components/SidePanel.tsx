@@ -214,6 +214,7 @@ export function SidePanel() {
   return (
     <div style={{ height: '100%', overflow: 'auto', background: '#fff' }}>
       <AccordionSection
+        storageKey="transitions"
         title={
           node ? (
             <>
@@ -275,7 +276,7 @@ export function SidePanel() {
         )}
       </AccordionSection>
 
-      <AccordionSection title="Send event">
+      <AccordionSection storageKey="send-event" title="Send event">
         <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>PAYLOAD (JSON)</div>
         <textarea
           value={payloadJson}
@@ -326,7 +327,7 @@ export function SidePanel() {
         </div>
       </AccordionSection>
 
-      <AccordionSection title="Context">
+      <AccordionSection storageKey="context" title="Context">
         {snapshot ? (
           snapshot.context === undefined ? (
             <div style={{ color: '#aaa', fontSize: 11 }}>(no context)</div>
@@ -338,34 +339,11 @@ export function SidePanel() {
         )}
       </AccordionSection>
 
-      <AccordionSection
-        title="Status"
-        defaultOpen={Boolean(snapshot && snapshot.status !== 'active')}
-      >
-        <div style={{ fontSize: 11 }}>
-          <div>
-            State: <strong>{snapshot?.status ?? 'unknown'}</strong>
-          </div>
-          {snapshot?.error && (
-            <pre
-              style={{
-                fontSize: 10,
-                marginTop: 4,
-                background: '#fff1f0',
-                color: '#a8071a',
-                padding: 6,
-                borderRadius: 4,
-                overflow: 'auto',
-              }}
-            >
-              {JSON.stringify(snapshot.error, null, 2)}
-            </pre>
-          )}
-        </div>
-      </AccordionSection>
-
-      <AccordionSection title="Actor info" defaultOpen={false}>
+      <AccordionSection storageKey="actor-info" title="Actor info" defaultOpen={false}>
         <div style={{ fontSize: 11, fontFamily: 'monospace', lineHeight: 1.6 }}>
+          <div>
+            status: <code>{snapshot?.status ?? 'unknown'}</code>
+          </div>
           <div>
             id: <code>{actor.machine?.id ?? '(no machine)'}</code>
           </div>
