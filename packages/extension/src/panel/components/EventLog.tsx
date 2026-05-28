@@ -66,7 +66,11 @@ function parseEventFilter(filter: string): EventFilterToken[] {
     .filter((token) => token.value.length > 0)
 }
 
-export function eventMatchesFilter(eventType: string, filter: string): boolean {
+export function eventMatchesFilter(
+  eventType: string,
+  filter: string,
+  actorLabel?: string,
+): boolean {
   const tokens = parseEventFilter(filter)
 
   if (tokens.length === 0) {
@@ -74,9 +78,14 @@ export function eventMatchesFilter(eventType: string, filter: string): boolean {
   }
 
   const normalizedEventType = eventType.toLowerCase()
+  const normalizedActorLabel = actorLabel?.toLowerCase()
   const positiveTokens = tokens.filter((token) => !token.negated)
 
-  if (tokens.some((token) => token.negated && normalizedEventType.includes(token.value))) {
+  const matchesField = (token: EventFilterToken) =>
+    normalizedEventType.includes(token.value) ||
+    (normalizedActorLabel !== undefined && normalizedActorLabel.includes(token.value))
+
+  if (tokens.some((token) => token.negated && matchesField(token))) {
     return false
   }
 
@@ -84,7 +93,7 @@ export function eventMatchesFilter(eventType: string, filter: string): boolean {
     return true
   }
 
-  return positiveTokens.every((token) => normalizedEventType.includes(token.value))
+  return positiveTokens.every(matchesField)
 }
 
 function formatTime(ts: number) {
@@ -170,7 +179,11 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
     previousLatestEventSeqRef.current = latestEventSeq
   }, [autoScroll, collapsed, latestEventSeq, timeTravelSeq])
 
-  const filtered = filter ? events.filter((e) => eventMatchesFilter(e.event.type, filter)) : events
+  const filtered = events.filter((e) => {
+    if (!filter) return true
+    const label = actors.get(e.sessionId)?.machine?.id ?? e.sessionId.slice(0, 12)
+    return eventMatchesFilter(e.event.type, filter, label)
+  })
 
   const selectLogEvent = (
     evt: (typeof filtered)[number],
@@ -257,7 +270,7 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter by type…"
+          placeholder="Filter by type or actor…"
           style={{
             fontSize: 11,
             padding: '2px 6px',
@@ -332,6 +345,26 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
           userSelect: 'none',
         }}
       >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '90px 120px 1fr',
+            gap: 8,
+            padding: '3px 8px',
+            position: 'sticky',
+            top: 0,
+            background: '#f5f5f5',
+            borderBottom: '1px solid #e8e8e8',
+            color: '#999',
+            fontSize: 10,
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+          }}
+        >
+          <span>Time</span>
+          <span>Actor</span>
+          <span>Event</span>
+        </div>
         {filtered.map((evt) => {
           const actorLabel = actors.get(evt.sessionId)?.machine?.id ?? evt.sessionId.slice(0, 12)
           const isCurrent = evt.globalSeq === timeTravelSeq
@@ -347,6 +380,15 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
                   {
                     label: isCurrent ? 'Back to live' : 'Time travel to event',
                     onSelect: () => selectLogEvent(evt, { toggleIfCurrent: true }),
+                  },
+                  {
+                    label: `Filter by actor: ${actorLabel}`,
+                    onSelect: () => setFilter(actorLabel),
+                  },
+                  {
+                    label: `Exclude actor: ${actorLabel}`,
+                    onSelect: () =>
+                      setFilter((f) => [f, `-${actorLabel}`].filter(Boolean).join(' ')),
                   },
                   {
                     label: 'Copy event JSON',
@@ -401,7 +443,7 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
               >
                 {actorLabel}
               </span>
-              <span style={{ fontWeight: 600, color: '#003a8c' }}>{evt.event.type}</span>
+              <span style={{ color: '#003a8c' }}>{evt.event.type}</span>
             </div>
           )
         })}

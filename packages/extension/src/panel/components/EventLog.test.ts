@@ -12,6 +12,18 @@ describe('eventMatchesFilter', () => {
     expect(eventMatchesFilter('PLAYER.WEIGHT_UPDATED', 'player -weight')).toBe(false)
     expect(eventMatchesFilter('CART.START', 'player -weight')).toBe(false)
   })
+
+  it('matches against actor label when provided', () => {
+    expect(eventMatchesFilter('xstate.init', 'cart', 'cartMachine')).toBe(true)
+    expect(eventMatchesFilter('xstate.init', 'cart', 'playerMachine')).toBe(false)
+    expect(eventMatchesFilter('CART.ADD', 'cart', 'playerMachine')).toBe(true)
+  })
+
+  it('excludes by actor label with negated token', () => {
+    expect(eventMatchesFilter('xstate.init', '-cart', 'cartMachine')).toBe(false)
+    expect(eventMatchesFilter('xstate.init', '-cart', 'playerMachine')).toBe(true)
+    expect(eventMatchesFilter('CART.ADD', '-cart', 'playerMachine')).toBe(false)
+  })
 })
 
 describe('syncEventLogScroll', () => {

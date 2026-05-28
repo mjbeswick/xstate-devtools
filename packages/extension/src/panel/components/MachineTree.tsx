@@ -168,7 +168,7 @@ function StateNodeRow({
         ) : (
           <span style={{ width: 10, flexShrink: 0 }} />
         )}
-        <span style={{ fontWeight: isActive || hasChanged ? 700 : 400, color: isActive ? '#237804' : '#333' }}>
+        <span style={{ fontWeight: 400, color: isActive ? '#237804' : '#333' }}>
           {highlight(node.key, filter)}
         </span>
         {node.description && (
