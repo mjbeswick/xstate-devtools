@@ -1,5 +1,6 @@
 // Server entrypoint — exposes a WebSocket bridge so the DevTools panel
 // can connect to actors running in Node.
+import { createServer as createTcpServer } from 'node:net'
 import type {
   ExtensionToPageMessage,
   PageToExtensionMessage,
@@ -11,6 +12,28 @@ import {
   warnLog as baseWarnLog,
 } from './logging.js'
 import { sanitize } from './sanitize.js'
+
+/**
+ * Find the lowest TCP port >= `start` that is not currently in use.
+ * Uses a temporary TCP server to probe; the port is released before resolving.
+ */
+function getAvailablePort(start: number): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = createTcpServer()
+    probe.unref()
+    probe.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EADDRINUSE') {
+        resolve(getAvailablePort(start + 1))
+      } else {
+        reject(err)
+      }
+    })
+    probe.listen(start, '127.0.0.1', () => {
+      const port = (probe.address() as { port: number }).port
+      probe.close(() => resolve(port))
+    })
+  })
+}
 
 export interface ServerAdapterOptions {
   /** Port to listen on. Defaults to env XSTATE_DEVTOOLS_PORT or 9301. */
@@ -89,6 +112,8 @@ interface CachedServer {
   buffer: string[]
   bufferSize: number
   activated: boolean
+  /** Resolves with the actual TCP port once the WS server is listening. */
+  port: Promise<number>
   close: () => void
 }
 
@@ -132,12 +157,20 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
     let wss: any = null
     let closed = false
 
+    let portResolve!: (port: number) => void
+    let portReject!: (err: unknown) => void
+    const portPromise = new Promise<number>((res, rej) => {
+      portResolve = res
+      portReject = rej
+    })
+
     server = {
       clients,
       dispatchHandlers,
       buffer,
       bufferSize,
       activated: false,
+      port: portPromise,
       close: () => {
         closed = true
         infoLog('closing WebSocket server', { host, port, clientCount: clients.size })
@@ -160,8 +193,12 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
         const mod = await import('ws')
         const WSServer = (mod as any).WebSocketServer ?? (mod as any).Server
         if (closed) return
-        wss = new WSServer({ port, host })
-        infoLog('WebSocket server listening', { host, port })
+        const actualPort = await getAvailablePort(port)
+        if (closed) return
+        wss = new WSServer({ port: actualPort, host })
+        process.env.XSTATE_DEVTOOLS_PORT = String(actualPort)
+        portResolve(actualPort)
+        infoLog('WebSocket server listening', { host, port: actualPort })
         wss.on('connection', (ws: ClientLike) => {
           infoLog('panel connected to WebSocket server', {
             host,
@@ -214,6 +251,7 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
           warnLog('WS server error', { host, port, message: err.message })
         })
       } catch (e) {
+        portReject(e)
         warnLog('could not start server adapter — install `ws` to enable', {
           host,
           port,
@@ -268,5 +306,5 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
   }
 
   const inspector = createInspector(transport, 'srv')
-  return { ...inspector, close: server.close }
+  return { ...inspector, close: server.close, port: server.port }
 }
