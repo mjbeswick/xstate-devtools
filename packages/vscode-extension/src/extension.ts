@@ -31,6 +31,12 @@ export async function activate(context: vscode.ExtensionContext) {
     });
     treeProvider.setTreeView(treeView);
 
+    // Track which items are currently expanded so a click on an already-selected,
+    // expanded node can collapse it (see navigateToNode).
+    const expandedItems = new WeakSet<object>();
+    const expandListener = treeView.onDidExpandElement(e => expandedItems.add(e.element));
+    const collapseListener = treeView.onDidCollapseElement(e => expandedItems.delete(e.element));
+
     // ── Search WebviewView ────────────────────────────────────────────────────
 
     const filterViewProvider = new FilterWebviewViewProvider(context.extensionUri);
@@ -222,6 +228,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
             const now = Date.now();
             const isDoubleClick = treeItem === lastClickedItem && (now - lastClickTime) < DOUBLE_CLICK_MS;
+            const wasAlreadySelected = treeItem === lastClickedItem;
             lastClickedItem = treeItem;
             lastClickTime = now;
 
@@ -249,6 +256,15 @@ export async function activate(context: vscode.ExtensionContext) {
                     // Couldn't resolve the target state — fall through to source navigation
                 }
                 // For non-implementable types, double-click is the same as single-click
+            }
+
+            // Clicking an already-selected, expanded node collapses it.
+            if (wasAlreadySelected
+                && treeItem.collapsibleState !== vscode.TreeItemCollapsibleState.None
+                && expandedItems.has(treeItem)) {
+                treeProvider.collapseItem(treeItem);
+                expandedItems.delete(treeItem);
+                return;
             }
 
             await vscode.window.showTextDocument(treeItem.uri, {
@@ -369,6 +385,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         treeView,
+        expandListener,
+        collapseListener,
         filterViewRegistration,
         refreshCommand,
         setScopeFileCommand,

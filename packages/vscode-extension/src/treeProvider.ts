@@ -388,6 +388,13 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         this.updateTreeViewDescription();
     }
 
+    /** Collapse a single expanded item in place (re-renders just that node). */
+    collapseItem(item: XStateMachineTreeItem): void {
+        if (item.collapsibleState === vscode.TreeItemCollapsibleState.None) { return; }
+        item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+        this._onDidChangeTreeData.fire(item);
+    }
+
     getTreeItem(element: XStateMachineTreeItem): vscode.TreeItem {
         return element;
     }
