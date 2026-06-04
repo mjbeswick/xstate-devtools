@@ -210,7 +210,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
     { id: 'action',     icon: 'rocket',           label: 'Action',     color: 'var(--vscode-symbolIcon-methodForeground)' },
     { id: 'entry',      icon: 'debug-step-into',  label: 'Entry',      color: 'var(--vscode-symbolIcon-methodForeground)' },
     { id: 'exit',       icon: 'debug-step-out',   label: 'Exit',       color: 'var(--vscode-symbolIcon-colorForeground)' },
-    { id: 'guard',      icon: 'shield',           label: 'Guard',      color: 'var(--vscode-charts-yellow)' },
+    { id: 'guard',      icon: 'shield',           label: 'Guard',      color: 'var(--vscode-terminal-ansiCyan)' },
     { id: 'invoke',     icon: 'circuit-board',    label: 'Invoke',     color: 'var(--vscode-symbolIcon-eventForeground)' },
     { id: 'context',    icon: 'symbol-variable',  label: 'Context',    color: 'var(--vscode-symbolIcon-variableForeground)' },
     { id: 'target',     icon: 'target',           label: 'Target',     color: 'var(--vscode-terminal-ansiBrightMagenta)' },

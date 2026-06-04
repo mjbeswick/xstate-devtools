@@ -702,7 +702,7 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
             case 'exit':
                 return new vscode.ThemeIcon('debug-step-out', new vscode.ThemeColor('symbolIcon.colorForeground'));
             case 'guard':
-                return new vscode.ThemeIcon('shield', new vscode.ThemeColor('charts.yellow'));
+                return new vscode.ThemeIcon('shield', new vscode.ThemeColor('terminal.ansiCyan'));
             case 'target':
                 return new vscode.ThemeIcon('target', new vscode.ThemeColor('terminal.ansiBrightMagenta'));
             case 'invoke':
