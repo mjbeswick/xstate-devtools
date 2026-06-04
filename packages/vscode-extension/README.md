@@ -57,15 +57,6 @@ The Outline view's title bar exposes toggles for scope (file/workspace), view mo
 - Visual Studio Code 1.78.0 or higher
 - A JavaScript or TypeScript project using XState
 
-## Development
-
-```bash
-npm install        # install dependencies
-npm run compile    # build to out/ (or `npm run watch` to rebuild on change)
-```
-
-Press **F5** to launch an Extension Development Host with the extension loaded. `out/` is not committed, so run `npm run compile` before launching if you see a "Cannot find module out/extension.js" activation error.
-
 ## Known limitations
 
 - Only detects statically defined machines (not dynamically generated ones)
