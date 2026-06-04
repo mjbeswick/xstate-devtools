@@ -704,7 +704,7 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
             case 'guard':
                 return new vscode.ThemeIcon('shield', new vscode.ThemeColor('symbolIcon.booleanForeground'));
             case 'target':
-                return new vscode.ThemeIcon('target', new vscode.ThemeColor('charts.pink'));
+                return new vscode.ThemeIcon('target', new vscode.ThemeColor('terminal.ansiBrightMagenta'));
             case 'invoke':
                 return new vscode.ThemeIcon('circuit-board', new vscode.ThemeColor('symbolIcon.eventForeground'));
             case 'context':
