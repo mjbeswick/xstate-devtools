@@ -2,7 +2,7 @@
   "name": "xstate-devtools",
   "displayName": "xState Devtools",
   "description": "XState developer tools: interactive outline, search, and navigation",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "publisher": "MichaelBeswick",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -255,12 +255,14 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run copy-codicons && npm run bundle",
     "copy-codicons": "node -e \"const fs=require('fs'),p=require('path');const dist=p.dirname(require.resolve('@vscode/codicons/package.json'))+'/dist';const out='resources/codicons';fs.mkdirSync(out,{recursive:true});for(const f of ['codicon.css','codicon.ttf'])fs.copyFileSync(p.join(dist,f),p.join(out,f));\"",
-    "compile": "npm run copy-codicons && tsc -p ./",
-    "build": "npm run copy-codicons && tsc -p ./",
-    "watch": "npm run copy-codicons && tsc -watch -p ./",
-    "dev": "npm run copy-codicons && tsc -watch -p ./",
+    "bundle": "node esbuild.js",
+    "compile": "npm run copy-codicons && npm run bundle",
+    "build": "npm run copy-codicons && npm run bundle",
+    "watch": "npm run copy-codicons && node esbuild.js --watch",
+    "dev": "npm run copy-codicons && node esbuild.js --watch",
+    "check": "tsc -p ./ --noEmit",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
@@ -269,6 +271,7 @@
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "@vscode/codicons": "^0.0.45",
+    "esbuild": "^0.17.6",
     "eslint": "^8.0.0",
     "typescript": "^5.0.0"
   }

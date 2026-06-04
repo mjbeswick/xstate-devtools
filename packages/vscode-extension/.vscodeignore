@@ -4,6 +4,7 @@
 src/**
 .gitignore
 .yarnrc
+esbuild.js
 CLAUDE.md
 PLAN.md
 vsc-extension-quickstart.md
