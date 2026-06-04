@@ -27,12 +27,12 @@ packages/
 
 ```bash
 npm install
-npm run build --workspace=packages/extension
+npm run build --workspace=packages/chrome-extension
 ```
 
 Load the extension:
 1. `chrome://extensions` → enable **Developer mode**
-2. **Load unpacked** → `packages/extension/dist`
+2. **Load unpacked** → `packages/chrome-extension/dist`
 
 Run the example:
 ```bash
@@ -100,7 +100,7 @@ In the panel header, toggle **Server adapter** on. Default endpoint: `ws://local
 
 ## Wire protocol
 
-Defined in `packages/extension/src/shared/types.ts`. Same protocol on both transports:
+Defined in `packages/chrome-extension/src/shared/types.ts`. Same protocol on both transports:
 
 - `XSTATE_ACTOR_REGISTERED` — new actor with serialized machine + initial snapshot
 - `XSTATE_SNAPSHOT` — snapshot tick (no event)
@@ -124,7 +124,7 @@ Defined in `packages/extension/src/shared/types.ts`. Same protocol on both trans
 
 ```bash
 npm test              # run all package tests
-npm run build --workspace=packages/extension
+npm run build --workspace=packages/chrome-extension
 npm run dev --workspace=packages/example-remix
 ```
 

@@ -1,0 +1,256 @@
+{
+  "name": "@xstate-devtools/vscode-extension",
+  "displayName": "xState Devtools",
+  "description": "XState developer tools: interactive outline, search, and navigation",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.78.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:xstateMachineOutline",
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact",
+    "onLanguage:javascript",
+    "onLanguage:javascriptreact"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "views": {
+      "xstate-outline": [
+        {
+          "type": "webview",
+          "id": "xstateMachineOutlineSearch",
+          "name": "Search",
+          "when": "true"
+        },
+        {
+          "id": "xstateMachineOutline",
+          "name": "Outline"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "xstateMachineOutline.refresh",
+        "title": "Refresh XState Outline",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "xstateMachineOutline.setScopeFile",
+        "title": "Scope: file"
+      },
+      {
+        "command": "xstateMachineOutline.setScopeFileActive",
+        "title": "Scope: file"
+      },
+      {
+        "command": "xstateMachineOutline.setScopeWorkspace",
+        "title": "Scope: workspace"
+      },
+      {
+        "command": "xstateMachineOutline.setScopeWorkspaceActive",
+        "title": "Scope: workspace"
+      },
+      {
+        "command": "xstateMachineOutline.setViewGrouped",
+        "title": "View: grouped"
+      },
+      {
+        "command": "xstateMachineOutline.setViewGroupedActive",
+        "title": "View: grouped"
+      },
+      {
+        "command": "xstateMachineOutline.setViewFlat",
+        "title": "View: flat"
+      },
+      {
+        "command": "xstateMachineOutline.setViewFlatActive",
+        "title": "View: flat"
+      },
+      {
+        "command": "xstateMachineOutline.setStateConfigsShow",
+        "title": "State configs: show"
+      },
+      {
+        "command": "xstateMachineOutline.setStateConfigsShowActive",
+        "title": "State configs: show"
+      },
+      {
+        "command": "xstateMachineOutline.setStateConfigsHide",
+        "title": "State configs: hide"
+      },
+      {
+        "command": "xstateMachineOutline.setStateConfigsHideActive",
+        "title": "State configs: hide"
+      },
+      {
+        "command": "xstateMachineOutline.toggleFollowCursor",
+        "title": "Cursor: follow"
+      },
+      {
+        "command": "xstateMachineOutline.toggleFollowCursorActive",
+        "title": "Cursor: do not follow"
+      },
+      {
+        "command": "xstateMachineOutline.navigateToNode",
+        "title": "Go to Source"
+      },
+      {
+        "command": "xstateMachineOutline.goToImplementation",
+        "title": "Go to Implementation",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "xstateMachineOutline.filter",
+        "title": "Filter",
+        "icon": "$(search)"
+      },
+      {
+        "command": "xstateMachineOutline.clearFilter",
+        "title": "Clear Filter",
+        "icon": "$(search-stop)"
+      },
+      {
+        "command": "xstateMachineOutline.goToImplementationSelected",
+        "title": "Go to Implementation",
+        "icon": "$(go-to-file)"
+      }
+    ],
+    "configuration": {
+      "title": "XState Outline",
+      "properties": {
+        "xstateOutline.defaultScope": {
+          "type": "string",
+          "enum": [
+            "file",
+            "workspace"
+          ],
+          "default": "workspace",
+          "description": "Default scope for XState Outline view (file or workspace)"
+        },
+        "xstateOutline.defaultViewMode": {
+          "type": "string",
+          "enum": [
+            "grouped",
+            "flat"
+          ],
+          "default": "flat",
+          "description": "Default view mode (grouped by file or flat list of machines)"
+        },
+        "xstateOutline.showStateConfigs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show createStateConfig/stateConfig patterns in the outline"
+        },
+        "xstateOutline.followCursor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically reveal the tree item corresponding to the cursor position"
+        }
+      }
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "xstateMachineOutline.refresh",
+          "when": "view == xstateMachineOutline",
+          "group": "navigation@3"
+        },
+        {
+          "command": "xstateMachineOutline.toggleFollowCursor",
+          "when": "view == xstateMachineOutline && !xstateOutline.followCursor",
+          "group": "0_cursor@1"
+        },
+        {
+          "command": "xstateMachineOutline.toggleFollowCursorActive",
+          "when": "view == xstateMachineOutline && xstateOutline.followCursor",
+          "group": "0_cursor@1"
+        },
+        {
+          "command": "xstateMachineOutline.setScopeFile",
+          "when": "view == xstateMachineOutline && xstateOutline.scopeIsWorkspace",
+          "group": "1_scope@1"
+        },
+        {
+          "command": "xstateMachineOutline.setScopeWorkspace",
+          "when": "view == xstateMachineOutline && !xstateOutline.scopeIsWorkspace",
+          "group": "1_scope@2"
+        },
+        {
+          "command": "xstateMachineOutline.setViewGrouped",
+          "when": "view == xstateMachineOutline && xstateOutline.viewModeIsFlat",
+          "group": "2_view@1"
+        },
+        {
+          "command": "xstateMachineOutline.setViewFlat",
+          "when": "view == xstateMachineOutline && !xstateOutline.viewModeIsFlat",
+          "group": "2_view@2"
+        },
+        {
+          "command": "xstateMachineOutline.setStateConfigsShow",
+          "when": "view == xstateMachineOutline && !xstateOutline.showStateConfigs",
+          "group": "3_configs@1"
+        },
+        {
+          "command": "xstateMachineOutline.setStateConfigsHide",
+          "when": "view == xstateMachineOutline && xstateOutline.showStateConfigs",
+          "group": "3_configs@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "xstateMachineOutline.goToImplementation",
+          "when": "view == xstateMachineOutline && viewItem =~ /^(action|guard|entry|exit|invoke)$/",
+          "group": "navigation@1"
+        }
+      ],
+      "view/item/inline": [
+        {
+          "command": "xstateMachineOutline.goToImplementation",
+          "when": "view == xstateMachineOutline && viewItem =~ /^(action|guard|entry|exit|invoke)$/",
+          "group": "inline"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "xstate-outline",
+          "title": "xState Devtools",
+          "icon": "resources/xstate.svg"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "xstateMachineOutline.goToImplementationSelected",
+        "key": "f12",
+        "mac": "f12",
+        "when": "focusedView == xstateMachineOutline"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "copy-codicons": "node -e \"const fs=require('fs'),p=require('path');const dist=p.dirname(require.resolve('@vscode/codicons/package.json'))+'/dist';const out='resources/codicons';fs.mkdirSync(out,{recursive:true});for(const f of ['codicon.css','codicon.ttf'])fs.copyFileSync(p.join(dist,f),p.join(out,f));\"",
+    "compile": "npm run copy-codicons && tsc -p ./",
+    "build": "npm run copy-codicons && tsc -p ./",
+    "watch": "npm run copy-codicons && tsc -watch -p ./",
+    "dev": "npm run copy-codicons && tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.78.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@vscode/codicons": "^0.0.45"
+  }
+}
