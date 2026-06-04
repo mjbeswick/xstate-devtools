@@ -2,7 +2,7 @@
   "name": "xstate-devtools",
   "displayName": "xState Devtools",
   "description": "XState developer tools: interactive outline, search, and navigation",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "publisher": "MichaelBeswick",
   "license": "MIT",
   "icon": "images/icon.png",
