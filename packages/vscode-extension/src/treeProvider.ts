@@ -680,7 +680,7 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
     private getIcon(): vscode.ThemeIcon {
         switch (this.node.type) {
             case 'machine':
-                return new vscode.ThemeIcon('package', new vscode.ThemeColor('symbolIcon.classForeground'));
+                return new vscode.ThemeIcon('package', new vscode.ThemeColor('charts.blue'));
             case 'state':
                 if (this.node.isInitial) {
                     return new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('charts.green'));
@@ -692,21 +692,21 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
             case 'transition':
                 // Use different icons for event handlers vs regular transitions
                 if (this.node.label === 'onDone' || this.node.label === 'onError') {
-                    return new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('symbolIcon.eventForeground'));
+                    return new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('charts.orange'));
                 }
-                return new vscode.ThemeIcon('symbol-event', new vscode.ThemeColor('symbolIcon.eventForeground'));
+                return new vscode.ThemeIcon('symbol-event', new vscode.ThemeColor('charts.orange'));
             case 'action':
                 return new vscode.ThemeIcon('rocket', new vscode.ThemeColor('symbolIcon.methodForeground'));
             case 'entry':
                 return new vscode.ThemeIcon('debug-step-into', new vscode.ThemeColor('symbolIcon.methodForeground'));
             case 'exit':
-                return new vscode.ThemeIcon('debug-step-out', new vscode.ThemeColor('symbolIcon.colorForeground'));
+                return new vscode.ThemeIcon('debug-step-out', new vscode.ThemeColor('symbolIcon.methodForeground'));
             case 'guard':
                 return new vscode.ThemeIcon('shield', new vscode.ThemeColor('terminal.ansiCyan'));
             case 'target':
                 return new vscode.ThemeIcon('target', new vscode.ThemeColor('terminal.ansiBrightMagenta'));
             case 'invoke':
-                return new vscode.ThemeIcon('circuit-board', new vscode.ThemeColor('symbolIcon.eventForeground'));
+                return new vscode.ThemeIcon('circuit-board', new vscode.ThemeColor('charts.yellow'));
             case 'context':
                 return new vscode.ThemeIcon('symbol-variable', new vscode.ThemeColor('symbolIcon.variableForeground'));
             default:

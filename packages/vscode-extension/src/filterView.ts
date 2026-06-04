@@ -204,14 +204,14 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
 
   // ── Type definitions (codicons + theme colors mirror the outline tree) ──
   const TYPES = [
-    { id: 'machine',    icon: 'package',          label: 'Machine',    color: 'var(--vscode-symbolIcon-classForeground)' },
+    { id: 'machine',    icon: 'package',          label: 'Machine',    color: 'var(--vscode-charts-blue)' },
     { id: 'state',      icon: 'circle-filled',    label: 'State',      color: 'var(--vscode-symbolIcon-fieldForeground)' },
-    { id: 'transition', icon: 'symbol-event',     label: 'Transition', color: 'var(--vscode-symbolIcon-eventForeground)' },
+    { id: 'transition', icon: 'symbol-event',     label: 'Transition', color: 'var(--vscode-charts-orange)' },
     { id: 'action',     icon: 'rocket',           label: 'Action',     color: 'var(--vscode-symbolIcon-methodForeground)' },
     { id: 'entry',      icon: 'debug-step-into',  label: 'Entry',      color: 'var(--vscode-symbolIcon-methodForeground)' },
-    { id: 'exit',       icon: 'debug-step-out',   label: 'Exit',       color: 'var(--vscode-symbolIcon-colorForeground)' },
+    { id: 'exit',       icon: 'debug-step-out',   label: 'Exit',       color: 'var(--vscode-symbolIcon-methodForeground)' },
     { id: 'guard',      icon: 'shield',           label: 'Guard',      color: 'var(--vscode-terminal-ansiCyan)' },
-    { id: 'invoke',     icon: 'circuit-board',    label: 'Invoke',     color: 'var(--vscode-symbolIcon-eventForeground)' },
+    { id: 'invoke',     icon: 'circuit-board',    label: 'Invoke',     color: 'var(--vscode-charts-yellow)' },
     { id: 'context',    icon: 'symbol-variable',  label: 'Context',    color: 'var(--vscode-symbolIcon-variableForeground)' },
     { id: 'target',     icon: 'target',           label: 'Target',     color: 'var(--vscode-terminal-ansiBrightMagenta)' },
   ];
