@@ -2,6 +2,8 @@
 
 A Visual Studio Code extension that displays XState state machines as an interactive tree outline, with search and smart navigation. It analyzes your source statically (no need to run your app) and works with both XState v4 and v5.
 
+![xState Devtools showing the machine outline, search, and source navigation](images/screenshot.png)
+
 ## Features
 
 - 📦 **Workspace scanning** — finds all XState machines across your project, updating live as you edit
