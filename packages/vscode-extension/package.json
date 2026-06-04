@@ -1,12 +1,33 @@
 {
-  "name": "@xstate-devtools/vscode-extension",
+  "name": "xstate-devtools",
   "displayName": "xState Devtools",
   "description": "XState developer tools: interactive outline, search, and navigation",
   "version": "0.1.0",
+  "publisher": "mjbeswick",
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "homepage": "https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mjbeswick/xstate-devtools.git",
+    "directory": "packages/vscode-extension"
+  },
+  "bugs": {
+    "url": "https://github.com/mjbeswick/xstate-devtools/issues"
+  },
+  "keywords": [
+    "xstate",
+    "state machine",
+    "statechart",
+    "outline",
+    "typescript"
+  ],
   "engines": {
     "vscode": "^1.78.0"
   },
   "categories": [
+    "Programming Languages",
+    "Visualization",
     "Other"
   ],
   "activationEvents": [
@@ -247,10 +268,8 @@
     "@types/vscode": "^1.78.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
+    "@vscode/codicons": "^0.0.45",
     "eslint": "^8.0.0",
     "typescript": "^5.0.0"
-  },
-  "dependencies": {
-    "@vscode/codicons": "^0.0.45"
   }
 }

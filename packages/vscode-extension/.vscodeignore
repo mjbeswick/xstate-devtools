@@ -1,9 +1,15 @@
 .vscode/**
 .vscode-test/**
+.claude/**
 src/**
 .gitignore
 .yarnrc
+CLAUDE.md
+PLAN.md
 vsc-extension-quickstart.md
+sample-machine.*
+test-*.ts
+resources/icon-source.svg
 **/tsconfig.json
 **/.eslintrc.json
 **/*.map
