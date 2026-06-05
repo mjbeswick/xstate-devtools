@@ -357,8 +357,8 @@ export class XStateTreeEditor {
         }
 
         if (treeItem.node.type === 'transition') {
-            const transitionProperty = this.findTransitionProperty(parsed, offsets.start, offsets.end, treeItem.node.label);
-            if (!transitionProperty) {
+            const transitionNode = this.findTransitionObject(parsed, offsets.start, offsets.end);
+            if (!transitionNode) {
                 vscode.window.showInformationMessage('Add action/guard is only supported on named transition handlers.');
                 return;
             }
@@ -373,7 +373,7 @@ export class XStateTreeEditor {
                 : await this.pickOrInput('Select guard', this.collectSetupKeys(parsed, 'guards'));
             if (!chosen) { return; }
 
-            await this.addTransitionReference(document, transitionProperty, kind as 'Action' | 'Guard', chosen);
+            await this.addTransitionReference(document, transitionNode, kind as 'Action' | 'Guard', chosen);
             return;
         }
 
@@ -466,11 +466,11 @@ export class XStateTreeEditor {
 
     private static async addTransitionReference(
         document: vscode.TextDocument,
-        transitionProperty: ts.PropertyAssignment,
+        transitionNode: ts.PropertyAssignment | ts.ObjectLiteralExpression,
         kind: 'Action' | 'Guard',
         value: string
     ): Promise<void> {
-        const initializer = transitionProperty.initializer;
+        const initializer = ts.isPropertyAssignment(transitionNode) ? transitionNode.initializer : transitionNode;
 
         if (ts.isStringLiteralLike(initializer)) {
             const rewritten = kind === 'Action'
@@ -480,8 +480,13 @@ export class XStateTreeEditor {
             return;
         }
 
+        if (ts.isArrayLiteralExpression(initializer)) {
+            vscode.window.showInformationMessage('Adding references directly to an array of conditional transitions is not supported. Please edit the specific branch object.');
+            return;
+        }
+
         if (!ts.isObjectLiteralExpression(initializer)) {
-            vscode.window.showInformationMessage('Conditional transition branches are not editable from this menu yet.');
+            vscode.window.showInformationMessage('Cannot edit this type of transition.');
             return;
         }
 
@@ -638,6 +643,40 @@ export class XStateTreeEditor {
                 found = node;
                 return;
             }
+            ts.forEachChild(node, visit);
+        };
+        visit(sourceFile);
+        return found;
+    }
+
+    private static findTransitionObject(sourceFile: ts.SourceFile, start: number, end: number): ts.ObjectLiteralExpression | ts.PropertyAssignment | undefined {
+        let found: ts.ObjectLiteralExpression | ts.PropertyAssignment | undefined;
+        const visit = (node: ts.Node): void => {
+            if (found) return;
+
+            // Could be the whole property assignment (e.g., `EVENT: { ... }`)
+            if (ts.isPropertyAssignment(node)) {
+                if ((node.getStart() === start && node.getEnd() === end) || (node.initializer.getStart() === start && node.initializer.getEnd() === end)) {
+                    found = node;
+                    return;
+                }
+            }
+            
+            // Could be an object inside an array (e.g., `EVENT: [ { ... }, { ... } ]`)
+            if (ts.isObjectLiteralExpression(node)) {
+                if (node.getStart() === start && node.getEnd() === end) {
+                    // Make sure it's inside a transition
+                    const parentArray = this.findAncestor(node, ts.isArrayLiteralExpression);
+                    if (parentArray) {
+                        const parentProp = this.findAncestor(parentArray, ts.isPropertyAssignment);
+                        if (parentProp) {
+                            found = node;
+                            return;
+                        }
+                    }
+                }
+            }
+
             ts.forEachChild(node, visit);
         };
         visit(sourceFile);
