@@ -9,7 +9,7 @@ import {
 } from './xstateSchema';
 
 export interface MachineNode {
-    type: 'machine' | 'state' | 'transition' | 'target' | 'action' | 'guard' | 'invoke' | 'entry' | 'exit' | 'context' | 'contextProperty' | 'actor' | 'delay' | 'setup' | 'invalid';
+    type: 'machine' | 'state' | 'transition' | 'target' | 'action' | 'guard' | 'invoke' | 'entry' | 'exit' | 'context' | 'contextProperty' | 'actor' | 'delay' | 'setup' | 'on' | 'invalid';
     label: string;
     range: vscode.Range;
     uri: vscode.Uri;

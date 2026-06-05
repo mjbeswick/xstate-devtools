@@ -5,6 +5,7 @@ import { findNodeAtPosition, normalizeTargetName, walkNodes } from './utils';
 
 export type ViewScope = 'file' | 'workspace';
 export type ViewMode = 'grouped' | 'flat';
+export type SortMode = 'original' | 'sorted';
 
 export interface SearchResultData {
     label: string;
@@ -30,6 +31,8 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
     private viewMode: ViewMode = 'grouped';
     private isLoading: boolean = false;
     private showStateConfigs: boolean = false; // Hidden by default
+    private groupEventHandlers: boolean = false; // Group transitions under an `on` node
+    private sortChildren: SortMode = 'original'; // Sort child nodes vs. keep source order
     private workspaceScanner: WorkspaceScanner;
     private outputChannel: vscode.OutputChannel;
 
@@ -46,11 +49,15 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         this.currentScope = config.get('defaultScope', 'workspace');
         this.viewMode = config.get('defaultViewMode', 'flat');
         this.showStateConfigs = config.get('showStateConfigs', false);
-        
+        this.groupEventHandlers = config.get('groupEventHandlers', false);
+        this.sortChildren = config.get<SortMode>('sortChildren', 'original');
+
         // Set initial context for menu checkmarks
         vscode.commands.executeCommand('setContext', 'xstateOutline.scopeIsWorkspace', this.currentScope === 'workspace');
         vscode.commands.executeCommand('setContext', 'xstateOutline.viewModeIsFlat', this.viewMode === 'flat');
         vscode.commands.executeCommand('setContext', 'xstateOutline.showStateConfigs', this.showStateConfigs);
+        vscode.commands.executeCommand('setContext', 'xstateOutline.groupEventHandlers', this.groupEventHandlers);
+        vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenIsSorted', this.sortChildren === 'sorted');
         
         // Trigger initial refresh
         this.refresh();
@@ -285,6 +292,72 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         this.refresh();
     }
 
+    setGroupEventHandlers(group: boolean): void {
+        this.groupEventHandlers = group;
+        const config = vscode.workspace.getConfiguration('xstateOutline');
+        config.update('groupEventHandlers', group, vscode.ConfigurationTarget.Global);
+        vscode.commands.executeCommand('setContext', 'xstateOutline.groupEventHandlers', group);
+        this.refresh();
+    }
+
+    setSortChildren(mode: SortMode): void {
+        this.sortChildren = mode;
+        const config = vscode.workspace.getConfiguration('xstateOutline');
+        config.update('sortChildren', mode, vscode.ConfigurationTarget.Global);
+        vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenIsSorted', mode === 'sorted');
+        this.refresh();
+    }
+
+    /**
+     * Transform a node's raw children for display: optionally group event-handler
+     * transitions under a synthetic `on` node, then optionally sort alphabetically.
+     * Pure with respect to the parser's `MachineNode` tree — the underlying data
+     * (used by search, graph, and target resolution) is left untouched.
+     */
+    private displayChildren(node: MachineNode): MachineNode[] {
+        let children = node.children ?? [];
+
+        // Only group the `on: {}` handlers of states/machines — not the onDone/onError
+        // transitions that live under an invoke, nor the transitions inside an `on` node.
+        if (this.groupEventHandlers && (node.type === 'state' || node.type === 'machine')) {
+            children = this.groupTransitions(children);
+        }
+
+        if (this.sortChildren === 'sorted') {
+            children = [...children].sort((a, b) => a.label.localeCompare(b.label));
+        }
+
+        return children;
+    }
+
+    /** Replace the run of `transition` children with a single `on` node containing them. */
+    private groupTransitions(children: MachineNode[]): MachineNode[] {
+        const transitions = children.filter(c => c.type === 'transition');
+        if (transitions.length === 0) { return children; }
+
+        const onNode: MachineNode = {
+            type: 'on',
+            label: 'on',
+            range: new vscode.Range(
+                transitions[0].range.start,
+                transitions[transitions.length - 1].range.end
+            ),
+            uri: transitions[0].uri,
+            children: transitions,
+        };
+
+        const result: MachineNode[] = [];
+        let inserted = false;
+        for (const c of children) {
+            if (c.type === 'transition') {
+                if (!inserted) { result.push(onNode); inserted = true; }
+            } else {
+                result.push(c);
+            }
+        }
+        return result;
+    }
+
     toggleViewMode(): void {
         this.viewMode = this.viewMode === 'grouped' ? 'flat' : 'grouped';
         
@@ -405,8 +478,9 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
     private preBuildItemCache(nodes: MachineNode[], parent: XStateMachineTreeItem | undefined): void {
         for (const node of nodes) {
             const item = this.getOrCreateItem(node, parent);
-            if (node.children) {
-                this.preBuildItemCache(node.children, item);
+            const children = this.displayChildren(node);
+            if (children.length > 0) {
+                this.preBuildItemCache(children, item);
             }
         }
     }
@@ -472,7 +546,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
                     .filter((m: MachineNode) => this.nodeMatchesFilter(m))
                     .map((m: MachineNode) => {
                         const item = this.getOrCreateItem(m, undefined);
-                        if (m.children) { this.preBuildItemCache(m.children, item); }
+                        this.preBuildItemCache(this.displayChildren(m), item);
                         return item;
                     });
                 
@@ -517,7 +591,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         } else {
             // Return children of the current node, filtered if needed
             if (element.node.children) {
-                return this.filterNodes(element.node.children)
+                return this.filterNodes(this.displayChildren(element.node))
                     .map(c => this.getOrCreateItem(c, element));
             }
             return [];
@@ -572,7 +646,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
                     } else {
                         item.tooltip = `${m.label}\n${fm.relativePath}`;
                     }
-                    if (m.children) { this.preBuildItemCache(m.children, item); }
+                    this.preBuildItemCache(this.displayChildren(m), item);
                     allMachines.push(item);
                 }
             }
@@ -584,7 +658,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
                 const machineItems = fm.machines
                     .map(m => {
                         const item = this.getOrCreateItem(m, undefined);
-                        if (m.children) { this.preBuildItemCache(m.children, item); }
+                        this.preBuildItemCache(this.displayChildren(m), item);
                         return item;
                     })
                     .sort((a, b) => a.node.label.localeCompare(b.node.label));
@@ -731,6 +805,10 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
         if (node.type === 'invalid') {
             return `Invalid XState property: ${node.label.replace(/^invalid:\s*/, '')}`;
         }
+        if (node.type === 'on') {
+            const count = node.children?.length ?? 0;
+            return `Event handlers (${count} ${count === 1 ? 'event' : 'events'})`;
+        }
         if (node.description) {
             const md = new vscode.MarkdownString();
             md.appendMarkdown(`**${node.label}**\n\n`);
@@ -760,6 +838,10 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
                     iconName = 'circle-filled';
                     iconColor = new vscode.ThemeColor('symbolIcon.fieldForeground');
                 }
+                break;
+            case 'on':
+                iconName = 'inbox';
+                iconColor = new vscode.ThemeColor('charts.orange');
                 break;
             case 'transition':
                 if (this.node.label === 'onDone' || this.node.label === 'onError') {

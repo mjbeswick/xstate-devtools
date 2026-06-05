@@ -126,6 +126,22 @@
         "icon": "$(list-tree)"
       },
       {
+        "command": "xstateMachineOutline.setGroupHandlersOn",
+        "title": "Handlers: group under on"
+      },
+      {
+        "command": "xstateMachineOutline.setGroupHandlersOff",
+        "title": "Handlers: flat"
+      },
+      {
+        "command": "xstateMachineOutline.setSortChildrenSorted",
+        "title": "Sort children: A–Z"
+      },
+      {
+        "command": "xstateMachineOutline.setSortChildrenOriginal",
+        "title": "Sort children: source order"
+      },
+      {
         "command": "xstateMachineOutline.navigateToNode",
         "title": "Go to Source"
       },
@@ -210,6 +226,20 @@
           "type": "boolean",
           "default": false,
           "description": "Make the visual graph selectively render only states that are expanded in the tree outline"
+        },
+        "xstateOutline.groupEventHandlers": {
+          "type": "boolean",
+          "default": false,
+          "description": "Group a state's event-handler transitions under an `on` node in the outline"
+        },
+        "xstateOutline.sortChildren": {
+          "type": "string",
+          "enum": [
+            "original",
+            "sorted"
+          ],
+          "default": "original",
+          "description": "Order of child nodes in the outline: source order (original) or alphabetical (sorted)"
         }
       }
     },
@@ -269,6 +299,26 @@
           "command": "xstateMachineOutline.setStateConfigsHide",
           "when": "view == xstateMachineOutline && xstateOutline.showStateConfigs",
           "group": "3_configs@2"
+        },
+        {
+          "command": "xstateMachineOutline.setGroupHandlersOn",
+          "when": "view == xstateMachineOutline && !xstateOutline.groupEventHandlers",
+          "group": "4_handlers@1"
+        },
+        {
+          "command": "xstateMachineOutline.setGroupHandlersOff",
+          "when": "view == xstateMachineOutline && xstateOutline.groupEventHandlers",
+          "group": "4_handlers@2"
+        },
+        {
+          "command": "xstateMachineOutline.setSortChildrenSorted",
+          "when": "view == xstateMachineOutline && !xstateOutline.sortChildrenIsSorted",
+          "group": "5_sort@1"
+        },
+        {
+          "command": "xstateMachineOutline.setSortChildrenOriginal",
+          "when": "view == xstateMachineOutline && xstateOutline.sortChildrenIsSorted",
+          "group": "5_sort@2"
         }
       ],
       "view/item/context": [

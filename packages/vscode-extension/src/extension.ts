@@ -22,6 +22,8 @@ export async function activate(context: vscode.ExtensionContext) {
     const initialScope = config.get<string>('defaultScope', 'workspace');
     const initialViewMode = config.get<string>('defaultViewMode', 'flat');
     const initialShowStateConfigs = config.get<boolean>('showStateConfigs', false);
+    const initialGroupEventHandlers = config.get<boolean>('groupEventHandlers', false);
+    const initialSortChildren = config.get<string>('sortChildren', 'original');
     let followCursor = config.get<boolean>('followCursor', true);
 
     let graphReflectsTreeExpansion = config.get<boolean>('graphReflectsTreeExpansion', false);
@@ -31,6 +33,8 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('setContext', 'xstateOutline.scopeIsWorkspace', initialScope === 'workspace'),
         vscode.commands.executeCommand('setContext', 'xstateOutline.viewModeIsFlat', initialViewMode === 'flat'),
         vscode.commands.executeCommand('setContext', 'xstateOutline.showStateConfigs', initialShowStateConfigs),
+        vscode.commands.executeCommand('setContext', 'xstateOutline.groupEventHandlers', initialGroupEventHandlers),
+        vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenIsSorted', initialSortChildren === 'sorted'),
         vscode.commands.executeCommand('setContext', 'xstateOutline.followCursor', followCursor),
         vscode.commands.executeCommand('setContext', 'xstateOutline.graphReflectsTreeExpansion', graphReflectsTreeExpansion),
     ]);
@@ -115,6 +119,26 @@ export async function activate(context: vscode.ExtensionContext) {
     const setStateConfigsHideCommand = vscode.commands.registerCommand(
         'xstateMachineOutline.setStateConfigsHide',
         () => treeProvider.setStateConfigs(false)
+    );
+
+    const setGroupHandlersOnCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.setGroupHandlersOn',
+        () => treeProvider.setGroupEventHandlers(true)
+    );
+
+    const setGroupHandlersOffCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.setGroupHandlersOff',
+        () => treeProvider.setGroupEventHandlers(false)
+    );
+
+    const setSortChildrenSortedCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.setSortChildrenSorted',
+        () => treeProvider.setSortChildren('sorted')
+    );
+
+    const setSortChildrenOriginalCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.setSortChildrenOriginal',
+        () => treeProvider.setSortChildren('original')
     );
 
     const toggleFollowCursorCommand = vscode.commands.registerCommand(
@@ -632,6 +656,10 @@ export async function activate(context: vscode.ExtensionContext) {
         setStateConfigsShowActiveCommand,
         setStateConfigsHideCommand,
         setStateConfigsHideActiveCommand,
+        setGroupHandlersOnCommand,
+        setGroupHandlersOffCommand,
+        setSortChildrenSortedCommand,
+        setSortChildrenOriginalCommand,
         toggleFollowCursorCommand,
         toggleFollowCursorActiveCommand,
         toggleGraphSyncExpansionCommand,
