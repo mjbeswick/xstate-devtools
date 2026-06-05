@@ -2,15 +2,10 @@
   "name": "xstate-devtools",
   "displayName": "xState Devtools",
   "description": "XState developer tools: interactive outline, search, and navigation",
-  "version": "1.1.0",
+  "version": "1.3.0",
   "publisher": "MichaelBeswick",
   "license": "MIT",
   "icon": "images/icon.png",
-  "files": [
-    "out/**",
-    "resources/**",
-    "images/icon.png"
-  ],
   "homepage": "https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension#readme",
   "repository": {
     "type": "git",
@@ -121,6 +116,16 @@
         "title": "Cursor: do not follow"
       },
       {
+        "command": "xstateMachineOutline.toggleGraphSyncExpansion",
+        "title": "Graph: reflect tree expansion",
+        "icon": "$(list-filter)"
+      },
+      {
+        "command": "xstateMachineOutline.toggleGraphSyncExpansionActive",
+        "title": "Graph: render full tree",
+        "icon": "$(list-tree)"
+      },
+      {
         "command": "xstateMachineOutline.navigateToNode",
         "title": "Go to Source"
       },
@@ -200,6 +205,11 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically reveal the tree item corresponding to the cursor position"
+        },
+        "xstateOutline.graphReflectsTreeExpansion": {
+          "type": "boolean",
+          "default": false,
+          "description": "Make the visual graph selectively render only states that are expanded in the tree outline"
         }
       }
     },
@@ -209,6 +219,16 @@
           "command": "xstateMachineOutline.refresh",
           "when": "view == xstateMachineOutline",
           "group": "navigation@3"
+        },
+        {
+          "command": "xstateMachineOutline.toggleGraphSyncExpansion",
+          "when": "view == xstateMachineOutline && !xstateOutline.graphReflectsTreeExpansion",
+          "group": "0_cursor@0"
+        },
+        {
+          "command": "xstateMachineOutline.toggleGraphSyncExpansionActive",
+          "when": "view == xstateMachineOutline && xstateOutline.graphReflectsTreeExpansion",
+          "group": "0_cursor@0"
         },
         {
           "command": "xstateMachineOutline.toggleFollowCursor",

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { MachineNode } from './parser';
+import { XStateMachineTreeProvider } from './treeProvider';
 
 export class XStateGraphViewProvider {
     public static readonly viewType = 'xstateGraphView';
@@ -8,7 +9,8 @@ export class XStateGraphViewProvider {
     private currentMachine: MachineNode | undefined;
 
     constructor(
-        private readonly extensionUri: vscode.Uri
+        private readonly extensionUri: vscode.Uri,
+        private readonly treeProvider: XStateMachineTreeProvider
     ) {}
 
     public show(machineNode: MachineNode, title: string) {
@@ -96,17 +98,23 @@ export class XStateGraphViewProvider {
         }
     }
 
+    public refresh() {
+        this.update();
+    }
+
     private update() {
         if (!this.panel || !this.currentMachine) {
             return;
         }
 
-        const mermaidCode = this.generateMermaid(this.currentMachine);
+        const config = vscode.workspace.getConfiguration('xstateOutline');
+        const reflectExpansion = config.get<boolean>('graphReflectsTreeExpansion', false);
+        const mermaidCode = this.generateMermaid(this.currentMachine, reflectExpansion);
         
         this.panel.webview.html = this.getHtmlForWebview(mermaidCode);
     }
 
-    private generateMermaid(node: MachineNode): string {
+    private generateMermaid(node: MachineNode, reflectExpansion: boolean): string {
         let code = 'stateDiagram-v2\n';
         
         const walk = (n: MachineNode, parentName?: string) => {
@@ -120,7 +128,16 @@ export class XStateGraphViewProvider {
                 }
 
                 if (n.children) {
-                    // Gather transitions
+                    // Check if node is expanded in the tree
+                    let shouldWalkChildren = true;
+                    if (reflectExpansion) {
+                        const treeItem = this.treeProvider.getTreeItemForNode(n);
+                        if (treeItem && treeItem.collapsibleState === vscode.TreeItemCollapsibleState.Collapsed) {
+                            shouldWalkChildren = false;
+                        }
+                    }
+
+                    // Gather transitions (we still want to show transitions to siblings even if children are collapsed)
                     const transitions = n.children.filter(c => c.type === 'transition');
                     for (const t of transitions) {
                         const targetNode = t.children?.find(c => c.type === 'target');
@@ -135,13 +152,15 @@ export class XStateGraphViewProvider {
                     }
 
                     // Recursively process nested states
-                    const states = n.children.filter(c => c.type === 'state');
-                    if (states.length > 0) {
-                        code += `    state ${safeName} {\n`;
-                        for (const child of states) {
-                            walk(child, safeName);
+                    if (shouldWalkChildren) {
+                        const states = n.children.filter(c => c.type === 'state');
+                        if (states.length > 0) {
+                            code += `    state ${safeName} {\n`;
+                            for (const child of states) {
+                                walk(child, safeName);
+                            }
+                            code += `    }\n`;
                         }
-                        code += `    }\n`;
                     }
                 }
             } else if (n.type === 'machine') {

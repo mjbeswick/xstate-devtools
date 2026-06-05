@@ -24,11 +24,15 @@ export async function activate(context: vscode.ExtensionContext) {
     const initialShowStateConfigs = config.get<boolean>('showStateConfigs', false);
     let followCursor = config.get<boolean>('followCursor', true);
 
+    let graphReflectsTreeExpansion = config.get<boolean>('graphReflectsTreeExpansion', false);
+    vscode.commands.executeCommand('setContext', 'xstateOutline.graphReflectsTreeExpansion', graphReflectsTreeExpansion);
+
     await Promise.all([
         vscode.commands.executeCommand('setContext', 'xstateOutline.scopeIsWorkspace', initialScope === 'workspace'),
         vscode.commands.executeCommand('setContext', 'xstateOutline.viewModeIsFlat', initialViewMode === 'flat'),
         vscode.commands.executeCommand('setContext', 'xstateOutline.showStateConfigs', initialShowStateConfigs),
         vscode.commands.executeCommand('setContext', 'xstateOutline.followCursor', followCursor),
+        vscode.commands.executeCommand('setContext', 'xstateOutline.graphReflectsTreeExpansion', graphReflectsTreeExpansion),
     ]);
 
     const outputChannel = vscode.window.createOutputChannel('XState Outline');
@@ -212,6 +216,32 @@ export async function activate(context: vscode.ExtensionContext) {
             const cfg = vscode.workspace.getConfiguration('xstateOutline');
             cfg.update('followCursor', followCursor, vscode.ConfigurationTarget.Global);
             vscode.commands.executeCommand('setContext', 'xstateOutline.followCursor', followCursor);
+        }
+    );
+
+    const toggleGraphSyncExpansionCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.toggleGraphSyncExpansion',
+        () => {
+            graphReflectsTreeExpansion = !graphReflectsTreeExpansion;
+            const cfg = vscode.workspace.getConfiguration('xstateOutline');
+            cfg.update('graphReflectsTreeExpansion', graphReflectsTreeExpansion, vscode.ConfigurationTarget.Global);
+            vscode.commands.executeCommand('setContext', 'xstateOutline.graphReflectsTreeExpansion', graphReflectsTreeExpansion);
+            
+            // Re-render graph if active
+            graphViewProvider.refresh();
+        }
+    );
+
+    const toggleGraphSyncExpansionActiveCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.toggleGraphSyncExpansionActive', () => {
+            vscode.commands.executeCommand('xstateMachineOutline.toggleGraphSyncExpansion');
+        }
+    );
+
+    const refreshGraphOnlyCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.refreshGraphOnly',
+        () => {
+            graphViewProvider.refresh();
         }
     );
 
@@ -558,7 +588,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }, 500);
     }
 
-    const graphViewProvider = new XStateGraphViewProvider(context.extensionUri);
+    const graphViewProvider = new XStateGraphViewProvider(context.extensionUri, treeProvider);
 
     const openGraphViewCommand = vscode.commands.registerCommand(
         'xstateMachineOutline.openGraphView',
@@ -604,6 +634,8 @@ export async function activate(context: vscode.ExtensionContext) {
         setStateConfigsHideActiveCommand,
         toggleFollowCursorCommand,
         toggleFollowCursorActiveCommand,
+        toggleGraphSyncExpansionCommand,
+        toggleGraphSyncExpansionActiveCommand,
         filterCommand,
         clearFilterCommand,
         editNodeCommand,
@@ -612,6 +644,7 @@ export async function activate(context: vscode.ExtensionContext) {
         addReferenceCommand,
         deleteNodeCommand,
         openGraphViewCommand,
+        refreshGraphOnlyCommand,
         navigateToNodeCommand,
         goToImplementationCommand,
         definitionProvider,

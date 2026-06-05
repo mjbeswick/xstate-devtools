@@ -61,6 +61,23 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         
         // Update tree view description based on scope
         this.updateTreeViewDescription();
+
+        // Listen for expand/collapse to update item state
+        this.treeView.onDidExpandElement(e => {
+            e.element.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+            const config = vscode.workspace.getConfiguration('xstateOutline');
+            if (config.get<boolean>('graphReflectsTreeExpansion', false)) {
+                vscode.commands.executeCommand('xstateMachineOutline.refreshGraphOnly');
+            }
+        });
+
+        this.treeView.onDidCollapseElement(e => {
+            e.element.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+            const config = vscode.workspace.getConfiguration('xstateOutline');
+            if (config.get<boolean>('graphReflectsTreeExpansion', false)) {
+                vscode.commands.executeCommand('xstateMachineOutline.refreshGraphOnly');
+            }
+        });
         
         // If starting in workspace scope, trigger initial scan
         if (this.currentScope === 'workspace') {
@@ -349,6 +366,10 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
             this.isLoading = false;
             this.refresh();
         }
+    }
+
+    public getTreeItemForNode(node: MachineNode): XStateMachineTreeItem | undefined {
+        return this.nodeItemCache.get(this.itemKey(node));
     }
 
     private itemKey(node: MachineNode): string {

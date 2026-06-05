@@ -14,14 +14,18 @@ Chrome DevTools extension for inspecting XState v5 machines at runtime — both 
 - **Server-side bridge** — a single `createServerAdapter()` call exposes Node actors to the panel via WebSocket
 - **Resizable, collapsible** three-column + drawer layout (Chrome DevTools style)
 
-## Repo layout
+## Packages
 
-```
-packages/
-├── adapter/                 # createAdapter() (browser) + createServerAdapter() (Node)
-├── extension/               # Chrome MV3 extension — service worker, content scripts, panel
-└── example-remix/           # demo app: 3 client machines + 1 server orchestrator
-```
+This is an npm-workspaces monorepo:
+
+| Package | Description |
+| --- | --- |
+| `@xstate-devtools/adapter` | `createAdapter()` (browser) + `createServerAdapter()` (Node) + React helpers — the inspector you wire into your app. |
+| `chrome-extension` | Chrome MV3 DevTools extension — service worker, content scripts, and the **XState** panel. |
+| [`vscode-extension`](packages/vscode-extension/README.md) | VS Code extension that **statically** analyzes source for XState machines and renders them as an interactive outline. Independent of the runtime inspector. |
+| `example-remix` | Demo Remix app: client machines + a server orchestrator, wired to the adapter. |
+
+> **Two tools, two jobs.** The adapter + chrome-extension inspect machines **at runtime**. The [vscode-extension](packages/vscode-extension/README.md) reads machines **statically** from source — no running app required. They share the XState domain but are otherwise independent.
 
 ## Quick start
 
