@@ -20,16 +20,34 @@ const options = {
     logLevel: 'info',
 };
 
+// Standalone browser bundle for the statechart graph webview (Cytoscape + elk +
+// expand-collapse). Loaded from out/webview/graph.js as a local webview resource.
+const webviewOptions = {
+    entryPoints: ['src/webview/graph.ts'],
+    bundle: true,
+    outfile: 'out/webview/graph.js',
+    platform: 'browser',
+    format: 'iife',
+    target: 'es2020',
+    sourcemap: watch,
+    minify: !watch,
+    logLevel: 'info',
+};
+
 async function main() {
     // Start from a clean out/ so stale unbundled tsc output isn't shipped.
     fs.rmSync('out', { recursive: true, force: true });
 
     if (watch) {
         const ctx = await esbuild.context(options);
-        await ctx.watch();
+        const webviewCtx = await esbuild.context(webviewOptions);
+        await Promise.all([ctx.watch(), webviewCtx.watch()]);
         console.log('esbuild: watching…');
     } else {
-        await esbuild.build(options);
+        await Promise.all([
+            esbuild.build(options),
+            esbuild.build(webviewOptions),
+        ]);
         console.log('esbuild: build complete');
     }
 }

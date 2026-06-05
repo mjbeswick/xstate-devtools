@@ -401,6 +401,7 @@
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
+    "@types/cytoscape": "^3.21.9",
     "@types/node": "^18.0.0",
     "@types/vscode": "^1.78.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
@@ -409,5 +410,11 @@
     "esbuild": "^0.17.6",
     "eslint": "^8.0.0",
     "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "cytoscape": "^3.34.0",
+    "cytoscape-elk": "^2.3.0",
+    "cytoscape-expand-collapse": "^4.1.1",
+    "elkjs": "^0.11.1"
   }
 }

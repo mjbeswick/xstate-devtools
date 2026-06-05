@@ -7,6 +7,9 @@ export class XStateGraphViewProvider {
 
     private panel: vscode.WebviewPanel | undefined;
     private currentMachine: MachineNode | undefined;
+    // Maps a graph node id back to the source range of the state it represents,
+    // and the parser node (used to resolve collapse state against the tree).
+    private nodeById = new Map<string, MachineNode>();
 
     constructor(
         private readonly extensionUri: vscode.Uri,
@@ -40,7 +43,7 @@ export class XStateGraphViewProvider {
                 message => {
                     switch (message.command) {
                         case 'stateClicked':
-                            this.navigateToState(message.stateId);
+                            this.navigateToState(message.id);
                             return;
                         case 'eventClicked':
                             this.simulateEvent(message.eventName);
@@ -68,32 +71,13 @@ export class XStateGraphViewProvider {
         // along the transition matching eventName to find the target state, then call highlightState(targetName).
     }
 
-    private navigateToState(stateSafeName: string) {
+    private navigateToState(id: string) {
         if (!this.currentMachine || !this.currentMachine.uri) return;
-        
-        // Find the node by matching its sanitized name
-        let foundNode: MachineNode | undefined;
-        const walk = (n: MachineNode) => {
-            if (foundNode) return;
-            if (n.type === 'state') {
-                const safeName = n.label.replace(/[^a-zA-Z0-9_]/g, '_');
-                if (safeName === stateSafeName) {
-                    foundNode = n;
-                    return;
-                }
-            }
-            if (n.children) {
-                for (const child of n.children) {
-                    walk(child);
-                }
-            }
-        };
-        
-        walk(this.currentMachine);
-        
+
+        const foundNode = this.nodeById.get(id);
         if (foundNode && foundNode.range) {
             vscode.workspace.openTextDocument(this.currentMachine.uri).then(doc => {
-                vscode.window.showTextDocument(doc, { selection: foundNode!.range, preserveFocus: true });
+                vscode.window.showTextDocument(doc, { selection: foundNode.range, preserveFocus: true });
             });
         }
     }
@@ -109,167 +93,148 @@ export class XStateGraphViewProvider {
 
         const config = vscode.workspace.getConfiguration('xstateOutline');
         const reflectExpansion = config.get<boolean>('graphReflectsTreeExpansion', false);
-        const mermaidCode = this.generateMermaid(this.currentMachine, reflectExpansion);
-        
-        this.panel.webview.html = this.getHtmlForWebview(mermaidCode);
+        const payload = this.buildElements(this.currentMachine, reflectExpansion);
+
+        this.panel.webview.html = this.getHtmlForWebview(this.panel.webview, payload);
     }
 
-    private generateMermaid(node: MachineNode, reflectExpansion: boolean): string {
-        let code = 'stateDiagram-v2\n';
-        
-        const walk = (n: MachineNode, parentName?: string) => {
-            if (n.type === 'state') {
-                const safeName = n.label.replace(/[^a-zA-Z0-9_]/g, '_');
-                code += `    state "${n.label}" as ${safeName}\n`;
-                // Add click event for webview to intercept
-                code += `    click ${safeName} call stateClicked()\n`;
-                if (n.isInitial && parentName) {
-                    code += `    [*] --> ${safeName}\n`;
-                }
+    /**
+     * Walk the parser's MachineNode tree into a Cytoscape elements payload:
+     * states → (compound) nodes, transitions → edges. Target names are resolved
+     * to node ids the same way the old Mermaid output did (sanitized, last-wins).
+     */
+    private buildElements(machine: MachineNode, reflectExpansion: boolean): GraphPayload {
+        const nodes: GraphNode[] = [];
+        const edges: GraphEdge[] = [];
+        const nameToId = new Map<string, string>();
+        const idByNode = new Map<MachineNode, string>();
+        const collapsedIds: string[] = [];
+        this.nodeById = new Map<string, MachineNode>();
+        let counter = 0;
 
-                if (n.children) {
-                    // Check if node is expanded in the tree
-                    let shouldWalkChildren = true;
-                    if (reflectExpansion) {
-                        const treeItem = this.treeProvider.getTreeItemForNode(n);
-                        if (treeItem && treeItem.collapsibleState === vscode.TreeItemCollapsibleState.Collapsed) {
-                            shouldWalkChildren = false;
-                        }
-                    }
+        const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9_]/g, '_');
 
-                    // Gather transitions (we still want to show transitions to siblings even if children are collapsed)
-                    const transitions = n.children.filter(c => c.type === 'transition');
-                    for (const t of transitions) {
-                        const targetNode = t.children?.find(c => c.type === 'target');
-                        if (targetNode) {
-                            const eventName = t.label;
-                            // Clean up target names
-                            const targetSafeName = targetNode.label.replace(/^#/, '').split('.').pop()?.replace(/[^a-zA-Z0-9_]/g, '_');
-                            if (targetSafeName) {
-                                code += `    ${safeName} --> ${targetSafeName} : ${eventName}\n`;
-                            }
-                        }
-                    }
+        const collect = (n: MachineNode, parentId?: string) => {
+            const id = `n${counter++}`;
+            idByNode.set(n, id);
+            this.nodeById.set(id, n);
+            const name = sanitize(n.label);
+            nameToId.set(name, id);
 
-                    // Recursively process nested states
-                    if (shouldWalkChildren) {
-                        const states = n.children.filter(c => c.type === 'state');
-                        if (states.length > 0) {
-                            code += `    state ${safeName} {\n`;
-                            for (const child of states) {
-                                walk(child, safeName);
-                            }
-                            code += `    }\n`;
-                        }
-                    }
+            const childStates = (n.children ?? []).filter(c => c.type === 'state');
+            nodes.push({
+                data: {
+                    id,
+                    label: n.label,
+                    name,
+                    parent: parentId,
+                    compound: childStates.length > 0,
+                    initial: !!n.isInitial,
+                    final: !!n.isFinal,
+                },
+            });
+
+            if (reflectExpansion && childStates.length > 0) {
+                const treeItem = this.treeProvider.getTreeItemForNode(n);
+                if (treeItem && treeItem.collapsibleState === vscode.TreeItemCollapsibleState.Collapsed) {
+                    collapsedIds.push(id);
                 }
-            } else if (n.type === 'machine') {
-                if (n.children) {
-                    const states = n.children.filter(c => c.type === 'state');
-                    for (const child of states) {
-                        walk(child, 'machineRoot');
-                    }
-                }
+            }
+
+            for (const c of childStates) {
+                collect(c, id);
             }
         };
 
-        walk(node);
-        return code;
+        const rootStates = machine.type === 'state'
+            ? [machine]
+            : (machine.children ?? []).filter(c => c.type === 'state');
+        for (const r of rootStates) {
+            collect(r, undefined);
+        }
+
+        // Edges (second pass so all target ids exist).
+        const addEdges = (n: MachineNode) => {
+            if (n.type === 'state') {
+                const sourceId = idByNode.get(n);
+                if (sourceId) {
+                    const transitions = (n.children ?? []).filter(c => c.type === 'transition');
+                    for (const t of transitions) {
+                        const target = t.children?.find(c => c.type === 'target');
+                        if (!target) { continue; }
+                        const targetName = sanitize(target.label.replace(/^#/, '').split('.').pop() ?? '');
+                        const targetId = nameToId.get(targetName);
+                        if (targetId) {
+                            edges.push({
+                                data: { id: `e${counter++}`, source: sourceId, target: targetId, label: t.label },
+                            });
+                        }
+                    }
+                }
+            }
+            for (const c of (n.children ?? [])) {
+                addEdges(c);
+            }
+        };
+        addEdges(machine);
+
+        return { nodes, edges, collapsedIds };
     }
 
-    private getHtmlForWebview(mermaidCode: string): string {
+    private getHtmlForWebview(webview: vscode.Webview, payload: GraphPayload): string {
+        const scriptUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this.extensionUri, 'out', 'webview', 'graph.js')
+        );
+        const nonce = getNonce();
+        const json = JSON.stringify(payload);
+
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
     <title>XState Graph</title>
     <style>
-        body {
-            padding: 0;
-            margin: 0;
-            background-color: var(--vscode-editor-background);
-            color: var(--vscode-editor-foreground);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        .mermaid {
-            background-color: white; /* Mermaid default theme works best on white */
-            padding: 20px;
-            border-radius: 8px;
-            overflow: auto;
-            max-width: 100vw;
-            max-height: 100vh;
-        }
-        /* Highlight styling injected by script */
-        .node.highlighted rect, .node.highlighted circle, .node.highlighted polygon {
-            stroke: #ff9900 !important;
-            stroke-width: 4px !important;
-            fill: #fff3e0 !important;
-        }
+        html, body { padding: 0; margin: 0; height: 100%; width: 100%; overflow: hidden; }
+        body { background-color: var(--vscode-editor-background); color: var(--vscode-editor-foreground); }
+        #cy { position: absolute; inset: 0; width: 100%; height: 100%; }
     </style>
 </head>
 <body>
-    <div class="mermaid">
-        ${mermaidCode}
-    </div>
-    <script type="module">
-        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-        const vscode = acquireVsCodeApi();
-        
-        mermaid.initialize({ 
-            startOnLoad: true, 
-            theme: 'default',
-            securityLevel: 'loose' // needed to enable clicks
-        });
-
-        window.stateClicked = function(stateId) {
-            vscode.postMessage({ command: 'stateClicked', stateId });
-            highlightState(stateId);
-        };
-
-        let currentState = null;
-
-        window.simulateEvent = function(targetId) {
-            highlightState(targetId);
-        };
-
-        function highlightState(stateId) {
-            // Remove previous highlights
-            document.querySelectorAll('.node.highlighted').forEach(el => el.classList.remove('highlighted'));
-            // Find and add highlight
-            const els = document.querySelectorAll('.node');
-            els.forEach(el => {
-                // Mermaid element IDs are often like 'flowchart-stateId-...' or just match the state name
-                if (el.id && el.id.includes(stateId)) {
-                    el.classList.add('highlighted');
-                }
-            });
-            currentState = stateId;
-        }
-
-        window.addEventListener('message', event => {
-            const message = event.data;
-            if (message.command === 'highlight') {
-                highlightState(message.stateId);
-            }
-        });
-        
-        // Let's add click handlers to edge labels (transitions) for static simulation
-        setTimeout(() => {
-            document.querySelectorAll('.edgeLabel').forEach(label => {
-                label.style.cursor = 'pointer';
-                label.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const text = label.textContent.trim();
-                    vscode.postMessage({ command: 'eventClicked', eventName: text });
-                });
-            });
-        }, 1000); // Wait for mermaid to render
-    </script>
+    <div id="cy"></div>
+    <script nonce="${nonce}">window.__GRAPH__ = ${json};</script>
+    <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
     }
+}
+
+interface GraphNode {
+    data: {
+        id: string;
+        label: string;
+        name: string;
+        parent?: string;
+        compound?: boolean;
+        initial?: boolean;
+        final?: boolean;
+    };
+}
+interface GraphEdge {
+    data: { id: string; source: string; target: string; label: string };
+}
+interface GraphPayload {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+    collapsedIds?: string[];
+}
+
+function getNonce(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let text = '';
+    for (let i = 0; i < 32; i++) {
+        text += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return text;
 }
