@@ -32,9 +32,13 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
     private workspaceScanner: WorkspaceScanner;
     private outputChannel: vscode.OutputChannel;
 
-    constructor(private context: vscode.ExtensionContext) {
-        this.outputChannel = vscode.window.createOutputChannel('XState Outline');
-        this.workspaceScanner = new WorkspaceScanner(this.outputChannel);
+    constructor(
+        private context: vscode.ExtensionContext,
+        workspaceScanner: WorkspaceScanner,
+        outputChannel: vscode.OutputChannel
+    ) {
+        this.outputChannel = outputChannel;
+        this.workspaceScanner = workspaceScanner;
         
         // Load saved preferences from configuration
         const config = vscode.workspace.getConfiguration('xstateOutline');

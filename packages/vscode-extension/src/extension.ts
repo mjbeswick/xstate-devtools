@@ -6,6 +6,8 @@ import { XStateCompletionProvider } from './completionProvider';
 import { XStateTreeEditor } from './treeEditor';
 import { XStateCodeActionProvider } from './codeActions';
 import { isSupportedXStateDocument, validateXStateDocument } from './diagnostics';
+import { WorkspaceScanner } from './workspaceScanner';
+import { XStateReferenceProvider, XStateRenameProvider } from './providers';
 
 let selectionTimeout: NodeJS.Timeout | undefined;
 
@@ -27,7 +29,10 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('setContext', 'xstateOutline.followCursor', followCursor),
     ]);
 
-    const treeProvider = new XStateMachineTreeProvider(context);
+    const outputChannel = vscode.window.createOutputChannel('XState Outline');
+    const workspaceScanner = new WorkspaceScanner(outputChannel);
+
+    const treeProvider = new XStateMachineTreeProvider(context, workspaceScanner, outputChannel);
     
     const treeView = vscode.window.createTreeView('xstateMachineOutline', {
         treeDataProvider: treeProvider,
@@ -495,6 +500,16 @@ export async function activate(context: vscode.ExtensionContext) {
         { providedCodeActionKinds: XStateCodeActionProvider.providedCodeActionKinds }
     );
 
+    const refProvider = vscode.languages.registerReferenceProvider(
+        xstateLanguages,
+        new XStateReferenceProvider(workspaceScanner)
+    );
+
+    const renameProvider = vscode.languages.registerRenameProvider(
+        xstateLanguages,
+        new XStateRenameProvider(workspaceScanner)
+    );
+
     const editorChangeListener = vscode.window.onDidChangeActiveTextEditor((editor) => {
         if (!editor) { return; }
         treeProvider.refresh();
@@ -564,6 +579,8 @@ export async function activate(context: vscode.ExtensionContext) {
         implementationProvider,
         completionProvider,
         codeActionProvider,
+        refProvider,
+        renameProvider,
         diagnosticCollection,
         goToImplementationSelectedCommand,
         editorChangeListener,
