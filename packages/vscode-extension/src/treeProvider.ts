@@ -663,9 +663,22 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
             this.resourceUri = fileUri;
         } else {
             // Machine/state/action node
-            this.tooltip = this.buildTooltip();
+            
+            // Check if there are diagnostics for this node's range
+            const diagnostics = vscode.languages.getDiagnostics(node.uri);
+            const nodeDiagnostics = diagnostics.filter(d => d.range.intersection(node.range));
+            
+            let hasError = false;
+            let hasWarning = false;
+            
+            if (nodeDiagnostics.length > 0) {
+                hasError = nodeDiagnostics.some(d => d.severity === vscode.DiagnosticSeverity.Error);
+                hasWarning = nodeDiagnostics.some(d => d.severity === vscode.DiagnosticSeverity.Warning);
+            }
+
+            this.tooltip = this.buildTooltip(nodeDiagnostics);
             this.description = this.getDescription();
-            this.iconPath = this.getIcon();
+            this.iconPath = this.getIcon(hasError, hasWarning);
             
             // Store range and uri for navigation
             this.range = node.range;
@@ -692,7 +705,7 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
         return undefined;
     }
 
-    private buildTooltip(): string | vscode.MarkdownString {
+    private buildTooltip(diagnostics?: vscode.Diagnostic[]): string | vscode.MarkdownString {
         const node = this.node;
         if (node.type === 'invalid') {
             return `Invalid XState property: ${node.label.replace(/^invalid:\s*/, '')}`;
@@ -706,50 +719,95 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
         return `${node.type}: ${node.label}`;
     }
 
-    private getIcon(): vscode.ThemeIcon {
+    private getIcon(hasError = false, hasWarning = false): vscode.ThemeIcon {
+        let iconName = '';
+        let iconColor: vscode.ThemeColor | undefined;
+
         switch (this.node.type) {
             case 'machine':
-                return new vscode.ThemeIcon('package', new vscode.ThemeColor('charts.blue'));
+                iconName = 'package';
+                iconColor = new vscode.ThemeColor('charts.blue');
+                break;
             case 'state':
                 if (this.node.isInitial) {
-                    return new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('charts.green'));
+                    iconName = 'circle-filled';
+                    iconColor = new vscode.ThemeColor('charts.green');
+                } else if (this.node.isFinal) {
+                    iconName = 'circle-filled';
+                    iconColor = new vscode.ThemeColor('charts.red');
+                } else {
+                    iconName = 'circle-filled';
+                    iconColor = new vscode.ThemeColor('symbolIcon.fieldForeground');
                 }
-                if (this.node.isFinal) {
-                    return new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('charts.red'));
-                }
-                return new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('symbolIcon.fieldForeground'));
+                break;
             case 'transition':
-                // Use different icons for event handlers vs regular transitions
                 if (this.node.label === 'onDone' || this.node.label === 'onError') {
-                    return new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('charts.orange'));
+                    iconName = 'circle-filled';
+                    iconColor = new vscode.ThemeColor('charts.orange');
+                } else {
+                    iconName = 'symbol-event';
+                    iconColor = new vscode.ThemeColor('charts.orange');
                 }
-                return new vscode.ThemeIcon('symbol-event', new vscode.ThemeColor('charts.orange'));
+                break;
             case 'action':
-                return new vscode.ThemeIcon('rocket', new vscode.ThemeColor('symbolIcon.methodForeground'));
+                iconName = 'rocket';
+                iconColor = new vscode.ThemeColor('symbolIcon.methodForeground');
+                break;
             case 'entry':
-                return new vscode.ThemeIcon('debug-step-into', new vscode.ThemeColor('symbolIcon.methodForeground'));
+                iconName = 'debug-step-into';
+                iconColor = new vscode.ThemeColor('symbolIcon.methodForeground');
+                break;
             case 'exit':
-                return new vscode.ThemeIcon('debug-step-out', new vscode.ThemeColor('symbolIcon.methodForeground'));
+                iconName = 'debug-step-out';
+                iconColor = new vscode.ThemeColor('symbolIcon.methodForeground');
+                break;
             case 'guard':
-                return new vscode.ThemeIcon('shield', new vscode.ThemeColor('terminal.ansiCyan'));
+                iconName = 'shield';
+                iconColor = new vscode.ThemeColor('terminal.ansiCyan');
+                break;
             case 'target':
-                return new vscode.ThemeIcon('target', new vscode.ThemeColor('terminal.ansiBrightMagenta'));
+                iconName = 'target';
+                iconColor = new vscode.ThemeColor('terminal.ansiBrightMagenta');
+                break;
             case 'invoke':
-                return new vscode.ThemeIcon('circuit-board', new vscode.ThemeColor('charts.yellow'));
+                iconName = 'circuit-board';
+                iconColor = new vscode.ThemeColor('charts.yellow');
+                break;
             case 'context':
-                return new vscode.ThemeIcon('symbol-variable', new vscode.ThemeColor('symbolIcon.variableForeground'));
+                iconName = 'symbol-variable';
+                iconColor = new vscode.ThemeColor('symbolIcon.variableForeground');
+                break;
             case 'contextProperty':
-                return new vscode.ThemeIcon('symbol-property', new vscode.ThemeColor('symbolIcon.propertyForeground'));
+                iconName = 'symbol-property';
+                iconColor = new vscode.ThemeColor('symbolIcon.propertyForeground');
+                break;
             case 'actor':
-                return new vscode.ThemeIcon('play-circle', new vscode.ThemeColor('charts.yellow'));
+                iconName = 'play-circle';
+                iconColor = new vscode.ThemeColor('charts.yellow');
+                break;
             case 'delay':
-                return new vscode.ThemeIcon('history', new vscode.ThemeColor('terminal.ansiYellow'));
+                iconName = 'history';
+                iconColor = new vscode.ThemeColor('terminal.ansiYellow');
+                break;
             case 'setup':
-                return new vscode.ThemeIcon('settings-gear', new vscode.ThemeColor('terminal.ansiBlue'));
+                iconName = 'settings-gear';
+                iconColor = new vscode.ThemeColor('terminal.ansiBlue');
+                break;
             case 'invalid':
-                return new vscode.ThemeIcon('error', new vscode.ThemeColor('terminal.ansiRed'));
+                iconName = 'error';
+                iconColor = new vscode.ThemeColor('terminal.ansiRed');
+                break;
             default:
-                return new vscode.ThemeIcon('symbol-misc');
+                iconName = 'symbol-misc';
+                break;
         }
+
+        if (hasError) {
+            iconColor = new vscode.ThemeColor('testing.iconFailed');
+        } else if (hasWarning) {
+            iconColor = new vscode.ThemeColor('testing.iconQueued'); // Queued maps to orange/yellow warning color in default themes
+        }
+
+        return new vscode.ThemeIcon(iconName, iconColor);
     }
 }

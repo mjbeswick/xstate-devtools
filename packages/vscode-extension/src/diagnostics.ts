@@ -13,12 +13,22 @@ export const XSTATE_DIAGNOSTIC_CODES = {
     unknownGuard: 'xstate.unknownGuard',
     unknownActor: 'xstate.unknownActor',
     duplicateId: 'xstate.duplicateId',
+    unusedAction: 'xstate.unusedAction',
+    unusedGuard: 'xstate.unusedGuard',
+    unusedActor: 'xstate.unusedActor',
+    unreachableState: 'xstate.unreachableState',
 } as const;
 
 interface SetupReferences {
-    actions: Set<string>;
-    guards: Set<string>;
-    actors: Set<string>;
+    actions: Map<string, { used: boolean, range: vscode.Range }>;
+    guards: Map<string, { used: boolean, range: vscode.Range }>;
+    actors: Map<string, { used: boolean, range: vscode.Range }>;
+}
+
+interface StateReference {
+    range: vscode.Range;
+    targeted: boolean;
+    isInitial: boolean;
 }
 
 interface ValidationContext {
@@ -26,6 +36,8 @@ interface ValidationContext {
     diagnostics: vscode.Diagnostic[];
     explicitIds: Map<string, vscode.Range>;
     setupReferences?: SetupReferences;
+    stateReferences: Map<string, StateReference>;
+    targetReferences: string[];
 }
 
 interface ReferenceCandidate {
@@ -67,18 +79,24 @@ export function validateXStateDocument(document: vscode.TextDocument): vscode.Di
                         document,
                         diagnostics,
                         explicitIds: new Map<string, vscode.Range>(),
-                        setupReferences: setupConfig ? collectSetupReferences(setupConfig) : undefined,
+                        setupReferences: setupConfig ? collectSetupReferences(setupConfig, document) : undefined,
+                        stateReferences: new Map<string, StateReference>(),
+                        targetReferences: []
                     };
 
                     if (setupConfig) {
                         validateSetupConfig(setupConfig, context);
                     }
                     validateMachineConfig(configArg, context);
+                    checkUnusedSetup(context);
+                    checkUnreachableStates(context);
                 } else {
                     validateStateConfig(configArg, {
                         document,
                         diagnostics,
                         explicitIds: new Map<string, vscode.Range>(),
+                        stateReferences: new Map<string, StateReference>(),
+                        targetReferences: []
                     });
                 }
             }
@@ -102,8 +120,14 @@ function validateMachineConfig(config: ts.ObjectLiteralExpression, context: Vali
     validateInvokeProperty(findPropertyAssignment(config, 'invoke')?.initializer, context);
 
     const statesProperty = findPropertyAssignment(config, 'states');
+    const initialProperty = findPropertyAssignment(config, 'initial');
+    let initialName: string | undefined;
+    if (initialProperty && ts.isStringLiteralLike(initialProperty.initializer)) {
+        initialName = initialProperty.initializer.text;
+    }
+
     if (statesProperty && ts.isObjectLiteralExpression(statesProperty.initializer)) {
-        validateStatesObject(statesProperty.initializer, context);
+        validateStatesObject(statesProperty.initializer, context, initialName);
     }
 }
 
@@ -120,8 +144,14 @@ function validateStateConfig(config: ts.ObjectLiteralExpression, context: Valida
     validateInvokeProperty(findPropertyAssignment(config, 'invoke')?.initializer, context);
 
     const statesProperty = findPropertyAssignment(config, 'states');
+    const initialProperty = findPropertyAssignment(config, 'initial');
+    let initialName: string | undefined;
+    if (initialProperty && ts.isStringLiteralLike(initialProperty.initializer)) {
+        initialName = initialProperty.initializer.text;
+    }
+
     if (statesProperty && ts.isObjectLiteralExpression(statesProperty.initializer)) {
-        validateStatesObject(statesProperty.initializer, context);
+        validateStatesObject(statesProperty.initializer, context, initialName);
     }
 }
 
@@ -129,7 +159,7 @@ function validateSetupConfig(config: ts.ObjectLiteralExpression, context: Valida
     validateInvalidProperties(config, 'setup', context);
 }
 
-function validateStatesObject(statesObject: ts.ObjectLiteralExpression, context: ValidationContext): void {
+function validateStatesObject(statesObject: ts.ObjectLiteralExpression, context: ValidationContext, parentInitialState?: string): void {
     for (const property of statesObject.properties) {
         if (!ts.isPropertyAssignment(property) || !ts.isObjectLiteralExpression(property.initializer)) {
             continue;
@@ -139,6 +169,12 @@ function validateStatesObject(statesObject: ts.ObjectLiteralExpression, context:
         if (!name) {
             continue;
         }
+
+        context.stateReferences.set(name, {
+            range: propertyNameRange(context.document, property.name),
+            targeted: false,
+            isInitial: name === parentInitialState
+        });
 
         validateStateConfig(property.initializer, context);
     }
@@ -160,6 +196,11 @@ function validateTransitionMap(node: ts.Expression | undefined, context: Validat
 
 function validateTransitionValue(node: ts.Expression | undefined, context: ValidationContext): void {
     if (!node) {
+        return;
+    }
+
+    if (ts.isStringLiteralLike(node)) {
+        context.targetReferences.push(node.text);
         return;
     }
 
@@ -188,7 +229,21 @@ function validateTransitionObject(node: ts.ObjectLiteralExpression, context: Val
             "'cond' is deprecated here; use 'guard' instead.",
             XSTATE_DIAGNOSTIC_CODES.condDeprecated
         );
+        diagnostic.severity = vscode.DiagnosticSeverity.Warning;
         context.diagnostics.push(diagnostic);
+    }
+
+    const targetProperty = findPropertyAssignment(node, 'target');
+    if (targetProperty) {
+        if (ts.isStringLiteralLike(targetProperty.initializer)) {
+            context.targetReferences.push(targetProperty.initializer.text);
+        } else if (ts.isArrayLiteralExpression(targetProperty.initializer)) {
+            for (const elem of targetProperty.initializer.elements) {
+                if (ts.isStringLiteralLike(elem)) {
+                    context.targetReferences.push(elem.text);
+                }
+            }
+        }
     }
 
     validateGuardProperty(findPropertyAssignment(node, 'guard')?.initializer ?? findPropertyAssignment(node, 'cond')?.initializer, context);
@@ -229,6 +284,7 @@ function validateActionProperty(node: ts.Expression | undefined, context: Valida
 
     for (const candidate of collectActionReferences(node)) {
         if (knownActions.has(candidate.name)) {
+            knownActions.get(candidate.name)!.used = true;
             continue;
         }
 
@@ -247,7 +303,12 @@ function validateGuardProperty(node: ts.Expression | undefined, context: Validat
     }
 
     const candidate = collectSimpleReference(node);
-    if (!candidate || knownGuards.has(candidate.name)) {
+    if (!candidate) {
+        return;
+    }
+    
+    if (knownGuards.has(candidate.name)) {
+        knownGuards.get(candidate.name)!.used = true;
         return;
     }
 
@@ -265,7 +326,12 @@ function validateActorProperty(node: ts.Expression | undefined, context: Validat
     }
 
     const candidate = collectSimpleReference(node);
-    if (!candidate || knownActors.has(candidate.name)) {
+    if (!candidate) {
+        return;
+    }
+    
+    if (knownActors.has(candidate.name)) {
+        knownActors.get(candidate.name)!.used = true;
         return;
     }
 
@@ -274,6 +340,52 @@ function validateActorProperty(node: ts.Expression | undefined, context: Validat
         `Unknown actor reference '${candidate.name}' in setup().`,
         XSTATE_DIAGNOSTIC_CODES.unknownActor
     ));
+}
+
+function checkUnusedSetup(context: ValidationContext): void {
+    if (!context.setupReferences) return;
+
+    const check = (map: Map<string, { used: boolean, range: vscode.Range }>, type: string, code: string) => {
+        for (const [name, info] of map.entries()) {
+            if (!info.used) {
+                const diagnostic = createDiagnostic(
+                    info.range,
+                    `${type} '${name}' is defined in setup() but never used.`,
+                    code
+                );
+                diagnostic.severity = vscode.DiagnosticSeverity.Hint;
+                diagnostic.tags = [vscode.DiagnosticTag.Unnecessary];
+                context.diagnostics.push(diagnostic);
+            }
+        }
+    };
+
+    check(context.setupReferences.actions, 'Action', XSTATE_DIAGNOSTIC_CODES.unusedAction);
+    check(context.setupReferences.guards, 'Guard', XSTATE_DIAGNOSTIC_CODES.unusedGuard);
+    check(context.setupReferences.actors, 'Actor', XSTATE_DIAGNOSTIC_CODES.unusedActor);
+}
+
+function checkUnreachableStates(context: ValidationContext): void {
+    // Normalize target references to compare against state keys
+    const targeted = new Set<string>();
+    for (const ref of context.targetReferences) {
+        const segments = ref.replace(/^#/, '').split('.').filter(Boolean);
+        if (segments.length > 0) {
+            targeted.add(segments[segments.length - 1]);
+        }
+    }
+
+    for (const [name, stateRef] of context.stateReferences.entries()) {
+        if (!stateRef.isInitial && !targeted.has(name)) {
+            const diagnostic = createDiagnostic(
+                stateRef.range,
+                `State '${name}' appears to be unreachable. It is not an initial state and has no incoming transitions.`,
+                XSTATE_DIAGNOSTIC_CODES.unreachableState
+            );
+            diagnostic.severity = vscode.DiagnosticSeverity.Warning;
+            context.diagnostics.push(diagnostic);
+        }
+    }
 }
 
 function validateExplicitId(node: ts.ObjectLiteralExpression, context: ValidationContext): void {
@@ -324,16 +436,16 @@ function validateInvalidProperties(
     }
 }
 
-function collectSetupReferences(setupConfig: ts.ObjectLiteralExpression): SetupReferences {
+function collectSetupReferences(setupConfig: ts.ObjectLiteralExpression, document: vscode.TextDocument): SetupReferences {
     return {
-        actions: collectSetupSectionKeys(setupConfig, 'actions'),
-        guards: collectSetupSectionKeys(setupConfig, 'guards'),
-        actors: collectSetupSectionKeys(setupConfig, 'actors'),
+        actions: collectSetupSectionKeys(setupConfig, 'actions', document),
+        guards: collectSetupSectionKeys(setupConfig, 'guards', document),
+        actors: collectSetupSectionKeys(setupConfig, 'actors', document),
     };
 }
 
-function collectSetupSectionKeys(setupConfig: ts.ObjectLiteralExpression, sectionName: 'actions' | 'guards' | 'actors'): Set<string> {
-    const keys = new Set<string>();
+function collectSetupSectionKeys(setupConfig: ts.ObjectLiteralExpression, sectionName: 'actions' | 'guards' | 'actors', document: vscode.TextDocument): Map<string, { used: boolean, range: vscode.Range }> {
+    const keys = new Map<string, { used: boolean, range: vscode.Range }>();
     const section = findPropertyAssignment(setupConfig, sectionName);
 
     if (!section || !ts.isObjectLiteralExpression(section.initializer)) {
@@ -347,7 +459,10 @@ function collectSetupSectionKeys(setupConfig: ts.ObjectLiteralExpression, sectio
 
         const name = getPropertyName(property.name);
         if (name) {
-            keys.add(name);
+            keys.set(name, {
+                used: false,
+                range: propertyNameRange(document, property.name)
+            });
         }
     }
 
