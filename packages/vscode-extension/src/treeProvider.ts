@@ -78,6 +78,18 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         return this.showStateConfigs;
     }
 
+    handleDocumentChange(document: vscode.TextDocument): void {
+        if (!this.isSupportedDocument(document)) {
+            return;
+        }
+
+        if (this.currentScope === 'workspace') {
+            this.workspaceScanner.updateDocument(document);
+        }
+
+        this.refresh();
+    }
+
     // ── Search ────────────────────────────────────────────────────────────────
 
     search(text: string): SearchResultData[] {
@@ -388,6 +400,10 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         this.updateTreeViewDescription();
     }
 
+    private isSupportedDocument(document: vscode.TextDocument): boolean {
+        return ['javascript', 'javascriptreact', 'typescript', 'typescriptreact'].includes(document.languageId);
+    }
+
     /** Collapse a single expanded item in place (re-renders just that node). */
     collapseItem(item: XStateMachineTreeItem): void {
         if (item.collapsibleState === vscode.TreeItemCollapsibleState.None) { return; }
@@ -420,6 +436,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
                     return [];
                 }
 
+                // Always re-parse to get latest changes
                 const machines = XStateMachineParser.parseMachines(editor.document);
                 if (machines.length === 0) {
                     if (this.treeView) {
@@ -513,8 +530,16 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
 
         if (this.viewMode === 'flat') {
             const allMachines: XStateMachineTreeItem[] = [];
+            const seenKeys = new Set<string>();
             for (const fm of filteredFileMachines) {
                 for (const m of fm.machines) {
+                    const key = this.itemKey(m);
+                    // Skip duplicates (same uri, type, range)
+                    if (seenKeys.has(key)) {
+                        continue;
+                    }
+                    seenKeys.add(key);
+                    
                     const item = this.getOrCreateItem(m, undefined);
                     if (m.description) {
                         const md = new vscode.MarkdownString();
@@ -668,6 +693,9 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
 
     private buildTooltip(): string | vscode.MarkdownString {
         const node = this.node;
+        if (node.type === 'invalid') {
+            return `Invalid XState property: ${node.label.replace(/^invalid:\s*/, '')}`;
+        }
         if (node.description) {
             const md = new vscode.MarkdownString();
             md.appendMarkdown(`**${node.label}**\n\n`);
@@ -709,6 +737,14 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
                 return new vscode.ThemeIcon('circuit-board', new vscode.ThemeColor('charts.yellow'));
             case 'context':
                 return new vscode.ThemeIcon('symbol-variable', new vscode.ThemeColor('symbolIcon.variableForeground'));
+            case 'actor':
+                return new vscode.ThemeIcon('play-circle', new vscode.ThemeColor('charts.yellow'));
+            case 'delay':
+                return new vscode.ThemeIcon('history', new vscode.ThemeColor('terminal.ansiYellow'));
+            case 'setup':
+                return new vscode.ThemeIcon('settings-gear', new vscode.ThemeColor('terminal.ansiBlue'));
+            case 'invalid':
+                return new vscode.ThemeIcon('error', new vscode.ThemeColor('terminal.ansiRed'));
             default:
                 return new vscode.ThemeIcon('symbol-misc');
         }

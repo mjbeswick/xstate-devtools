@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as ts from 'typescript';
 
 export interface MachineNode {
-    type: 'machine' | 'state' | 'transition' | 'target' | 'action' | 'guard' | 'invoke' | 'entry' | 'exit' | 'context';
+    type: 'machine' | 'state' | 'transition' | 'target' | 'action' | 'guard' | 'invoke' | 'entry' | 'exit' | 'context' | 'actor' | 'delay' | 'setup' | 'invalid';
     label: string;
     range: vscode.Range;
     uri: vscode.Uri;
@@ -14,6 +14,29 @@ export interface MachineNode {
 }
 
 export class XStateMachineParser {
+    private static readonly MACHINE_PROPERTIES = new Set([
+        'id', 'initial', 'states', 'context', 'entry', 'exit', 'on', 'onDone', 'onError',
+        'invoke', 'type', 'preserveActionOrder', 'output', 'schema', 'description',
+        'meta', 'tags', 'version', 'tsTypes', 'predictableActionArguments', 'types'
+    ]);
+
+    private static readonly STATE_PROPERTIES = new Set([
+        'type', 'initial', 'states', 'entry', 'exit', 'on', 'onDone', 'onError',
+        'invoke', 'description', 'meta', 'tags', 'always', 'after', 'output',
+        'input', 'data', 'id'
+    ]);
+
+    private static readonly TRANSITION_PROPERTIES = new Set([
+        'target', 'guard', 'cond', 'actions', 'internal', 'reenter', 'in', 'description', 'meta'
+    ]);
+
+    private static readonly INVOKE_PROPERTIES = new Set([
+        'id', 'src', 'input', 'onDone', 'onError', 'data', 'autoForward', 'forward', 'systemId'
+    ]);
+
+    private static readonly SETUP_PROPERTIES = new Set([
+        'actions', 'guards', 'actors', 'delays', 'types'
+    ]);
     
     /**
      * Parse the document and extract XState machine definitions
@@ -30,9 +53,20 @@ export class XStateMachineParser {
         const machines: MachineNode[] = [];
         this.visit(sourceFile, document, machines);
         
-        console.log(`[XState Parser] Found ${machines.length} machines in ${document.fileName}`);
+        // Deduplicate machines based on their location (uri + range)
+        const seen = new Set<string>();
+        const deduplicated: MachineNode[] = [];
+        for (const machine of machines) {
+            const key = `${machine.range.start.line}:${machine.range.start.character}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                deduplicated.push(machine);
+            }
+        }
         
-        return machines;
+        console.log(`[XState Parser] Found ${machines.length} machines, ${deduplicated.length} after dedup in ${document.fileName}`);
+        
+        return deduplicated;
     }
 
     private static visit(
@@ -55,6 +89,7 @@ export class XStateMachineParser {
             let isValidMachineCall = false;
             let callName = '';
             let variableName: string | null = null;
+            let setupConfig: ts.ObjectLiteralExpression | null = null;
             
             // Extract variable name by walking up the AST tree
             let parent = node.parent;
@@ -82,12 +117,22 @@ export class XStateMachineParser {
                 isValidMachineCall = propertyName === 'createMachine' || propertyName === 'Machine' ||
                                     propertyName === 'createStateConfig' || propertyName === 'stateConfig';
                 callName = propertyName;
+                
+                // Check if this is setup().createMachine() - extract setup config
+                if (ts.isCallExpression(expression.expression) && 
+                    ts.isIdentifier(expression.expression.expression) &&
+                    expression.expression.expression.text === 'setup') {
+                    const setupArg = expression.expression.arguments[0];
+                    if (setupArg && ts.isObjectLiteralExpression(setupArg)) {
+                        setupConfig = setupArg;
+                    }
+                }
             }
             
             if (isValidMachineCall) {
                 const machineConfig = node.arguments[0];
                 if (machineConfig && ts.isObjectLiteralExpression(machineConfig)) {
-                    const machine = this.parseMachineConfig(machineConfig, document, variableName || undefined);
+                    const machine = this.parseMachineConfig(machineConfig, document, variableName || undefined, setupConfig);
                     if (machine) {
                         // Mark state configs
                         if (callName === 'createStateConfig' || callName === 'stateConfig') {
@@ -106,7 +151,8 @@ export class XStateMachineParser {
     private static parseMachineConfig(
         config: ts.ObjectLiteralExpression,
         document: vscode.TextDocument,
-        variableName: string | null = null
+        variableName: string | null = null,
+        setupConfig: ts.ObjectLiteralExpression | null = null
     ): MachineNode | null {
         const range = this.nodeToRange(config, document);
         const children: MachineNode[] = [];
@@ -119,6 +165,14 @@ export class XStateMachineParser {
         } else if (variableName) {
             // Use the variable name if no id property exists
             machineId = variableName;
+        }
+
+        // Add setup implementations if provided (chained setup().createMachine() pattern)
+        if (setupConfig) {
+            const setupNode = this.parseSetup(setupConfig, document);
+            if (setupNode && setupNode.children && setupNode.children.length > 0) {
+                children.push(setupNode);
+            }
         }
 
         // Parse states with initial state tracking
@@ -179,6 +233,8 @@ export class XStateMachineParser {
             children.push(...this.parseInvokes(invokeProp, document));
         }
 
+        children.push(...this.parseInvalidProperties(config, document, this.MACHINE_PROPERTIES));
+
         return {
             type: 'machine',
             label: machineId,
@@ -187,6 +243,85 @@ export class XStateMachineParser {
             children,
             description: this.extractDescription(config)
         };
+    }
+
+    /**
+     * Parse XState v5 setup() configuration to extract actions, guards, actors, and delays
+     */
+    private static parseSetup(
+        setupConfig: ts.ObjectLiteralExpression,
+        document: vscode.TextDocument
+    ): MachineNode | null {
+        const children: MachineNode[] = [];
+
+        // Parse actions
+        const actionsProp = this.findProperty(setupConfig, 'actions');
+        if (actionsProp && ts.isObjectLiteralExpression(actionsProp)) {
+            const actions = this.parseImplementationObject('actor', actionsProp, document);
+            children.push(...actions);
+        }
+
+        // Parse guards
+        const guardsProp = this.findProperty(setupConfig, 'guards');
+        if (guardsProp && ts.isObjectLiteralExpression(guardsProp)) {
+            const guards = this.parseImplementationObject('guard', guardsProp, document);
+            children.push(...guards);
+        }
+
+        // Parse actors
+        const actorsProp = this.findProperty(setupConfig, 'actors');
+        if (actorsProp && ts.isObjectLiteralExpression(actorsProp)) {
+            const actors = this.parseImplementationObject('actor', actorsProp, document);
+            children.push(...actors);
+        }
+
+        // Parse delays
+        const delaysProp = this.findProperty(setupConfig, 'delays');
+        if (delaysProp && ts.isObjectLiteralExpression(delaysProp)) {
+            const delays = this.parseImplementationObject('delay', delaysProp, document);
+            children.push(...delays);
+        }
+
+        children.push(...this.parseInvalidProperties(setupConfig, document, this.SETUP_PROPERTIES));
+
+        // If we found implementations, return a setup node
+        if (children.length > 0) {
+            return {
+                type: 'setup',
+                label: 'setup',
+                range: this.nodeToRange(setupConfig, document),
+                uri: document.uri,
+                children
+            };
+        }
+
+        return null;
+    }
+
+    /**
+     * Parse an object of implementations (actions, guards, actors, delays)
+     */
+    private static parseImplementationObject(
+        type: 'actor' | 'guard' | 'delay',
+        obj: ts.ObjectLiteralExpression,
+        document: vscode.TextDocument
+    ): MachineNode[] {
+        const items: MachineNode[] = [];
+
+        for (const prop of obj.properties) {
+            if (ts.isPropertyAssignment(prop) && (ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name))) {
+                const name = ts.isIdentifier(prop.name) ? prop.name.text : prop.name.text;
+                
+                items.push({
+                    type,
+                    label: name,
+                    range: this.nodeToRange(prop, document),
+                    uri: document.uri
+                });
+            }
+        }
+
+        return items;
     }
 
     private static parseStates(
@@ -273,6 +408,8 @@ export class XStateMachineParser {
                 uri: document.uri
             });
         }
+
+        children.push(...this.parseInvalidProperties(config, document, this.STATE_PROPERTIES));
 
         const label = stateName;
 
@@ -385,6 +522,8 @@ export class XStateMachineParser {
                 const actions = this.parseActions('action', actionsProp, document);
                 children.push(...actions);
             }
+
+            children.push(...this.parseInvalidProperties(node, document, this.TRANSITION_PROPERTIES));
         } else if (ts.isArrayLiteralExpression(node)) {
             for (const element of node.elements) {
                 this.parseTransitionDetails(element, document, children);
@@ -646,6 +785,37 @@ export class XStateMachineParser {
         }
         return null;
     }
+
+    private static parseInvalidProperties(
+        node: ts.ObjectLiteralExpression,
+        document: vscode.TextDocument,
+        validProperties: Set<string>
+    ): MachineNode[] {
+        const invalidNodes: MachineNode[] = [];
+
+        for (const prop of node.properties) {
+            let propertyName: string | null = null;
+
+            if (ts.isPropertyAssignment(prop) || ts.isMethodDeclaration(prop)) {
+                propertyName = this.getPropertyName(prop.name);
+            } else {
+                continue;
+            }
+
+            if (!propertyName || validProperties.has(propertyName)) {
+                continue;
+            }
+
+            invalidNodes.push({
+                type: 'invalid',
+                label: `invalid: ${propertyName}`,
+                range: this.nodeToRange(prop, document),
+                uri: document.uri
+            });
+        }
+
+        return invalidNodes;
+    }
     private static parseInvokes(
         invokeProp: ts.Node,
         document: vscode.TextDocument
@@ -703,6 +873,8 @@ export class XStateMachineParser {
             }
         }
 
+        children.push(...this.parseInvalidProperties(invokeObj, document, this.INVOKE_PROPERTIES));
+
         return {
             type: 'invoke',
             label: src,
@@ -746,6 +918,8 @@ export class XStateMachineParser {
             const actions = this.parseActions('action', actionsProp, document);
             children.push(...actions);
         }
+
+        children.push(...this.parseInvalidProperties(obj, document, this.TRANSITION_PROPERTIES));
 
         return {
             type: 'transition',
@@ -854,6 +1028,8 @@ export class XStateMachineParser {
                     });
                 }
             }
+
+            children.push(...this.parseInvalidProperties(transitionProp, document, this.TRANSITION_PROPERTIES));
         }
 
         return {

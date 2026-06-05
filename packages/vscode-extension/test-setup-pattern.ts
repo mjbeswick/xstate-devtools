@@ -1,12 +1,31 @@
 // Test file for XState v5 setup pattern
-import { setup, createMachine } from 'xstate';
+import { setup, createMachine, fromPromise } from 'xstate';
 
-// Pattern 1: Using setup().createMachine()
+// Pattern 1: Using setup().createMachine() with implementations
 const setupMachine = setup({
   types: {} as {
     context: { count: number };
     events: { type: 'INCREMENT' } | { type: 'DECREMENT' };
   },
+  actions: {
+    increment: ({ context }) => {
+      context.count++;
+    },
+    decrement: ({ context }) => {
+      context.count--;
+    }
+  },
+  guards: {
+    canIncrement: ({ context }) => context.count < 100
+  },
+  actors: {
+    fetchData: fromPromise(async () => {
+      return { data: 'test' };
+    })
+  },
+  delays: {
+    RETRY_DELAY: 5000
+  }
 }).createMachine({
   id: 'counter',
   initial: 'active',
@@ -15,7 +34,8 @@ const setupMachine = setup({
     active: {
       on: {
         INCREMENT: {
-          actions: 'increment'
+          actions: 'increment',
+          guard: 'canIncrement'
         },
         DECREMENT: {
           actions: 'decrement'

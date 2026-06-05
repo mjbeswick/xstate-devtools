@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { XStateMachineTreeProvider } from './treeProvider';
 import { ImplementationFinder } from './implementationFinder';
 import { FilterWebviewViewProvider } from './filterView';
+import { XStateCompletionProvider } from './completionProvider';
 
 let selectionTimeout: NodeJS.Timeout | undefined;
 
@@ -304,8 +305,8 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     const documentChangeListener = vscode.workspace.onDidChangeTextDocument((e) => {
-        if (e.document === vscode.window.activeTextEditor?.document) {
-            setTimeout(() => treeProvider.refresh(), 500);
+        if (vscode.window.activeTextEditor && e.document === vscode.window.activeTextEditor.document) {
+            setImmediate(() => treeProvider.handleDocumentChange(e.document));
         }
     });
 
@@ -372,6 +373,16 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    // ── Completion provider for XState machine configurations ───────────────
+    const completionProvider = vscode.languages.registerCompletionItemProvider(
+        xstateLanguages,
+        new XStateCompletionProvider(),
+        ':', // Trigger after colon (property assignments)
+        '\'', // Trigger for string value suggestions
+        '"', // Trigger for string value suggestions
+        '`', // Trigger for template-string value suggestions
+    );
+
     if (vscode.window.activeTextEditor) {
         setTimeout(() => {
             if (!followCursor) { return; }
@@ -409,6 +420,7 @@ export async function activate(context: vscode.ExtensionContext) {
         goToImplementationCommand,
         definitionProvider,
         implementationProvider,
+        completionProvider,
         goToImplementationSelectedCommand,
         editorChangeListener,
         documentChangeListener,
@@ -417,4 +429,3 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {}
-

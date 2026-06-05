@@ -94,25 +94,34 @@ export class WorkspaceScanner {
     async updateFile(uri: vscode.Uri): Promise<void> {
         try {
             const document = await vscode.workspace.openTextDocument(uri);
-            const machines = XStateMachineParser.parseMachines(document);
-            
-            if (machines.length > 0) {
-                const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
-                const relativePath = workspaceFolder 
-                    ? vscode.workspace.asRelativePath(uri, false)
-                    : uri.fsPath;
-
-                this.cache.set(uri.toString(), {
-                    uri,
-                    relativePath,
-                    machines
-                });
-            } else {
-                // No machines found, remove from cache
-                this.cache.delete(uri.toString());
-            }
+            this.updateDocument(document);
         } catch (error) {
             // If file can't be parsed, remove from cache
+            this.cache.delete(uri.toString());
+        }
+    }
+
+    /**
+     * Update a single open document in the cache using its in-memory contents.
+     * This is used for unsaved edits so the tree can reflect changes immediately.
+     */
+    updateDocument(document: vscode.TextDocument): void {
+        const uri = document.uri;
+        const machines = XStateMachineParser.parseMachines(document);
+
+        if (machines.length > 0) {
+            const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+            const relativePath = workspaceFolder
+                ? vscode.workspace.asRelativePath(uri, false)
+                : uri.fsPath;
+
+            this.cache.set(uri.toString(), {
+                uri,
+                relativePath,
+                machines
+            });
+        } else {
+            // No machines found, remove from cache
             this.cache.delete(uri.toString());
         }
     }
