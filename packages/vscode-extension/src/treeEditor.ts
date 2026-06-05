@@ -258,7 +258,8 @@ export class XStateTreeEditor {
         if (!stateName) { return; }
 
         if (treeItem.node.type === 'machine') {
-            const machineConfig = this.findMachineConfigByRange(parsed, ...Object.values(this.toOffsets(document, treeItem.range!)));
+            const offsets = this.toOffsets(document, treeItem.range!);
+            const machineConfig = this.findMachineConfigByRange(parsed, offsets.start, offsets.end);
             if (!machineConfig) {
                 vscode.window.showInformationMessage('Could not resolve the selected machine in source.');
                 return;
@@ -268,7 +269,8 @@ export class XStateTreeEditor {
         }
 
         if (treeItem.node.type === 'state') {
-            const stateProperty = this.findStateProperty(parsed, ...Object.values(this.toOffsets(document, treeItem.range!)), treeItem.node.label);
+            const offsets = this.toOffsets(document, treeItem.range!);
+            const stateProperty = this.findStateProperty(parsed, offsets.start, offsets.end, treeItem.node.label);
             if (!stateProperty || !ts.isObjectLiteralExpression(stateProperty.initializer)) {
                 vscode.window.showInformationMessage('Could not resolve the selected state in source.');
                 return;
@@ -289,7 +291,8 @@ export class XStateTreeEditor {
         const editor = await this.openEditor(treeItem);
         const document = editor.document;
         const parsed = this.parseDocument(document);
-        const stateProperty = this.findStateProperty(parsed, ...Object.values(this.toOffsets(document, treeItem.range!)), treeItem.node.label);
+        const offsets = this.toOffsets(document, treeItem.range!);
+        const stateProperty = this.findStateProperty(parsed, offsets.start, offsets.end, treeItem.node.label);
         if (!stateProperty || !ts.isObjectLiteralExpression(stateProperty.initializer)) {
             vscode.window.showInformationMessage('Could not resolve the selected state in source.');
             return;
@@ -360,7 +363,7 @@ export class XStateTreeEditor {
                 return;
             }
 
-            const kind = await vscode.window.showQuickPick(['Action', 'Guard'], {
+            const kind = await vscode.window.showQuickPick(['Action', 'Guard'] as const, {
                 placeHolder: 'Select what to add'
             });
             if (!kind) { return; }
@@ -370,7 +373,7 @@ export class XStateTreeEditor {
                 : await this.pickOrInput('Select guard', this.collectSetupKeys(parsed, 'guards'));
             if (!chosen) { return; }
 
-            await this.addTransitionReference(document, transitionProperty, kind, chosen);
+            await this.addTransitionReference(document, transitionProperty, kind as 'Action' | 'Guard', chosen);
             return;
         }
 

@@ -2,10 +2,15 @@
   "name": "xstate-devtools",
   "displayName": "xState Devtools",
   "description": "XState developer tools: interactive outline, search, and navigation",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "publisher": "MichaelBeswick",
   "license": "MIT",
   "icon": "images/icon.png",
+  "files": [
+    "out/**",
+    "resources/**",
+    "images/icon.png"
+  ],
   "homepage": "https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension#readme",
   "repository": {
     "type": "git",

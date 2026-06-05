@@ -4,6 +4,8 @@ import { ImplementationFinder } from './implementationFinder';
 import { FilterWebviewViewProvider } from './filterView';
 import { XStateCompletionProvider } from './completionProvider';
 import { XStateTreeEditor } from './treeEditor';
+import { XStateCodeActionProvider } from './codeActions';
+import { isSupportedXStateDocument, validateXStateDocument } from './diagnostics';
 
 let selectionTimeout: NodeJS.Timeout | undefined;
 
@@ -376,16 +378,6 @@ export async function activate(context: vscode.ExtensionContext) {
         }, 300);
     });
 
-    const editorChangeListener = vscode.window.onDidChangeActiveTextEditor((editor) => {
-        if (editor) { treeProvider.refresh(); }
-    });
-
-    const documentChangeListener = vscode.workspace.onDidChangeTextDocument((e) => {
-        if (vscode.window.activeTextEditor && e.document === vscode.window.activeTextEditor.document) {
-            setImmediate(() => treeProvider.handleDocumentChange(e.document));
-        }
-    });
-
     // ── Go to implementation for focused tree item (F12 when tree focused) ───
     const goToImplementationSelectedCommand = vscode.commands.registerCommand(
         'xstateMachineOutline.goToImplementationSelected',
@@ -407,6 +399,44 @@ export async function activate(context: vscode.ExtensionContext) {
         { scheme: 'file', language: 'javascript' },
         { scheme: 'file', language: 'javascriptreact' },
     ];
+
+    const diagnosticCollection = vscode.languages.createDiagnosticCollection('xstate');
+    const pendingDiagnosticUpdates = new Map<string, NodeJS.Timeout>();
+
+    const clearPendingDiagnosticUpdate = (uri: vscode.Uri) => {
+        const key = uri.toString();
+        const timeout = pendingDiagnosticUpdates.get(key);
+        if (timeout) {
+            clearTimeout(timeout);
+            pendingDiagnosticUpdates.delete(key);
+        }
+    };
+
+    const updateDiagnostics = (document: vscode.TextDocument) => {
+        clearPendingDiagnosticUpdate(document.uri);
+
+        if (!isSupportedXStateDocument(document)) {
+            diagnosticCollection.delete(document.uri);
+            return;
+        }
+
+        diagnosticCollection.set(document.uri, validateXStateDocument(document));
+    };
+
+    const scheduleDiagnostics = (document: vscode.TextDocument, delay = 200) => {
+        clearPendingDiagnosticUpdate(document.uri);
+
+        if (!isSupportedXStateDocument(document)) {
+            diagnosticCollection.delete(document.uri);
+            return;
+        }
+
+        const key = document.uri.toString();
+        pendingDiagnosticUpdates.set(key, setTimeout(() => {
+            pendingDiagnosticUpdates.delete(key);
+            updateDiagnostics(document);
+        }, delay));
+    };
 
     function extractNameAtPosition(document: vscode.TextDocument, position: vscode.Position): string | null {
         const line = document.lineAt(position.line).text;
@@ -459,6 +489,37 @@ export async function activate(context: vscode.ExtensionContext) {
         '`', // Trigger for template-string value suggestions
     );
 
+    const codeActionProvider = vscode.languages.registerCodeActionsProvider(
+        xstateLanguages,
+        new XStateCodeActionProvider(),
+        { providedCodeActionKinds: XStateCodeActionProvider.providedCodeActionKinds }
+    );
+
+    const editorChangeListener = vscode.window.onDidChangeActiveTextEditor((editor) => {
+        if (!editor) { return; }
+        treeProvider.refresh();
+        scheduleDiagnostics(editor.document, 0);
+    });
+
+    const documentOpenListener = vscode.workspace.onDidOpenTextDocument((document) => {
+        scheduleDiagnostics(document, 0);
+    });
+
+    const documentCloseListener = vscode.workspace.onDidCloseTextDocument((document) => {
+        clearPendingDiagnosticUpdate(document.uri);
+        diagnosticCollection.delete(document.uri);
+    });
+
+    const documentChangeListener = vscode.workspace.onDidChangeTextDocument((e) => {
+        scheduleDiagnostics(e.document);
+
+        if (vscode.window.activeTextEditor && e.document === vscode.window.activeTextEditor.document) {
+            setImmediate(() => treeProvider.handleDocumentChange(e.document));
+        }
+    });
+
+    vscode.workspace.textDocuments.forEach((document) => updateDiagnostics(document));
+
     if (vscode.window.activeTextEditor) {
         setTimeout(() => {
             if (!followCursor) { return; }
@@ -502,10 +563,20 @@ export async function activate(context: vscode.ExtensionContext) {
         definitionProvider,
         implementationProvider,
         completionProvider,
+        codeActionProvider,
+        diagnosticCollection,
         goToImplementationSelectedCommand,
         editorChangeListener,
+        documentOpenListener,
+        documentCloseListener,
         documentChangeListener,
-        cursorChangeListener
+        cursorChangeListener,
+        {
+            dispose: () => {
+                pendingDiagnosticUpdates.forEach((timeout) => clearTimeout(timeout));
+                pendingDiagnosticUpdates.clear();
+            }
+        }
     );
 }
 

@@ -1,5 +1,12 @@
 import * as vscode from 'vscode';
 import * as ts from 'typescript';
+import {
+    XSTATE_INVOKE_PROPERTIES,
+    XSTATE_MACHINE_PROPERTIES,
+    XSTATE_SETUP_PROPERTIES,
+    XSTATE_STATE_PROPERTIES,
+    XSTATE_TRANSITION_PROPERTIES,
+} from './xstateSchema';
 
 export interface MachineNode {
     type: 'machine' | 'state' | 'transition' | 'target' | 'action' | 'guard' | 'invoke' | 'entry' | 'exit' | 'context' | 'contextProperty' | 'actor' | 'delay' | 'setup' | 'invalid';
@@ -14,29 +21,15 @@ export interface MachineNode {
 }
 
 export class XStateMachineParser {
-    private static readonly MACHINE_PROPERTIES = new Set([
-        'id', 'initial', 'states', 'context', 'entry', 'exit', 'on', 'onDone', 'onError',
-        'invoke', 'type', 'preserveActionOrder', 'output', 'schema', 'description',
-        'meta', 'tags', 'version', 'tsTypes', 'predictableActionArguments', 'types'
-    ]);
+    private static readonly MACHINE_PROPERTIES = new Set(XSTATE_MACHINE_PROPERTIES);
 
-    private static readonly STATE_PROPERTIES = new Set([
-        'type', 'initial', 'states', 'entry', 'exit', 'on', 'onDone', 'onError',
-        'invoke', 'description', 'meta', 'tags', 'always', 'after', 'output',
-        'input', 'data', 'id'
-    ]);
+    private static readonly STATE_PROPERTIES = new Set(XSTATE_STATE_PROPERTIES);
 
-    private static readonly TRANSITION_PROPERTIES = new Set([
-        'target', 'guard', 'cond', 'actions', 'internal', 'reenter', 'in', 'description', 'meta'
-    ]);
+    private static readonly TRANSITION_PROPERTIES = new Set(XSTATE_TRANSITION_PROPERTIES);
 
-    private static readonly INVOKE_PROPERTIES = new Set([
-        'id', 'src', 'input', 'onDone', 'onError', 'data', 'autoForward', 'forward', 'systemId'
-    ]);
+    private static readonly INVOKE_PROPERTIES = new Set(XSTATE_INVOKE_PROPERTIES);
 
-    private static readonly SETUP_PROPERTIES = new Set([
-        'actions', 'guards', 'actors', 'delays', 'types'
-    ]);
+    private static readonly SETUP_PROPERTIES = new Set(XSTATE_SETUP_PROPERTIES);
     
     /**
      * Parse the document and extract XState machine definitions
