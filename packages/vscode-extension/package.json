@@ -138,6 +138,26 @@
         "command": "xstateMachineOutline.goToImplementationSelected",
         "title": "Go to Implementation",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "xstateMachineOutline.editNode",
+        "title": "Edit"
+      },
+      {
+        "command": "xstateMachineOutline.addChildState",
+        "title": "Add Child State"
+      },
+      {
+        "command": "xstateMachineOutline.addTransition",
+        "title": "Add Transition"
+      },
+      {
+        "command": "xstateMachineOutline.addReference",
+        "title": "Add Action / Guard / Invoke"
+      },
+      {
+        "command": "xstateMachineOutline.deleteNode",
+        "title": "Delete"
       }
     ],
     "configuration": {
@@ -224,14 +244,39 @@
       "view/item/context": [
         {
           "command": "xstateMachineOutline.goToImplementation",
-          "when": "view == xstateMachineOutline && viewItem =~ /^(action|guard|entry|exit|invoke)$/",
+          "when": "view == xstateMachineOutline && viewItem != loading",
           "group": "navigation@1"
+        },
+        {
+          "command": "xstateMachineOutline.editNode",
+          "when": "view == xstateMachineOutline && (viewItem == state || viewItem == transition || viewItem == target || viewItem == action || viewItem == guard || viewItem == invoke || viewItem == contextProperty || viewItem == actor || viewItem == delay || viewItem == invalid)",
+          "group": "edit@1"
+        },
+        {
+          "command": "xstateMachineOutline.addChildState",
+          "when": "view == xstateMachineOutline && (viewItem == machine || viewItem == state)",
+          "group": "edit@2"
+        },
+        {
+          "command": "xstateMachineOutline.addTransition",
+          "when": "view == xstateMachineOutline && viewItem == state",
+          "group": "edit@3"
+        },
+        {
+          "command": "xstateMachineOutline.addReference",
+          "when": "view == xstateMachineOutline && (viewItem == machine || viewItem == state || viewItem == transition || viewItem == setup || viewItem == action || viewItem == guard || viewItem == actor || viewItem == delay || viewItem == invoke)",
+          "group": "edit@4"
+        },
+        {
+          "command": "xstateMachineOutline.deleteNode",
+          "when": "view == xstateMachineOutline && (viewItem == state || viewItem == transition || viewItem == target || viewItem == action || viewItem == guard || viewItem == invoke || viewItem == contextProperty || viewItem == actor || viewItem == delay || viewItem == invalid)",
+          "group": "edit@5"
         }
       ],
       "view/item/inline": [
         {
           "command": "xstateMachineOutline.goToImplementation",
-          "when": "view == xstateMachineOutline && viewItem =~ /^(action|guard|entry|exit|invoke)$/",
+          "when": "view == xstateMachineOutline && (viewItem == action || viewItem == guard || viewItem == entry || viewItem == exit || viewItem == invoke)",
           "group": "inline"
         }
       ]

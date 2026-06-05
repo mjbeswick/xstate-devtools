@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as ts from 'typescript';
 
 export interface MachineNode {
-    type: 'machine' | 'state' | 'transition' | 'target' | 'action' | 'guard' | 'invoke' | 'entry' | 'exit' | 'context' | 'actor' | 'delay' | 'setup' | 'invalid';
+    type: 'machine' | 'state' | 'transition' | 'target' | 'action' | 'guard' | 'invoke' | 'entry' | 'exit' | 'context' | 'contextProperty' | 'actor' | 'delay' | 'setup' | 'invalid';
     label: string;
     range: vscode.Range;
     uri: vscode.Uri;
@@ -257,7 +257,7 @@ export class XStateMachineParser {
         // Parse actions
         const actionsProp = this.findProperty(setupConfig, 'actions');
         if (actionsProp && ts.isObjectLiteralExpression(actionsProp)) {
-            const actions = this.parseImplementationObject('actor', actionsProp, document);
+            const actions = this.parseImplementationObject('action', actionsProp, document);
             children.push(...actions);
         }
 
@@ -302,7 +302,7 @@ export class XStateMachineParser {
      * Parse an object of implementations (actions, guards, actors, delays)
      */
     private static parseImplementationObject(
-        type: 'actor' | 'guard' | 'delay',
+        type: 'action' | 'actor' | 'guard' | 'delay',
         obj: ts.ObjectLiteralExpression,
         document: vscode.TextDocument
     ): MachineNode[] {
@@ -656,7 +656,7 @@ export class XStateMachineParser {
                         const label = `${propName}: ${value}`;
                         
                         const childNode: MachineNode = {
-                            type: 'action',
+                            type: 'contextProperty',
                             label,
                             range: this.nodeToRange(prop, document),
                             uri: document.uri
@@ -677,7 +677,7 @@ export class XStateMachineParser {
                     // Handle shorthand properties like { count }
                     const propName = prop.name.text;
                     children.push({
-                        type: 'action',
+                        type: 'contextProperty',
                         label: propName,
                         range: this.nodeToRange(prop, document),
                         uri: document.uri
@@ -714,7 +714,7 @@ export class XStateMachineParser {
                     if (propName) {
                         const value = this.formatContextValue(prop.initializer);
                         children.push({
-                            type: 'action',
+                            type: 'contextProperty',
                             label: `${propName}: ${value}`,
                             range: this.nodeToRange(prop, document),
                             uri: document.uri
@@ -726,7 +726,7 @@ export class XStateMachineParser {
             node.elements.forEach((element, index) => {
                 const value = this.formatContextValue(element);
                 children.push({
-                    type: 'action',
+                    type: 'contextProperty',
                     label: `[${index}]: ${value}`,
                     range: this.nodeToRange(element, document),
                     uri: document.uri

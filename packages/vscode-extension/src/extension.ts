@@ -3,6 +3,7 @@ import { XStateMachineTreeProvider } from './treeProvider';
 import { ImplementationFinder } from './implementationFinder';
 import { FilterWebviewViewProvider } from './filterView';
 import { XStateCompletionProvider } from './completionProvider';
+import { XStateTreeEditor } from './treeEditor';
 
 let selectionTimeout: NodeJS.Timeout | undefined;
 
@@ -131,6 +132,51 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    const editNodeCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.editNode',
+        async (treeItem) => {
+            if (!treeItem?.node) { return; }
+            await XStateTreeEditor.editNode(treeItem);
+            treeProvider.refresh();
+        }
+    );
+
+    const addChildStateCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.addChildState',
+        async (treeItem) => {
+            if (!treeItem?.node) { return; }
+            await XStateTreeEditor.addChildState(treeItem);
+            treeProvider.refresh();
+        }
+    );
+
+    const addTransitionCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.addTransition',
+        async (treeItem) => {
+            if (!treeItem?.node) { return; }
+            await XStateTreeEditor.addTransition(treeItem);
+            treeProvider.refresh();
+        }
+    );
+
+    const addReferenceCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.addReference',
+        async (treeItem) => {
+            if (!treeItem?.node) { return; }
+            await XStateTreeEditor.addReference(treeItem);
+            treeProvider.refresh();
+        }
+    );
+
+    const deleteNodeCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.deleteNode',
+        async (treeItem) => {
+            if (!treeItem?.node) { return; }
+            await XStateTreeEditor.deleteNode(treeItem);
+            treeProvider.refresh();
+        }
+    );
+
     // ── Active-state noop commands (provide ✓ prefix via title) ──────────────
 
     const setScopeFileActiveCommand = vscode.commands.registerCommand(
@@ -164,7 +210,27 @@ export async function activate(context: vscode.ExtensionContext) {
     const goToImplementationCommand = vscode.commands.registerCommand(
         'xstateMachineOutline.goToImplementation',
         async (treeItem) => {
-            if (!treeItem || !treeItem.node) { return; }
+            if (!treeItem) { return; }
+
+            if (treeItem.type === 'file' && treeItem.resourceUri) {
+                const document = await vscode.workspace.openTextDocument(treeItem.resourceUri);
+                await vscode.window.showTextDocument(document, { preserveFocus: false, preview: false });
+                return;
+            }
+
+            if (!treeItem.node) { return; }
+
+            if (treeItem.node.type === 'target') {
+                const loc = treeProvider.resolveTargetLocation(treeItem.node);
+                if (loc) {
+                    await vscode.window.showTextDocument(loc.uri, {
+                        selection: loc.range,
+                        preserveFocus: false,
+                        preview: false
+                    });
+                    return;
+                }
+            }
 
             // 1. Try VS Code's LSP definition provider at the source position.
             //    Works best with XState v5 typed setup() — the TS server resolves
@@ -189,7 +255,13 @@ export async function activate(context: vscode.ExtensionContext) {
             // 2. Fall back to AST-based search (same file → imports → workspace symbols)
             const functionName = ImplementationFinder.extractFunctionName(treeItem.node.label);
             if (!functionName) {
-                vscode.window.showInformationMessage('Could not extract function name');
+                if (treeItem.uri && treeItem.range) {
+                    await vscode.window.showTextDocument(treeItem.uri, {
+                        selection: treeItem.range,
+                        preserveFocus: false,
+                        preview: false
+                    });
+                }
                 return;
             }
 
@@ -210,9 +282,13 @@ export async function activate(context: vscode.ExtensionContext) {
                     preserveFocus: false
                 });
             } else {
-                vscode.window.showInformationMessage(
-                    `Could not find implementation for '${functionName}'`
-                );
+                if (treeItem.uri && treeItem.range) {
+                    await vscode.window.showTextDocument(treeItem.uri, {
+                        selection: treeItem.range,
+                        preserveFocus: false,
+                        preview: false
+                    });
+                }
             }
         }
     );
@@ -416,6 +492,11 @@ export async function activate(context: vscode.ExtensionContext) {
         toggleFollowCursorActiveCommand,
         filterCommand,
         clearFilterCommand,
+        editNodeCommand,
+        addChildStateCommand,
+        addTransitionCommand,
+        addReferenceCommand,
+        deleteNodeCommand,
         navigateToNodeCommand,
         goToImplementationCommand,
         definitionProvider,

@@ -737,6 +737,8 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
                 return new vscode.ThemeIcon('circuit-board', new vscode.ThemeColor('charts.yellow'));
             case 'context':
                 return new vscode.ThemeIcon('symbol-variable', new vscode.ThemeColor('symbolIcon.variableForeground'));
+            case 'contextProperty':
+                return new vscode.ThemeIcon('symbol-property', new vscode.ThemeColor('symbolIcon.propertyForeground'));
             case 'actor':
                 return new vscode.ThemeIcon('play-circle', new vscode.ThemeColor('charts.yellow'));
             case 'delay':
