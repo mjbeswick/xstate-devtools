@@ -163,6 +163,11 @@
       {
         "command": "xstateMachineOutline.deleteNode",
         "title": "Delete"
+      },
+      {
+        "command": "xstateMachineOutline.openGraphView",
+        "title": "Open Visual Graph",
+        "icon": "$(git-merge)"
       }
     ],
     "configuration": {
@@ -248,6 +253,11 @@
       ],
       "view/item/context": [
         {
+          "command": "xstateMachineOutline.openGraphView",
+          "when": "view == xstateMachineOutline && (viewItem == machine || viewItem == state)",
+          "group": "navigation@0"
+        },
+        {
           "command": "xstateMachineOutline.goToImplementation",
           "when": "view == xstateMachineOutline && viewItem != loading",
           "group": "navigation@1"
@@ -279,6 +289,11 @@
         }
       ],
       "view/item/inline": [
+        {
+          "command": "xstateMachineOutline.openGraphView",
+          "when": "view == xstateMachineOutline && (viewItem == machine || viewItem == state)",
+          "group": "inline@1"
+        },
         {
           "command": "xstateMachineOutline.goToImplementation",
           "when": "view == xstateMachineOutline && (viewItem == action || viewItem == guard || viewItem == entry || viewItem == exit || viewItem == invoke)",

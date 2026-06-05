@@ -9,6 +9,7 @@ import { isSupportedXStateDocument, validateXStateDocument } from './diagnostics
 import { WorkspaceScanner } from './workspaceScanner';
 import { XStateReferenceProvider, XStateRenameProvider } from './providers';
 import { XStateHoverProvider } from './hoverProvider';
+import { XStateGraphViewProvider } from './graphView';
 
 let selectionTimeout: NodeJS.Timeout | undefined;
 
@@ -381,6 +382,11 @@ export async function activate(context: vscode.ExtensionContext) {
                 treeView.reveal(item, { select: true, focus: false });
                 setTimeout(() => { isTreeSelectionChange = false; }, 300);
             }
+            
+            // Sync with graph view
+            if (item && item.node && item.node.type === 'state') {
+                graphViewProvider.highlightState(item.node.label);
+            }
         }, 300);
     });
 
@@ -552,6 +558,32 @@ export async function activate(context: vscode.ExtensionContext) {
         }, 500);
     }
 
+    const graphViewProvider = new XStateGraphViewProvider(context.extensionUri);
+
+    const openGraphViewCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.openGraphView',
+        (treeItem) => {
+            if (!treeItem?.node) { return; }
+            
+            let machineNode = treeItem.node;
+            
+            // If they clicked on a state, find the root machine using the workspaceScanner cache
+            if (machineNode.type === 'state' && treeItem.uri) {
+                const fileMachines = workspaceScanner.getFile(treeItem.uri);
+                if (fileMachines) {
+                    for (const m of fileMachines.machines) {
+                        if (m.range.contains(machineNode.range)) {
+                            machineNode = m;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            graphViewProvider.show(machineNode, machineNode.label);
+        }
+    );
+
     context.subscriptions.push(
         treeView,
         expandListener,
@@ -579,6 +611,7 @@ export async function activate(context: vscode.ExtensionContext) {
         addTransitionCommand,
         addReferenceCommand,
         deleteNodeCommand,
+        openGraphViewCommand,
         navigateToNodeCommand,
         goToImplementationCommand,
         definitionProvider,
