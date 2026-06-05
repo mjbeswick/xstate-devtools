@@ -42,6 +42,27 @@ cytoscape.use(expandCollapse);
 const vscode = acquireVsCodeApi();
 const payload: GraphPayload = (window as unknown as { __GRAPH__: GraphPayload }).__GRAPH__;
 
+// Cytoscape draws to <canvas> and does NOT understand CSS var() — it needs
+// concrete colour strings. Resolve the VS Code theme variables to real values.
+const rootStyle = getComputedStyle(document.documentElement);
+const bodyStyle = getComputedStyle(document.body);
+function themeVar(name: string, fallback: string): string {
+    const v = (rootStyle.getPropertyValue(name) || bodyStyle.getPropertyValue(name)).trim();
+    return v || fallback;
+}
+const C = {
+    fg: themeVar('--vscode-editor-foreground', '#1f1f1f'),
+    bg: themeVar('--vscode-editor-background', '#ffffff'),
+    nodeBg: themeVar('--vscode-editorWidget-background', '#f3f3f3'),
+    border: themeVar('--vscode-widget-border', themeVar('--vscode-panel-border', '#c8c8c8')),
+    accent: themeVar('--vscode-charts-blue', '#3b82f6'),
+    focus: themeVar('--vscode-focusBorder', '#0090f1'),
+    selBg: themeVar('--vscode-list-activeSelectionBackground', '#cce5ff'),
+    selFg: themeVar('--vscode-list-activeSelectionForeground', themeVar('--vscode-editor-foreground', '#1f1f1f')),
+    desc: themeVar('--vscode-descriptionForeground', '#717171'),
+};
+const fontFamily = themeVar('--vscode-font-family', 'system-ui, sans-serif');
+
 const elkOptions = {
     name: 'elk',
     fit: true,
@@ -50,13 +71,13 @@ const elkOptions = {
         algorithm: 'layered',
         'elk.direction': 'DOWN',
         'elk.edgeRouting': 'ORTHOGONAL',
-        'elk.layered.spacing.nodeNodeBetweenLayers': 64,
-        'elk.spacing.nodeNode': 44,
-        'elk.spacing.edgeNode': 24,
-        'elk.spacing.edgeEdge': 16,
-        'elk.layered.spacing.edgeNodeBetweenLayers': 24,
+        'elk.layered.spacing.nodeNodeBetweenLayers': 72,
+        'elk.spacing.nodeNode': 48,
+        'elk.spacing.edgeNode': 28,
+        'elk.spacing.edgeEdge': 18,
+        'elk.layered.spacing.edgeNodeBetweenLayers': 28,
         'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
-        'elk.padding': '[top=36,left=24,bottom=24,right=24]',
+        'elk.padding': '[top=40,left=28,bottom=28,right=28]',
     },
 } as const;
 
@@ -75,12 +96,11 @@ const cy = cytoscape({
                 'text-wrap': 'wrap',
                 'text-max-width': '140px',
                 'font-size': 12,
-                'font-family': 'var(--vscode-font-family)',
-                'color': 'var(--vscode-editor-foreground)',
-                'background-color': 'var(--vscode-editorWidget-background)',
-                'background-opacity': 1,
+                'font-family': fontFamily,
+                'color': C.fg,
+                'background-color': C.nodeBg,
                 'border-width': 1,
-                'border-color': 'var(--vscode-widget-border, var(--vscode-panel-border))',
+                'border-color': C.border,
                 'shape': 'round-rectangle',
                 'width': 'label',
                 'height': 'label',
@@ -91,17 +111,16 @@ const cy = cytoscape({
             // Compound (nested) states: label sits at the top, children inside.
             selector: 'node:parent',
             style: {
-                'label': 'data(label)',
                 'text-valign': 'top',
                 'text-halign': 'center',
                 'text-margin-y': 6,
                 'font-weight': 'bold',
-                'background-color': 'var(--vscode-editor-foreground)',
+                'background-color': C.fg,
                 'background-opacity': 0.04,
                 'border-width': 1,
                 'border-style': 'dashed',
-                'border-color': 'var(--vscode-widget-border, var(--vscode-panel-border))',
-                'padding': '16px',
+                'border-color': C.border,
+                'padding': '18px',
             },
         },
         {
@@ -111,7 +130,7 @@ const cy = cytoscape({
                 'width': 12,
                 'height': 12,
                 'shape': 'ellipse',
-                'background-color': 'var(--vscode-editor-foreground)',
+                'background-color': C.fg,
                 'background-opacity': 1,
                 'border-width': 0,
                 'label': '',
@@ -121,18 +140,15 @@ const cy = cytoscape({
         },
         {
             selector: 'node[?final]',
-            style: {
-                'border-width': 3,
-                'border-color': 'var(--vscode-editor-foreground)',
-                'border-style': 'double',
-            },
+            style: { 'border-width': 3, 'border-color': C.fg, 'border-style': 'double' },
         },
         {
             selector: 'node.highlighted',
             style: {
                 'border-width': 2,
-                'border-color': 'var(--vscode-focusBorder)',
-                'background-color': 'var(--vscode-list-activeSelectionBackground)',
+                'border-color': C.focus,
+                'background-color': C.selBg,
+                'color': C.selFg,
             },
         },
         {
@@ -140,34 +156,36 @@ const cy = cytoscape({
             style: {
                 'label': 'data(label)',
                 'text-wrap': 'wrap',
+                'text-max-width': '120px',
+                'text-overflow-wrap': 'anywhere',
                 'font-size': 10,
-                'font-family': 'var(--vscode-font-family)',
-                'color': 'var(--vscode-editor-foreground)',
-                'text-background-color': 'var(--vscode-editor-background)',
-                'text-background-opacity': 0.95,
+                'font-family': fontFamily,
+                'color': C.fg,
+                'text-background-color': C.bg,
+                'text-background-opacity': 0.92,
                 'text-background-padding': '3px',
                 'text-background-shape': 'roundrectangle',
                 'text-border-opacity': 1,
                 'text-border-width': 1,
-                'text-border-color': 'var(--vscode-widget-border, var(--vscode-panel-border))',
+                'text-border-color': C.border,
                 'curve-style': 'round-taxi',
                 'taxi-direction': 'auto',
                 'taxi-turn': '40%',
                 'taxi-radius': 8,
                 'width': 1.5,
-                'line-color': 'var(--vscode-charts-blue, #569cd6)',
-                'target-arrow-color': 'var(--vscode-charts-blue, #569cd6)',
+                'line-color': C.accent,
+                'target-arrow-color': C.accent,
                 'target-arrow-shape': 'triangle',
                 'arrow-scale': 0.9,
             },
         },
         {
-            // Start-marker edges: thin, no label, no arrowhead clutter.
+            // Start-marker edges: thin, straight, no label.
             selector: 'edge[source ^= "start_"]',
             style: {
                 'width': 1.5,
-                'line-color': 'var(--vscode-editor-foreground)',
-                'target-arrow-color': 'var(--vscode-editor-foreground)',
+                'line-color': C.fg,
+                'target-arrow-color': C.fg,
                 'curve-style': 'straight',
             },
         },
