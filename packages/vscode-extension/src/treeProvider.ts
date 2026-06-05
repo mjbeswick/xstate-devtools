@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { XStateMachineParser, MachineNode } from './parser';
 import { WorkspaceScanner, FileMachines } from './workspaceScanner';
+import { findNodeAtPosition, normalizeTargetName, walkNodes } from './utils';
 
 export type ViewScope = 'file' | 'workspace';
 export type ViewMode = 'grouped' | 'flat';
@@ -142,7 +143,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
      * Returns the defining state's uri/range, or undefined if it can't be resolved.
      */
     resolveTargetLocation(targetNode: MachineNode): { uri: vscode.Uri; range: vscode.Range } | undefined {
-        const name = this.normalizeTargetName(targetNode.label);
+        const name = normalizeTargetName(targetNode.label);
         if (!name) { return undefined; }
 
         const roots = this.getAllMachineNodes();
@@ -162,11 +163,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         return undefined;
     }
 
-    /** Strip XState target sigils (`#id`, leading `.`) and return the leaf state name. */
-    private normalizeTargetName(raw: string): string {
-        const segments = raw.replace(/^#/, '').split('.').filter(Boolean);
-        return segments.length ? segments[segments.length - 1] : '';
-    }
+
 
     /** Depth-first search for a `state` node with the given name, ignoring non-state branches. */
     private findStateByName(node: MachineNode, name: string): MachineNode | undefined {

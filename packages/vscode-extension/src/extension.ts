@@ -8,6 +8,7 @@ import { XStateCodeActionProvider } from './codeActions';
 import { isSupportedXStateDocument, validateXStateDocument } from './diagnostics';
 import { WorkspaceScanner } from './workspaceScanner';
 import { XStateReferenceProvider, XStateRenameProvider } from './providers';
+import { XStateHoverProvider } from './hoverProvider';
 
 let selectionTimeout: NodeJS.Timeout | undefined;
 
@@ -510,6 +511,11 @@ export async function activate(context: vscode.ExtensionContext) {
         new XStateRenameProvider(workspaceScanner)
     );
 
+    const hoverProvider = vscode.languages.registerHoverProvider(
+        xstateLanguages,
+        new XStateHoverProvider(workspaceScanner)
+    );
+
     const editorChangeListener = vscode.window.onDidChangeActiveTextEditor((editor) => {
         if (!editor) { return; }
         treeProvider.refresh();
@@ -581,6 +587,7 @@ export async function activate(context: vscode.ExtensionContext) {
         codeActionProvider,
         refProvider,
         renameProvider,
+        hoverProvider,
         diagnosticCollection,
         goToImplementationSelectedCommand,
         editorChangeListener,

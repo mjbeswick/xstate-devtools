@@ -8,8 +8,8 @@ interface PropertySchema {
     v5?: boolean;
 }
 
-type ValueContext = 'state' | 'action' | 'guard' | 'actor' | 'none';
-type ObjectContext = 'machine' | 'state' | 'transition' | 'invoke' | 'setup' | 'none';
+type ValueContext = 'state' | 'action' | 'guard' | 'actor' | 'event' | 'none';
+type ObjectContext = 'machine' | 'state' | 'transition' | 'invoke' | 'setup' | 'on' | 'none';
 
 /**
  * Provides XState-aware autocomplete for machine configs and string targets.
@@ -100,6 +100,20 @@ export class XStateCompletionProvider implements vscode.CompletionItemProvider {
         }
 
         const objectContext = this.getObjectContext(objectLiteral);
+        if (objectContext === 'on') {
+            const machineConfig = this.findMachineConfig(node);
+            if (machineConfig) {
+                const events = this.collectEvents(machineConfig);
+                return events.map((event) => {
+                    const item = new vscode.CompletionItem(event, vscode.CompletionItemKind.Event);
+                    item.insertText = event;
+                    item.sortText = `1_${event}`;
+                    return item;
+                });
+            }
+            return undefined;
+        }
+
         const existingProperties = this.getExistingPropertyNames(objectLiteral);
         const properties = this.getPropertiesForContext(objectContext)
             .filter((prop) => !existingProperties.has(prop.name));
@@ -204,11 +218,25 @@ export class XStateCompletionProvider implements vscode.CompletionItemProvider {
             return 'transition';
         }
 
+        if (this.isOnConfigObject(objectLiteral)) {
+            return 'on';
+        }
+
         if (this.isStateConfigObject(objectLiteral)) {
             return 'state';
         }
 
         return 'none';
+    }
+
+    private isOnConfigObject(objectLiteral: ts.ObjectLiteralExpression): boolean {
+        const property = this.findAncestor(objectLiteral, ts.isPropertyAssignment);
+        if (!property || property.initializer !== objectLiteral) {
+            return false;
+        }
+
+        const propertyName = this.getPropertyName(property.name);
+        return propertyName === 'on';
     }
 
     private getPropertiesForContext(context: ObjectContext): PropertySchema[] {
@@ -265,6 +293,32 @@ export class XStateCompletionProvider implements vscode.CompletionItemProvider {
                 this.collectStateTargetsFromStatesObject(childStatesProperty.initializer, nextPath, targets);
             }
         }
+    }
+
+    private collectEvents(machineConfig: ts.ObjectLiteralExpression): string[] {
+        const events = new Set<string>();
+
+        const visit = (node: ts.Node): void => {
+            if (ts.isPropertyAssignment(node) && this.getPropertyName(node.name) === 'on' && ts.isObjectLiteralExpression(node.initializer)) {
+                for (const prop of node.initializer.properties) {
+                    const eventName = this.getPropertyName(prop.name);
+                    if (eventName) {
+                        events.add(eventName);
+                    }
+                }
+            }
+
+            // Also check `setup({ types: { events: {} } })`
+            if (ts.isPropertyAssignment(node) && this.getPropertyName(node.name) === 'types' && ts.isObjectLiteralExpression(node.initializer)) {
+                const eventsProp = this.findProperty(node.initializer, 'events');
+                // Could extract TS types, but that's complex. Let's just rely on usage in `on:` blocks.
+            }
+
+            ts.forEachChild(node, visit);
+        };
+
+        visit(machineConfig);
+        return Array.from(events).sort();
     }
 
     private collectSetupKeys(sourceFile: ts.SourceFile, sectionName: 'actions' | 'guards' | 'actors'): string[] {
@@ -505,7 +559,22 @@ export class XStateCompletionProvider implements vscode.CompletionItemProvider {
         }
 
         item.documentation = new vscode.MarkdownString(documentation);
-        item.insertText = `${prop.name}: `;
+        
+        // Add snippets for complex properties
+        if (prop.name === 'states') {
+            item.insertText = new vscode.SnippetString('states: {\n\t$1\n}');
+        } else if (prop.name === 'on') {
+            item.insertText = new vscode.SnippetString('on: {\n\t$1\n}');
+        } else if (prop.name === 'invoke') {
+            item.insertText = new vscode.SnippetString('invoke: {\n\tsrc: \'${1:actorName}\',\n\tid: \'${2:actorId}\',\n\tonDone: {\n\t\ttarget: \'${3:nextState}\'\n\t}\n}');
+        } else if (prop.name === 'setup') {
+            item.insertText = new vscode.SnippetString('setup({\n\tactions: {},\n\tguards: {},\n\tactors: {},\n\tdelays: {}\n})');
+        } else if (prop.name === 'always') {
+            item.insertText = new vscode.SnippetString('always: {\n\ttarget: \'${1:nextState}\',\n\tguard: \'${2:condition}\'\n}');
+        } else {
+            item.insertText = `${prop.name}: `;
+        }
+        
         item.sortText = `1_${prop.name}`;
         item.detail = versions.length > 0 ? `XState ${versions.join(', ')}` : undefined;
         return item;
