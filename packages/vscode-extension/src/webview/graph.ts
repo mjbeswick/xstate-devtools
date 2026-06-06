@@ -201,18 +201,31 @@ function text(content: string, x: number, y: number, attrs: Record<string, strin
     return t;
 }
 
+const ARC_PAD = 70; // vertical space reserved above ELK box for backward arcs
+
 const container = document.getElementById('cy')!;
 const nameToRect = new Map<string, SVGElement>();
 let viewport: SVGElement;
 let scale = 1, tx = 0, ty = 0;
+let lastW = 100, lastH = 100;
 let didFit = false;
 
 function applyTransform() { viewport.setAttribute('transform', `translate(${tx} ${ty}) scale(${scale})`); }
+
+function fitToScreen() {
+    const cw = container.clientWidth || 800, ch = container.clientHeight || 600;
+    const totalH = lastH + ARC_PAD;
+    scale = Math.min(cw / lastW, ch / totalH, 1.5) * 0.94 || 1;
+    tx = (cw - lastW * scale) / 2;
+    ty = (ch - totalH * scale) / 2;
+    applyTransform();
+}
 
 // ── Render ──────────────────────────────────────────────────────────────────
 async function render(): Promise<void> {
     const result = await elk.layout(buildElkGraph()) as ElkNode;
     const W = result.width ?? 100, H = result.height ?? 100;
+    lastW = W; lastH = H;
 
     container.replaceChildren();
     nameToRect.clear();
@@ -229,10 +242,6 @@ async function render(): Promise<void> {
     viewport.append(gRegions, gEdges, gNodes, gLabels);
     svg.appendChild(viewport);
     container.appendChild(svg);
-
-    // Reserve vertical space above the ELK bounding box so that backward
-    // (feedback) arcs, which arc above the diagram, stay within the SVG.
-    const ARC_PAD = 70;
 
     // Nodes (absolute geometry).
     const geom = new Map<string, { x: number; y: number; w: number; h: number }>();
@@ -380,16 +389,7 @@ async function render(): Promise<void> {
         gEdges.appendChild(el('path', { d, fill: 'none', stroke: C.fg, 'stroke-width': 1.4, 'stroke-linejoin': 'round', 'marker-end': 'url(#arrow)' }));
     }
 
-    if (!didFit) {
-        const cw = container.clientWidth || 800, ch = container.clientHeight || 600;
-        // Include ARC_PAD in height so the initial fit shows both the nodes
-        // (shifted down by ARC_PAD) and the backward arcs above them.
-        const totalH = H + ARC_PAD;
-        scale = Math.min(cw / W, ch / totalH, 1.5) * 0.94 || 1;
-        tx = (cw - W * scale) / 2;
-        ty = (ch - totalH * scale) / 2;
-        didFit = true;
-    }
+    if (!didFit) { fitToScreen(); didFit = true; }
     applyTransform();
 }
 
@@ -465,5 +465,54 @@ function showError(err: unknown): void {
     container.appendChild(pre);
     console.error('[xstate graph]', err);
 }
+
+// ── Export helpers ──────────────────────────────────────────────────────────
+function exportSvg(): void {
+    const svgEl = container.querySelector('svg');
+    if (!svgEl) { return; }
+    const cw = container.clientWidth || 800, ch = container.clientHeight || 600;
+    const clone = svgEl.cloneNode(true) as SVGElement;
+    clone.setAttribute('width', String(cw));
+    clone.setAttribute('height', String(ch));
+    clone.setAttribute('viewBox', `0 0 ${cw} ${ch}`);
+    const data = new XMLSerializer().serializeToString(clone);
+    vscode.postMessage({ command: 'exportSvg', data });
+}
+
+function exportPng(): void {
+    const svgEl = container.querySelector('svg');
+    if (!svgEl) { return; }
+    const cw = container.clientWidth || 800, ch = container.clientHeight || 600;
+    const clone = svgEl.cloneNode(true) as SVGElement;
+    clone.setAttribute('width', String(cw));
+    clone.setAttribute('height', String(ch));
+    clone.setAttribute('viewBox', `0 0 ${cw} ${ch}`);
+    const svgStr = new XMLSerializer().serializeToString(clone);
+    const dataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgStr)));
+    const canvas = document.createElement('canvas');
+    canvas.width = cw * 2; canvas.height = ch * 2;
+    const ctx = canvas.getContext('2d')!;
+    const img = new Image();
+    img.onload = () => {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        vscode.postMessage({ command: 'exportPng', data: canvas.toDataURL('image/png') });
+    };
+    img.src = dataUrl;
+}
+
+// ── Toolbar buttons ─────────────────────────────────────────────────────────
+function zoomAround(factor: number) {
+    const cx = container.clientWidth / 2, cy = container.clientHeight / 2;
+    const ns = Math.min(3, Math.max(0.15, scale * factor));
+    tx = cx - ((cx - tx) / scale) * ns;
+    ty = cy - ((cy - ty) / scale) * ns;
+    scale = ns;
+    applyTransform();
+}
+document.getElementById('btn-zoom-in')?.addEventListener('click', () => zoomAround(1.25));
+document.getElementById('btn-zoom-out')?.addEventListener('click', () => zoomAround(1 / 1.25));
+document.getElementById('btn-fit')?.addEventListener('click', fitToScreen);
+document.getElementById('btn-export-svg')?.addEventListener('click', exportSvg);
+document.getElementById('btn-export-png')?.addEventListener('click', exportPng);
 
 render().catch(showError);
