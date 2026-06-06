@@ -20,6 +20,8 @@ interface NodeData {
     initial?: boolean;
     final?: boolean;
     start?: boolean;
+    entryActions?: string[];
+    exitActions?: string[];
 }
 interface GraphPayload {
     nodes: { data: NodeData }[];
@@ -78,7 +80,22 @@ function textWidth(text: string, px: number, weight = 'normal'): number {
     return measureCtx.measureText(text).width;
 }
 const REGION_TITLE_H = 26;
-const nodeWidth = (label: string) => Math.max(64, Math.ceil(textWidth(label, 12)) + 34);
+const ACTION_LINE_H = 14;   // height per entry/exit action row
+const ACTION_SECTION_PAD = 8; // space above first action row (below divider)
+
+function nodeWidth(label: string, entryActions: string[] = [], exitActions: string[] = []): number {
+    const actionLabels = [
+        ...entryActions.map(a => `entry/ ${a}`),
+        ...exitActions.map(a => `exit/ ${a}`),
+    ];
+    const allLabels = [label, ...actionLabels];
+    return Math.max(80, Math.max(...allLabels.map(l => Math.ceil(textWidth(l, 11)) + 28)));
+}
+
+function nodeHeight(entryActions: string[] = [], exitActions: string[] = []): number {
+    const lines = entryActions.length + exitActions.length;
+    return lines > 0 ? 28 + ACTION_SECTION_PAD + lines * ACTION_LINE_H + 4 : 36;
+}
 
 // ── Indexes ─────────────────────────────────────────────────────────────────
 const nodeById = new Map<string, NodeData>(payload.nodes.map(n => [n.data.id, n.data]));
@@ -107,7 +124,9 @@ function buildElkNode(id: string): ElkNode {
     const states = childStateIds(id);
     const isRegion = states.length > 0 && !collapsed.has(id);
     if (!isRegion) {
-        return { id, width: nodeWidth(d.label), height: 36, labels: [{ text: d.label }] };
+        const w = nodeWidth(d.label, d.entryActions, d.exitActions);
+        const h = nodeHeight(d.entryActions, d.exitActions);
+        return { id, width: w, height: h, labels: [{ text: d.label }] };
     }
     return {
         id,
@@ -243,8 +262,27 @@ async function render(): Promise<void> {
                 if (d.final) {
                     g.appendChild(el('rect', { x: ax + 3, y: ay + 3, width: w - 6, height: h - 6, rx: 9, ry: 9, fill: 'none', stroke: C.fg, 'stroke-width': 1 }));
                 }
-                const label = d.label + (isCollapsed ? '  ⊕' : '');
-                g.appendChild(text(label, ax + w / 2, ay + h / 2 + 4, { 'text-anchor': 'middle', 'font-size': 12, 'font-weight': isCollapsed ? 'bold' : 'normal' }));
+                const entryActions = d.entryActions ?? [];
+                const exitActions  = d.exitActions  ?? [];
+                const hasActions = entryActions.length > 0 || exitActions.length > 0;
+                const stateLabel = d.label + (isCollapsed ? '  ⊕' : '');
+                if (hasActions && !isCollapsed) {
+                    // Harel convention: name in top section, divider, then actions
+                    g.appendChild(text(stateLabel, ax + w / 2, ay + 18, { 'text-anchor': 'middle', 'font-size': 12 }));
+                    const divY = ay + 27;
+                    g.appendChild(el('line', { x1: ax + 1, y1: divY, x2: ax + w - 1, y2: divY, stroke: C.fg, 'stroke-width': 0.6, 'stroke-opacity': 0.35 }));
+                    let lineBaseline = divY + ACTION_SECTION_PAD + 10;
+                    for (const a of entryActions) {
+                        g.appendChild(text(`entry/ ${a}`, ax + 8, lineBaseline, { 'font-size': 10, fill: C.desc }));
+                        lineBaseline += ACTION_LINE_H;
+                    }
+                    for (const a of exitActions) {
+                        g.appendChild(text(`exit/ ${a}`, ax + 8, lineBaseline, { 'font-size': 10, fill: C.desc }));
+                        lineBaseline += ACTION_LINE_H;
+                    }
+                } else {
+                    g.appendChild(text(stateLabel, ax + w / 2, ay + h / 2 + 4, { 'text-anchor': 'middle', 'font-size': 12, 'font-weight': isCollapsed ? 'bold' : 'normal' }));
+                }
                 gNodes.appendChild(g);
             }
         }
@@ -280,16 +318,22 @@ async function render(): Promise<void> {
             let d: string;
             let lblCx: number, lblCy: number; // label centre
             if (ex < sx - 20) {
-                // Feedback (backward) edge — ELK's ORTHOGONAL routing for these
-                // produces a rectangular U-shape that merges visually with the
-                // corresponding forward edge.  Replace with a smooth bezier arc
-                // that curves above the diagram (into the ARC_PAD space).
-                const midX = (sx + ex) / 2;
-                const arcH = Math.max(36, (sx - ex) * 0.32);
-                d = `M ${sx} ${sy} C ${midX} ${sy - arcH} ${midX} ${ey - arcH} ${ex} ${ey}`;
-                // Bezier midpoint at t=0.5 analytically
-                lblCx = midX;
-                lblCy = (sy + ey) / 2 - arcH * 0.75;
+                // Feedback (backward) edge — ELK's ORTHOGONAL routing produces
+                // a rectangular U-shape; replace with a bezier arc above the
+                // diagram.  Use node geometry so the arc joins state borders
+                // precisely: exit source LEFT-center, enter target RIGHT-center.
+                const srcG = geom.get(e.sources[0]);
+                const tgtG = geom.get(e.targets[0]);
+                const arcSx = srcG ? srcG.x           : sx;
+                const arcSy = srcG ? srcG.y + srcG.h / 2 : sy;
+                const arcEx = tgtG ? tgtG.x + tgtG.w  : ex;
+                const arcEy = tgtG ? tgtG.y + tgtG.h / 2 : ey;
+                const arcH = Math.max(40, Math.abs(arcSx - arcEx) * 0.32);
+                // Cubic bezier: depart straight up from source, arrive straight
+                // down at target — gives consistent arrowhead direction.
+                d = `M ${arcSx} ${arcSy} C ${arcSx} ${arcSy - arcH} ${arcEx} ${arcEy - arcH} ${arcEx} ${arcEy}`;
+                lblCx = (arcSx + arcEx) / 2;
+                lblCy = (arcSy + arcEy) / 2 - arcH * 0.75;
             } else {
                 const pts = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint];
                 d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${ax + p.x} ${ay + p.y}`).join(' ');

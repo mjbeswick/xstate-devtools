@@ -614,6 +614,20 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const graphViewProvider = new XStateGraphViewProvider(context.extensionUri, treeProvider);
 
+    // When the user selects a node in the tree, sync the diagram:
+    // - state node  → highlight it in the current graph
+    // - machine node → switch the graph to show that machine
+    const treeSelectionListener = treeView.onDidChangeSelection(e => {
+        if (isTreeSelectionChange) { return; } // ignore programmatic reveals driven by cursor sync
+        const item = e.selection[0];
+        if (!item?.node) { return; }
+        if (item.node.type === 'state') {
+            graphViewProvider.highlightState(item.node.label);
+        } else if (item.node.type === 'machine') {
+            graphViewProvider.show(item.node, item.node.label);
+        }
+    });
+
     const openGraphViewCommand = vscode.commands.registerCommand(
         'xstateMachineOutline.openGraphView',
         (treeItem) => {
@@ -642,6 +656,7 @@ export async function activate(context: vscode.ExtensionContext) {
         treeView,
         expandListener,
         collapseListener,
+        treeSelectionListener,
         filterViewRegistration,
         refreshCommand,
         setScopeFileCommand,

@@ -73,7 +73,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         this.treeView.onDidExpandElement(e => {
             e.element.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
             const config = vscode.workspace.getConfiguration('xstateOutline');
-            if (config.get<boolean>('graphReflectsTreeExpansion', false)) {
+            if (config.get<boolean>('graphReflectsTreeExpansion', true)) {
                 vscode.commands.executeCommand('xstateMachineOutline.refreshGraphOnly');
             }
         });
@@ -81,7 +81,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         this.treeView.onDidCollapseElement(e => {
             e.element.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
             const config = vscode.workspace.getConfiguration('xstateOutline');
-            if (config.get<boolean>('graphReflectsTreeExpansion', false)) {
+            if (config.get<boolean>('graphReflectsTreeExpansion', true)) {
                 vscode.commands.executeCommand('xstateMachineOutline.refreshGraphOnly');
             }
         });
