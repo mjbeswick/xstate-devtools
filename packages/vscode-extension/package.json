@@ -224,7 +224,7 @@
         },
         "xstateOutline.graphReflectsTreeExpansion": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Make the visual graph selectively render only states that are expanded in the tree outline"
         },
         "xstateOutline.groupEventHandlers": {

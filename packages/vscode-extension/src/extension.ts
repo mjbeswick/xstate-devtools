@@ -26,7 +26,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const initialSortChildren = config.get<string>('sortChildren', 'original');
     let followCursor = config.get<boolean>('followCursor', true);
 
-    let graphReflectsTreeExpansion = config.get<boolean>('graphReflectsTreeExpansion', false);
+    let graphReflectsTreeExpansion = config.get<boolean>('graphReflectsTreeExpansion', true);
     vscode.commands.executeCommand('setContext', 'xstateOutline.graphReflectsTreeExpansion', graphReflectsTreeExpansion);
 
     await Promise.all([

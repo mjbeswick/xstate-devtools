@@ -249,30 +249,39 @@ async function render(): Promise<void> {
     };
     drawNode(result, 0, 0);
 
-    // Edges (sections root-relative == absolute under INCLUDE_CHILDREN).
-    for (const e of result.edges ?? []) {
-        // Initial-marker edges are drawn deterministically below — ELK's routing
-        // of the tiny start node leaves them invisible.
-        if (e.sources[0]?.startsWith('start_')) { continue; }
-        const s = e.sections?.[0];
-        if (!s) { continue; }
-        const pts = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint];
-        const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-        gEdges.appendChild(el('path', { d, fill: 'none', stroke: C.fg, 'stroke-width': 1.4, 'stroke-linejoin': 'round', 'marker-end': 'url(#arrow)' }));
+    // Edges — ELK may place same-parent edges on their compound ancestor node
+    // rather than the root (even with INCLUDE_CHILDREN).  Recurse through the
+    // full result tree so we never miss them.  Coordinates in each ElkNode's
+    // edges array are relative to that node, so we accumulate the absolute
+    // offset as we descend (identical bookkeeping to drawNode above).
+    const drawEdgesInNode = (n: ElkNode, ox: number, oy: number) => {
+        const ax = ox + (n.x ?? 0), ay = oy + (n.y ?? 0);
+        for (const e of n.edges ?? []) {
+            // Initial-marker edges are drawn deterministically below — ELK's
+            // routing of the tiny start node leaves them invisible.
+            if (e.sources[0]?.startsWith('start_')) { continue; }
+            const s = e.sections?.[0];
+            if (!s) { continue; }
+            const pts = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint];
+            const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${ax + p.x} ${ay + p.y}`).join(' ');
+            gEdges.appendChild(el('path', { d, fill: 'none', stroke: C.fg, 'stroke-width': 1.4, 'stroke-linejoin': 'round', 'marker-end': 'url(#arrow)' }));
 
-        const lbl = e.labels?.[0];
-        if (lbl && lbl.text) {
-            const lw = lbl.width ?? Math.ceil(textWidth(lbl.text, 11)) + 10;
-            const lh = lbl.height ?? 16;
-            const lx = lbl.x ?? (s.startPoint.x + s.endPoint.x) / 2 - lw / 2;
-            const ly = lbl.y ?? (s.startPoint.y + s.endPoint.y) / 2 - lh / 2;
-            const g = el('g', { 'data-event': lbl.text });
-            (g as SVGElement).style.cursor = 'pointer';
-            g.appendChild(el('rect', { x: lx - 3, y: ly - 1, width: lw + 6, height: lh + 2, rx: 4, ry: 4, fill: C.bg, 'fill-opacity': 0.9 }));
-            g.appendChild(text(lbl.text, lx + lw / 2, ly + lh - 4, { 'text-anchor': 'middle', 'font-size': 11, fill: C.desc }));
-            gLabels.appendChild(g);
+            const lbl = e.labels?.[0];
+            if (lbl && lbl.text) {
+                const lw = lbl.width ?? Math.ceil(textWidth(lbl.text, 11)) + 10;
+                const lh = lbl.height ?? 16;
+                const lx = ax + (lbl.x ?? (s.startPoint.x + s.endPoint.x) / 2 - lw / 2);
+                const ly = ay + (lbl.y ?? (s.startPoint.y + s.endPoint.y) / 2 - lh / 2);
+                const g = el('g', { 'data-event': lbl.text });
+                (g as SVGElement).style.cursor = 'pointer';
+                g.appendChild(el('rect', { x: lx - 3, y: ly - 1, width: lw + 6, height: lh + 2, rx: 4, ry: 4, fill: C.bg, 'fill-opacity': 0.9 }));
+                g.appendChild(text(lbl.text, lx + lw / 2, ly + lh - 4, { 'text-anchor': 'middle', 'font-size': 11, fill: C.desc }));
+                gLabels.appendChild(g);
+            }
         }
-    }
+        for (const c of n.children ?? []) { drawEdgesInNode(c, ax, ay); }
+    };
+    drawEdgesInNode(result, 0, 0);
 
     // Initial-state arrows: filled dot → initial substate, routed orthogonally
     // from the geometry ELK reserved for the start marker.
