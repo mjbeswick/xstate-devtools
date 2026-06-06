@@ -477,9 +477,19 @@ async function render(): Promise<void> {
 
         let kind: Spec['kind'], sSide: Side, tSide: Side;
         if (isBackward) {
-            // Loop back on the "negative cross" face (left for DOWN, top for RIGHT).
+            // Loop back around whichever side has more free space between the
+            // two nodes and the diagram edge, so the loop stays short instead
+            // of always sweeping the same way. Ties prefer the trailing side.
             kind = 'backward';
-            [sSide, tSide] = DOWN ? ['L', 'L'] : ['T', 'T'];
+            if (DOWN) {
+                const leftSpace  = Math.min(sg.x, tg.x);
+                const rightSpace = lastW - Math.max(sg.x + sg.w, tg.x + tg.w);
+                [sSide, tSide] = rightSpace >= leftSpace ? ['R', 'R'] : ['L', 'L'];
+            } else {
+                const topSpace    = Math.min(sg.y, tg.y);
+                const bottomSpace = lastH - Math.max(sg.y + sg.h, tg.y + tg.h);
+                [sSide, tSide] = bottomSpace >= topSpace ? ['B', 'B'] : ['T', 'T'];
+            }
         } else if (isLateral) {
             // Same layer → connect the facing cross sides.
             kind = 'lateral';
