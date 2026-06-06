@@ -764,29 +764,30 @@ async function render(): Promise<void> {
     }
 
     // ── Self-transitions ──────────────────────────────────────────────────
-    // A transition back to its own state: draw a small loop off the top-right
-    // corner (leaves the top edge, returns to the right edge) with its label.
+    // A transition back to its own state: draw a smooth rounded arch above the
+    // top edge (both ends on the top edge, control points spread wide so the
+    // curve is gentle and never hooks sharply).
     for (const [id, label] of selfEdges.entries()) {
         const r = geom.get(id);
         if (!r) { continue; }
-        const lx = r.x + r.w * 0.72, ly = r.y;          // exit point on top edge
-        const rx = r.x + r.w,        ry = r.y + r.h * 0.28; // entry point on right edge
-        const k = 22;                                    // loop reach
+        const x1 = r.x + r.w * 0.40, x2 = r.x + r.w * 0.66;  // exit / entry on top edge
+        const y0 = r.y;
+        const k = 30;                                         // arch height
         gEdges.appendChild(el('path', {
-            d: `M ${lx} ${ly} C ${lx} ${ly - k} ${rx + k} ${ry - k} ${rx + k} ${ry} `
-             + `C ${rx + k} ${ry + 6} ${rx + 4} ${ry} ${rx} ${ry}`,
+            d: `M ${x1} ${y0} C ${x1} ${y0 - k} ${x2} ${y0 - k} ${x2} ${y0}`,
             fill: 'none', stroke: C.fg, 'stroke-width': 1.4, 'stroke-opacity': 0.7,
             'marker-end': 'url(#arr)',
         }));
         const lines = label ? label.split('\n').filter(Boolean) : [];
         if (lines.length) {
             const lw = Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 12;
-            const bx = rx + k - lw / 2, by = ry - k - lines.length * ACTION_LINE_H;
+            const cxp = (x1 + x2) / 2;
+            const by = y0 - k * 0.75 - lines.length * ACTION_LINE_H / 2;
             const g = el('g', { 'data-src': id });
             (g as SVGElement).style.cursor = 'pointer';
-            g.appendChild(el('rect', { x: bx - 2, y: by, width: lw + 4, height: lines.length * ACTION_LINE_H + 4, rx: 3, ry: 3, fill: C.bg, 'fill-opacity': 1, stroke: C.fg, 'stroke-width': 0.5, 'stroke-opacity': 0.12 }));
+            g.appendChild(el('rect', { x: cxp - lw / 2 - 2, y: by, width: lw + 4, height: lines.length * ACTION_LINE_H + 4, rx: 3, ry: 3, fill: C.bg, 'fill-opacity': 1, stroke: C.fg, 'stroke-width': 0.5, 'stroke-opacity': 0.12 }));
             for (let i = 0; i < lines.length; i++) {
-                const t = txt(lines[i], bx + lw / 2, by + (i + 0.5) * ACTION_LINE_H + ACTION_LINE_H / 2, { 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': ACTION_PX, fill: C.desc });
+                const t = txt(lines[i], cxp, by + (i + 0.5) * ACTION_LINE_H + ACTION_LINE_H / 2, { 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': ACTION_PX, fill: C.desc });
                 t.setAttribute('data-event', lines[i]);
                 g.appendChild(t);
             }
