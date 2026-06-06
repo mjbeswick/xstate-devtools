@@ -243,6 +243,10 @@ export class XStateGraphViewProvider {
         html, body { padding: 0; margin: 0; height: 100%; width: 100%; overflow: hidden; }
         body { background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); }
         #cy { position: absolute; inset: 0; }
+        /* Smooth transitions for hover interactivity */
+        path { transition: stroke-opacity 0.12s ease, stroke-width 0.12s ease; }
+        [data-event] { transition: opacity 0.12s ease; }
+        rect { transition: stroke-opacity 0.12s ease, stroke-width 0.12s ease, fill 0.12s ease; }
         #toolbar {
             position: absolute;
             bottom: 12px;

@@ -53,9 +53,9 @@ function textW(s: string, px: number, weight = 'normal'): number {
 const LABEL_PX      = 13;
 const ACTION_PX     = 11;
 const ACTION_LINE_H = 15;
-const ACTION_TOP    = 7;    // gap from divider to first action baseline
-const NODE_V_PAD    = 10;   // top/bottom padding inside plain state box
-const REGION_H      = 28;   // height of region title bar
+const ACTION_TOP    = 7;
+const NODE_V_PAD    = 10;
+const REGION_H      = 28;
 const MIN_W         = 110;
 
 function nw(label: string, entry: string[], exit: string[]): number {
@@ -210,7 +210,7 @@ async function render(): Promise<void> {
     svg.appendChild(viewport);
     container.appendChild(svg);
 
-    // Pass 1 — collect absolute geometry for all nodes
+    // ── Pass 1: absolute geometry for all nodes ───────────────────────────
     const collectGeom = (n: ElkNode, ox: number, oy: number) => {
         const ax = ox + (n.x ?? 0), ay = oy + (n.y ?? 0);
         if (n.id !== 'root') { geom.set(n.id, { x: ax, y: ay, w: n.width ?? 0, h: n.height ?? 0 }); }
@@ -218,12 +218,33 @@ async function render(): Promise<void> {
     };
     collectGeom(result, 0, 0);
 
-    // Leftmost node edge used to anchor backward arcs to a consistent column
     let leftBound = Infinity;
     for (const r of geom.values()) { leftBound = Math.min(leftBound, r.x); }
     const arcX = isFinite(leftBound) ? leftBound - 42 : -42;
 
-    // Pass 2 — draw nodes
+    // Per-node edge lists populated during edge drawing — closures in drawNode
+    // read these after edge drawing completes.
+    interface EdgeEntry { path: SVGElement; labelG: SVGElement | null }
+    const allEdges: EdgeEntry[] = [];
+    const nodeEdgeMap = new Map<string, EdgeEntry[]>();
+    function registerEdge(srcId: string, tgtId: string, entry: EdgeEntry) {
+        allEdges.push(entry);
+        for (const id of [srcId, tgtId]) {
+            const arr = nodeEdgeMap.get(id) ?? [];
+            arr.push(entry);
+            nodeEdgeMap.set(id, arr);
+        }
+    }
+
+    function resetEdgeStyles() {
+        for (const { path, labelG } of allEdges) {
+            path.setAttribute('stroke-opacity', '0.7');
+            path.setAttribute('stroke-width', '1.5');
+            if (labelG) { labelG.setAttribute('opacity', '1'); }
+        }
+    }
+
+    // ── Pass 2: draw nodes ────────────────────────────────────────────────
     const drawNode = (n: ElkNode, ox: number, oy: number) => {
         const ax = ox + (n.x ?? 0), ay = oy + (n.y ?? 0);
         if (n.id !== 'root') {
@@ -243,11 +264,12 @@ async function render(): Promise<void> {
                 g.appendChild(el('circle', { cx: ax + w/2, cy: ay + h/2, r: 6, fill: C.fg }));
                 gNodes.appendChild(g);
             } else if (isRegion) {
-                g.appendChild(el('rect', {
+                const regionRect = el('rect', {
                     x: ax, y: ay, width: w, height: h, rx: 14, ry: 14,
                     fill: C.nodeBg, 'fill-opacity': 0.5,
                     stroke: C.fg, 'stroke-width': 1.5, 'stroke-opacity': 0.6,
-                }));
+                });
+                g.appendChild(regionRect);
                 g.appendChild(el('line', {
                     x1: ax+1, y1: ay+REGION_H, x2: ax+w-1, y2: ay+REGION_H,
                     stroke: C.fg, 'stroke-width': 0.75, 'stroke-opacity': 0.35,
@@ -255,6 +277,26 @@ async function render(): Promise<void> {
                 g.appendChild(txt(d.label, ax+w/2, ay+REGION_H-9, {
                     'text-anchor': 'middle', 'font-size': 12, 'font-weight': 'bold',
                 }));
+                // Hover: highlight connected edges (closure reads nodeEdgeMap after fill)
+                g.addEventListener('mouseenter', () => {
+                    regionRect.setAttribute('stroke-width', '2');
+                    regionRect.setAttribute('stroke-opacity', '0.9');
+                    const mine = new Set(nodeEdgeMap.get(n.id) ?? []);
+                    for (const e of allEdges) {
+                        if (mine.has(e)) {
+                            e.path.setAttribute('stroke-opacity', '0.95');
+                            e.path.setAttribute('stroke-width', '2');
+                        } else {
+                            e.path.setAttribute('stroke-opacity', '0.1');
+                            if (e.labelG) { e.labelG.setAttribute('opacity', '0.15'); }
+                        }
+                    }
+                });
+                g.addEventListener('mouseleave', () => {
+                    regionRect.setAttribute('stroke-width', '1.5');
+                    regionRect.setAttribute('stroke-opacity', '0.6');
+                    resetEdgeStyles();
+                });
                 gBack.appendChild(g);
             } else {
                 const rect = el('rect', {
@@ -263,7 +305,6 @@ async function render(): Promise<void> {
                 });
                 nameToRect.set(d.name, rect);
                 g.appendChild(rect);
-
                 if (d.final) {
                     g.appendChild(el('rect', {
                         x: ax+4, y: ay+4, width: w-8, height: h-8,
@@ -271,11 +312,9 @@ async function render(): Promise<void> {
                         stroke: C.fg, 'stroke-width': 1, 'stroke-opacity': 0.5,
                     }));
                 }
-
                 const entry = d.entryActions ?? [];
                 const exit  = d.exitActions  ?? [];
                 const label = d.label + (isCollapsed && hasChildren ? ' ⊕' : '');
-
                 if (entry.length > 0 || exit.length > 0) {
                     const labelY = ay + NODE_V_PAD + LABEL_PX;
                     g.appendChild(txt(label, ax+w/2, labelY, {
@@ -300,6 +339,26 @@ async function render(): Promise<void> {
                         'text-anchor': 'middle', 'font-size': LABEL_PX, 'font-weight': '500',
                     }));
                 }
+                // Hover: highlight connected edges + thicken border
+                g.addEventListener('mouseenter', () => {
+                    rect.setAttribute('stroke-width', '2');
+                    rect.setAttribute('stroke-opacity', '1');
+                    const mine = new Set(nodeEdgeMap.get(n.id) ?? []);
+                    for (const e of allEdges) {
+                        if (mine.has(e)) {
+                            e.path.setAttribute('stroke-opacity', '0.95');
+                            e.path.setAttribute('stroke-width', '2');
+                        } else {
+                            e.path.setAttribute('stroke-opacity', '0.1');
+                            if (e.labelG) { e.labelG.setAttribute('opacity', '0.15'); }
+                        }
+                    }
+                });
+                g.addEventListener('mouseleave', () => {
+                    rect.setAttribute('stroke-width', '1.5');
+                    rect.setAttribute('stroke-opacity', '0.8');
+                    resetEdgeStyles();
+                });
                 gNodes.appendChild(g);
             }
         }
@@ -307,8 +366,8 @@ async function render(): Promise<void> {
     };
     drawNode(result, 0, 0);
 
-    // Pass 3 — draw edges as smooth bezier curves from node geometry
-    // Deduplicate after visibility transform, merging labels onto the same arc.
+    // ── Pass 3: compute edge bezier params ────────────────────────────────
+    // Deduplicate edges after visibility transform, merging labels.
     const visEdges = new Map<string, string>(); // "srcId tgtId" → merged label
     for (const e of payload.edges) {
         if (e.data.source.startsWith('start_')) { continue; }
@@ -319,6 +378,15 @@ async function render(): Promise<void> {
         visEdges.set(key, prev ? (lbl ? `${prev}\n${lbl}` : prev) : lbl);
     }
 
+    interface BezierEdge {
+        srcId: string; tgtId: string; label: string;
+        sx: number; sy: number; cp1x: number; cp1y: number;
+        cp2x: number; cp2y: number; ex: number; ey: number;
+        // Label geometry — resolved by push-apart
+        lmx: number; lmy: number; lw: number; lh: number; lines: string[];
+    }
+
+    const bezierEdges: BezierEdge[] = [];
     for (const [key, label] of visEdges.entries()) {
         const sp = key.indexOf(' ');
         const srcId = key.slice(0, sp), tgtId = key.slice(sp + 1);
@@ -335,14 +403,11 @@ async function render(): Promise<void> {
         let cp1x: number, cp1y: number, cp2x: number, cp2y: number;
 
         if (isBackward) {
-            // Upward (feedback) edge — route through a fixed column to the left
-            // of the diagram, capped so it doesn't extend far off-screen.
             sx = sg.x; sy = scy;
             ex = tg.x; ey = tcy;
             cp1x = arcX; cp1y = sy;
             cp2x = arcX; cp2y = ey;
         } else if (isLateral) {
-            // Same-layer nodes — horizontal S-curve between sides
             if (tcx >= scx) {
                 sx = sg.x + sg.w; sy = scy; ex = tg.x;        ey = tcy;
             } else {
@@ -352,7 +417,6 @@ async function render(): Promise<void> {
             cp1x = sx + (ex > sx ?  bend : -bend); cp1y = sy;
             cp2x = ex + (ex > sx ? -bend :  bend); cp2y = ey;
         } else {
-            // Forward (downward) — smooth S-curve, bottom-center → top-center
             sx = scx; sy = sg.y + sg.h;
             ex = tcx; ey = tg.y;
             const bend = Math.max(20, (ey - sy) * 0.45);
@@ -360,38 +424,86 @@ async function render(): Promise<void> {
             cp2x = ex; cp2y = ey - bend;
         }
 
-        gEdges.appendChild(el('path', {
-            d: `M ${sx} ${sy} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${ex} ${ey}`,
+        // Label midpoint at t=0.5 on the cubic bezier
+        const lmx = 0.125*sx + 0.375*cp1x + 0.375*cp2x + 0.125*ex;
+        const lmy = 0.125*sy + 0.375*cp1y + 0.375*cp2y + 0.125*ey;
+
+        const lines = label ? label.split('\n').filter(Boolean) : [];
+        const lw = lines.length ? Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 16 : 0;
+        const lh = lines.length ? lines.length * ACTION_LINE_H + 4 : 0;
+
+        bezierEdges.push({ srcId, tgtId, label, sx, sy, cp1x, cp1y, cp2x, cp2y, ex, ey, lmx, lmy, lw, lh, lines });
+    }
+
+    // ── Label overlap resolution: iterative push-apart ────────────────────
+    // Only label boxes participate; run up to 12 iterations.
+    const labelled = bezierEdges.filter(e => e.lines.length > 0);
+    for (let iter = 0; iter < 12; iter++) {
+        let moved = false;
+        for (let i = 0; i < labelled.length; i++) {
+            for (let j = i + 1; j < labelled.length; j++) {
+                const a = labelled[i], b = labelled[j];
+                const dx = b.lmx - a.lmx, dy = b.lmy - a.lmy;
+                const minSepX = (a.lw + b.lw) / 2 + 6;
+                const minSepY = (a.lh + b.lh) / 2 + 6;
+                if (Math.abs(dx) < minSepX && Math.abs(dy) < minSepY) {
+                    // Overlap: push apart along the axis with least separation
+                    const pushX = (minSepX - Math.abs(dx)) / 2 + 1;
+                    const pushY = (minSepY - Math.abs(dy)) / 2 + 1;
+                    const signX = dx >= 0 ? 1 : -1;
+                    const signY = dy >= 0 ? 1 : -1;
+                    if (pushX <= pushY) {
+                        a.lmx -= pushX * signX; b.lmx += pushX * signX;
+                    } else {
+                        a.lmy -= pushY * signY; b.lmy += pushY * signY;
+                    }
+                    moved = true;
+                }
+            }
+        }
+        if (!moved) { break; }
+    }
+
+    // ── Pass 4: draw edges and labels ─────────────────────────────────────
+    for (const e of bezierEdges) {
+        const path = el('path', {
+            d: `M ${e.sx} ${e.sy} C ${e.cp1x} ${e.cp1y} ${e.cp2x} ${e.cp2y} ${e.ex} ${e.ey}`,
             fill: 'none', stroke: C.fg,
             'stroke-width': 1.5, 'stroke-opacity': 0.7,
             'marker-end': 'url(#arr)',
-        }));
+        });
 
-        if (label) {
-            const lines = label.split('\n').filter(Boolean);
-            const maxW = Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 10;
-            const boxH = lines.length * ACTION_LINE_H + 2;
-            // Midpoint at t=0.5 on the cubic bezier
-            const mx = 0.125*sx + 0.375*cp1x + 0.375*cp2x + 0.125*ex;
-            const my = 0.125*sy + 0.375*cp1y + 0.375*cp2y + 0.125*ey;
-            const bx = mx - maxW/2 - 3, by = my - boxH/2 - 2;
-
-            const labelG = el('g', { 'data-event': label });
+        let labelG: SVGElement | null = null;
+        if (e.lines.length > 0) {
+            const bx = e.lmx - e.lw/2, by = e.lmy - e.lh/2 - 1;
+            labelG = el('g', { 'data-event': e.label });
             (labelG as SVGElement).style.cursor = 'pointer';
             labelG.appendChild(el('rect', {
-                x: bx, y: by, width: maxW + 6, height: boxH + 4,
+                x: bx - 2, y: by, width: e.lw + 4, height: e.lh + 2,
                 rx: 3, ry: 3, fill: C.bg, 'fill-opacity': 0.9,
             }));
-            for (let i = 0; i < lines.length; i++) {
-                labelG.appendChild(txt(lines[i], mx, by + (i+1)*ACTION_LINE_H - 3, {
+            for (let i = 0; i < e.lines.length; i++) {
+                labelG.appendChild(txt(e.lines[i], e.lmx, by + (i+1)*ACTION_LINE_H - 3, {
                     'text-anchor': 'middle', 'font-size': ACTION_PX, fill: C.desc,
                 }));
             }
+            // Edge hover: brighten this edge when its label is hovered
+            labelG.addEventListener('mouseenter', () => {
+                path.setAttribute('stroke-opacity', '0.95');
+                path.setAttribute('stroke-width', '2');
+            });
+            labelG.addEventListener('mouseleave', () => {
+                path.setAttribute('stroke-opacity', '0.7');
+                path.setAttribute('stroke-width', '1.5');
+            });
             gLabels.appendChild(labelG);
         }
+
+        gEdges.appendChild(path);
+        registerEdge(e.srcId, e.tgtId, { path, labelG });
     }
 
-    // Initial-state arrows: filled dot → first child, smooth bezier
+    // ── Initial-state arrows ──────────────────────────────────────────────
     for (const e of payload.edges) {
         if (!e.data.source.startsWith('start_')) { continue; }
         const sg = geom.get(e.data.source), tg = geom.get(e.data.target);
@@ -501,10 +613,9 @@ function exportPng(): void {
     )));
     const canvas = document.createElement('canvas');
     canvas.width = cw * 2; canvas.height = ch * 2;
-    const ctx = canvas.getContext('2d')!;
     const img = new Image();
     img.onload = () => {
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
         vscode.postMessage({ command: 'exportPng', data: canvas.toDataURL('image/png') });
     };
     img.src = url;
@@ -519,11 +630,11 @@ function zoomAround(factor: number) {
     scale = ns;
     applyTransform();
 }
-document.getElementById('btn-zoom-in')?.addEventListener('click',      () => zoomAround(1.25));
-document.getElementById('btn-zoom-out')?.addEventListener('click',     () => zoomAround(1/1.25));
-document.getElementById('btn-fit')?.addEventListener('click',          fitToScreen);
-document.getElementById('btn-export-svg')?.addEventListener('click',   exportSvg);
-document.getElementById('btn-export-png')?.addEventListener('click',   exportPng);
+document.getElementById('btn-zoom-in')?.addEventListener('click',    () => zoomAround(1.25));
+document.getElementById('btn-zoom-out')?.addEventListener('click',   () => zoomAround(1/1.25));
+document.getElementById('btn-fit')?.addEventListener('click',        fitToScreen);
+document.getElementById('btn-export-svg')?.addEventListener('click', exportSvg);
+document.getElementById('btn-export-png')?.addEventListener('click', exportPng);
 
 // ── Error display ─────────────────────────────────────────────────────────────
 function showError(err: unknown): void {
