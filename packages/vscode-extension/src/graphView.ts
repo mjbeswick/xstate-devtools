@@ -70,7 +70,7 @@ export class XStateGraphViewProvider {
         panel.webview.onDidReceiveMessage(message => {
             switch (message.command) {
                 case 'stateClicked': this.selectInTree(message.id, entry); return;
-                case 'eventClicked': this.simulateEvent(message.eventName); return;
+                case 'eventClicked': this.selectEventInTree(message.src, message.eventName, entry); return;
                 case 'exportSvg':   this.saveExport(message.data, 'svg', title); return;
                 case 'exportPng':   this.saveExport(message.data, 'png', title); return;
             }
@@ -91,10 +91,19 @@ export class XStateGraphViewProvider {
         for (const key of this.panels.keys()) { this.updatePanel(key); }
     }
 
-    private simulateEvent(eventName: string) {
-        vscode.window.showInformationMessage(
-            `Static simulation: Fired event '${eventName}'. Full simulation engine coming soon!`
-        );
+    // Event label clicked → select the matching transition node in the tree.
+    // `eventName` is the rendered Harel label (EVENT [guard] / actions); the
+    // transition node's own label is just the event, so match on that prefix.
+    private selectEventInTree(srcId: string | undefined, eventName: string, entry: PanelEntry) {
+        if (!srcId || !eventName) { return; }
+        const state = entry.nodeById.get(srcId);
+        if (!state) { return; }
+        const event = eventName.split(/\s*[[/]/)[0].trim();
+        const transitions = (state.children ?? []).filter(c => c.type === 'transition');
+        const match = transitions.find(t => t.label === eventName)
+            ?? transitions.find(t => t.label === event)
+            ?? transitions.find(t => (t.label ?? '').trim() === event);
+        if (match) { this.revealInTree?.(match); }
     }
 
     // Diagram node clicked → select the matching item in the tree outline.

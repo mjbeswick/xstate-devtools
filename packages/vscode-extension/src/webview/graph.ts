@@ -473,30 +473,35 @@ async function render(): Promise<void> {
 
     // ── Label overlap resolution ──────────────────────────────────────────
     // Many distinct edges can route between the same pair of collapsed nodes,
-    // so their label midpoints land in a tight cluster. The push-apart below
-    // separates them, but it stalls when boxes are perfectly co-located
-    // (dx≈dy≈0). Seed each cluster with a deterministic golden-angle spiral
-    // first so the iterative step has a direction to work with.
+    // so their label midpoints land in a tight cluster. Event labels are wide
+    // but short, so separating them vertically is far cheaper than horizontally
+    // (~17px vs ~120px). Seed co-located clusters as a centred vertical stack,
+    // then run an iterative push-apart, then a guaranteed greedy stack pass so
+    // no residual overlap can survive.
     const labelled = bezierEdges.filter(e => e.lines.length > 0);
 
     const clusters = new Map<string, BezierEdge[]>();
     for (const e of labelled) {
-        const key = `${Math.round(e.lmx / 12)},${Math.round(e.lmy / 12)}`;
+        const key = `${Math.round(e.lmx / 14)},${Math.round(e.lmy / 14)}`;
         const arr = clusters.get(key) ?? [];
         arr.push(e);
         clusters.set(key, arr);
     }
-    const GOLDEN = 2.399963229728653;
     for (const arr of clusters.values()) {
         if (arr.length < 2) { continue; }
+        // Stable order top-to-bottom by source y, then stack vertically centred.
+        arr.sort((p, q) => p.sy - q.sy);
+        const meanY = arr.reduce((s, e) => s + e.lmy, 0) / arr.length;
         arr.forEach((e, i) => {
-            const r = 8 + i * 3;
-            e.lmx += Math.cos(i * GOLDEN) * r;
-            e.lmy += Math.sin(i * GOLDEN) * r;
+            e.lmy = meanY + (i - (arr.length - 1) / 2) * (e.lh + 5);
         });
     }
 
-    for (let iter = 0; iter < 80; iter++) {
+    const overlaps = (a: BezierEdge, b: BezierEdge) =>
+        Math.abs(a.lmx - b.lmx) < (a.lw + b.lw) / 2 + 6 &&
+        Math.abs(a.lmy - b.lmy) < (a.lh + b.lh) / 2 + 4;
+
+    for (let iter = 0; iter < 160; iter++) {
         let moved = false;
         for (let i = 0; i < labelled.length; i++) {
             for (let j = i + 1; j < labelled.length; j++) {
@@ -505,22 +510,33 @@ async function render(): Promise<void> {
                 const minSepX = (a.lw + b.lw) / 2 + 6;
                 const minSepY = (a.lh + b.lh) / 2 + 4;
                 if (Math.abs(dx) < minSepX && Math.abs(dy) < minSepY) {
-                    // Break exact ties deterministically by index parity.
                     if (dx === 0 && dy === 0) { dx = (i % 2 ? 1 : -1) * 0.5; dy = 0.5; }
                     const pushX = (minSepX - Math.abs(dx)) / 2 + 1;
                     const pushY = (minSepY - Math.abs(dy)) / 2 + 1;
                     const signX = dx >= 0 ? 1 : -1;
                     const signY = dy >= 0 ? 1 : -1;
-                    if (pushX <= pushY) {
-                        a.lmx -= pushX * signX; b.lmx += pushX * signX;
-                    } else {
+                    // Prefer the cheaper (usually vertical) separation.
+                    if (pushY <= pushX) {
                         a.lmy -= pushY * signY; b.lmy += pushY * signY;
+                    } else {
+                        a.lmx -= pushX * signX; b.lmx += pushX * signX;
                     }
                     moved = true;
                 }
             }
         }
         if (!moved) { break; }
+    }
+
+    // Guaranteed final pass: place labels top-to-bottom; nudge any still-
+    // colliding box straight down until it clears everything already placed.
+    const placed: BezierEdge[] = [];
+    for (const e of [...labelled].sort((a, b) => a.lmy - b.lmy || a.lmx - b.lmx)) {
+        let guard = 0;
+        while (placed.some(p => overlaps(e, p)) && guard++ < 400) {
+            e.lmy += 4;
+        }
+        placed.push(e);
     }
 
     // ── Pass 4: draw edges and labels ─────────────────────────────────────
@@ -535,16 +551,20 @@ async function render(): Promise<void> {
         let labelG: SVGElement | null = null;
         if (e.lines.length > 0) {
             const bx = e.lmx - e.lw/2, by = e.lmy - e.lh/2 - 1;
-            labelG = el('g', { 'data-event': e.label });
+            labelG = el('g', { 'data-src': e.srcId });
             (labelG as SVGElement).style.cursor = 'pointer';
             labelG.appendChild(el('rect', {
                 x: bx - 2, y: by, width: e.lw + 4, height: e.lh + 2,
                 rx: 3, ry: 3, fill: C.bg, 'fill-opacity': 0.9,
             }));
             for (let i = 0; i < e.lines.length; i++) {
-                labelG.appendChild(txt(e.lines[i], e.lmx, by + (i+1)*ACTION_LINE_H - 3, {
+                // Each line is a distinct event → individually clickable so it
+                // can reveal that specific transition in the tree.
+                const lineEl = txt(e.lines[i], e.lmx, by + (i+1)*ACTION_LINE_H - 3, {
                     'text-anchor': 'middle', 'font-size': ACTION_PX, fill: C.desc,
-                }));
+                });
+                lineEl.setAttribute('data-event', e.lines[i]);
+                labelG.appendChild(lineEl);
             }
             // Edge hover: brighten this edge when its label is hovered
             labelG.addEventListener('mouseenter', () => {
@@ -585,9 +605,14 @@ let panMoved = false;
 container.addEventListener('click', (ev) => {
     if (panMoved) { return; }
     const target = ev.target as Element;
-    const labelG = target.closest('[data-event]');
-    if (labelG) {
-        vscode.postMessage({ command: 'eventClicked', eventName: labelG.getAttribute('data-event') });
+    const lineEl = target.closest('[data-event]');
+    if (lineEl) {
+        const grp = lineEl.closest('[data-src]');
+        vscode.postMessage({
+            command: 'eventClicked',
+            eventName: lineEl.getAttribute('data-event'),
+            src: grp?.getAttribute('data-src'),
+        });
         return;
     }
     const nodeG = target.closest('[data-id]');
