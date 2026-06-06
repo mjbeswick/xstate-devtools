@@ -277,15 +277,12 @@ async function render(): Promise<void> {
                 gNodes.appendChild(g);
             } else if (isRegion) {
                 const isParallel = !!d.parallel;
-                const parent = d.parent ? nodeById.get(d.parent) : undefined;
-                const inParallel = !!parent?.parallel;
+                // Regions are outline-only: translucent fills stack on deep
+                // nesting and turn muddy, so let the border + title bar define
+                // them. Parallel-ness reads from the dashed border + tag.
                 const regionRect = el('rect', {
                     x: ax, y: ay, width: w, height: h, rx: 14, ry: 14,
-                    // Orthogonal regions of a parallel state get a faint accent
-                    // tint so the concurrent regions read as a group.
-                    fill: inParallel ? C.accent : C.nodeBg,
-                    'fill-opacity': inParallel ? 0.08 : 0.5,
-                    // Parallel state: dark dashed border (UML orthogonal convention).
+                    fill: 'none',
                     stroke: C.fg,
                     'stroke-width': isParallel ? 1.6 : 1.5,
                     'stroke-opacity': isParallel ? 0.75 : 0.6,
@@ -330,12 +327,9 @@ async function render(): Promise<void> {
                 gBack.appendChild(g);
             } else {
                 const isParallel = !!d.parallel; // a collapsed parallel state
-                const parent = d.parent ? nodeById.get(d.parent) : undefined;
-                const inParallel = !!parent?.parallel;
                 const rect = el('rect', {
                     x: ax, y: ay, width: w, height: h, rx: 8, ry: 8,
-                    fill: inParallel ? C.accent : C.nodeBg,
-                    'fill-opacity': inParallel ? 0.08 : 1,
+                    fill: C.nodeBg, 'fill-opacity': 1,
                     stroke: C.fg,
                     'stroke-width': isParallel ? 1.6 : 1.5,
                     'stroke-opacity': isParallel ? 0.75 : 0.8,
