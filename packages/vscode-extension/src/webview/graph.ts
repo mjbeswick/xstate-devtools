@@ -161,7 +161,6 @@ function buildElkGraph(): ElkNode {
             'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
             'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
             'elk.layered.cycleBreaking.strategy': 'DEPTH_FIRST',
-            'elk.layered.mergeEdges': 'true',
             'elk.layered.unnecessaryBendpoints': 'true',
             'elk.edgeLabels.placement': 'CENTER',
             'elk.spacing.edgeLabel': '4',
@@ -212,6 +211,10 @@ async function render(): Promise<void> {
     svg.appendChild(viewport);
     container.appendChild(svg);
 
+    // Reserve vertical space above the ELK bounding box so that backward
+    // (feedback) arcs, which arc above the diagram, stay within the SVG.
+    const ARC_PAD = 70;
+
     // Nodes (absolute geometry).
     const geom = new Map<string, { x: number; y: number; w: number; h: number }>();
     const drawNode = (n: ElkNode, ox: number, oy: number) => {
@@ -247,13 +250,21 @@ async function render(): Promise<void> {
         }
         for (const c of n.children ?? []) { drawNode(c, ax, ay); }
     };
-    drawNode(result, 0, 0);
+    // Pass ARC_PAD as the initial y-offset so all nodes shift down, leaving
+    // room at the top for feedback arcs that arc above the diagram.
+    drawNode(result, 0, ARC_PAD);
 
     // Edges — ELK may place same-parent edges on their compound ancestor node
     // rather than the root (even with INCLUDE_CHILDREN).  Recurse through the
     // full result tree so we never miss them.  Coordinates in each ElkNode's
     // edges array are relative to that node, so we accumulate the absolute
     // offset as we descend (identical bookkeeping to drawNode above).
+    //
+    // Backward (feedback) edges: ELK's ORTHOGONAL routing for a right-to-left
+    // edge produces a rectangular U-shape that visually merges with the
+    // corresponding forward edge into a closed rectangle.  We detect feedback
+    // edges (endPoint.x significantly left of startPoint.x) and replace ELK's
+    // waypoints with a smooth cubic bezier arc that arcs above the diagram.
     const drawEdgesInNode = (n: ElkNode, ox: number, oy: number) => {
         const ax = ox + (n.x ?? 0), ay = oy + (n.y ?? 0);
         for (const e of n.edges ?? []) {
@@ -262,16 +273,41 @@ async function render(): Promise<void> {
             if (e.sources[0]?.startsWith('start_')) { continue; }
             const s = e.sections?.[0];
             if (!s) { continue; }
-            const pts = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint];
-            const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${ax + p.x} ${ay + p.y}`).join(' ');
+
+            const sx = ax + s.startPoint.x, sy = ay + s.startPoint.y;
+            const ex = ax + s.endPoint.x,   ey = ay + s.endPoint.y;
+
+            let d: string;
+            let lblCx: number, lblCy: number; // label centre
+            if (ex < sx - 20) {
+                // Feedback (backward) edge — ELK's ORTHOGONAL routing for these
+                // produces a rectangular U-shape that merges visually with the
+                // corresponding forward edge.  Replace with a smooth bezier arc
+                // that curves above the diagram (into the ARC_PAD space).
+                const midX = (sx + ex) / 2;
+                const arcH = Math.max(36, (sx - ex) * 0.32);
+                d = `M ${sx} ${sy} C ${midX} ${sy - arcH} ${midX} ${ey - arcH} ${ex} ${ey}`;
+                // Bezier midpoint at t=0.5 analytically
+                lblCx = midX;
+                lblCy = (sy + ey) / 2 - arcH * 0.75;
+            } else {
+                const pts = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint];
+                d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${ax + p.x} ${ay + p.y}`).join(' ');
+                lblCx = (sx + ex) / 2;
+                lblCy = (sy + ey) / 2;
+            }
             gEdges.appendChild(el('path', { d, fill: 'none', stroke: C.fg, 'stroke-width': 1.4, 'stroke-linejoin': 'round', 'marker-end': 'url(#arrow)' }));
 
             const lbl = e.labels?.[0];
             if (lbl && lbl.text) {
                 const lw = lbl.width ?? Math.ceil(textWidth(lbl.text, 11)) + 10;
                 const lh = lbl.height ?? 16;
-                const lx = ax + (lbl.x ?? (s.startPoint.x + s.endPoint.x) / 2 - lw / 2);
-                const ly = ay + (lbl.y ?? (s.startPoint.y + s.endPoint.y) / 2 - lh / 2);
+                // Use arc midpoint for feedback edges (ELK's label position is on
+                // the rectangular path we discarded); ELK's position for others.
+                const lx = ex < sx - 20 ? lblCx - lw / 2
+                    : ax + (lbl.x ?? s.startPoint.x + (s.endPoint.x - s.startPoint.x) / 2 - lw / 2);
+                const ly = ex < sx - 20 ? lblCy - lh / 2
+                    : ay + (lbl.y ?? s.startPoint.y + (s.endPoint.y - s.startPoint.y) / 2 - lh / 2);
                 const g = el('g', { 'data-event': lbl.text });
                 (g as SVGElement).style.cursor = 'pointer';
                 g.appendChild(el('rect', { x: lx - 3, y: ly - 1, width: lw + 6, height: lh + 2, rx: 4, ry: 4, fill: C.bg, 'fill-opacity': 0.9 }));
@@ -281,7 +317,8 @@ async function render(): Promise<void> {
         }
         for (const c of n.children ?? []) { drawEdgesInNode(c, ax, ay); }
     };
-    drawEdgesInNode(result, 0, 0);
+    // Same initial y-offset as drawNode so edge coordinates stay aligned.
+    drawEdgesInNode(result, 0, ARC_PAD);
 
     // Initial-state arrows: filled dot → initial substate, routed orthogonally
     // from the geometry ELK reserved for the start marker.
@@ -301,9 +338,12 @@ async function render(): Promise<void> {
 
     if (!didFit) {
         const cw = container.clientWidth || 800, ch = container.clientHeight || 600;
-        scale = Math.min(cw / W, ch / H, 1.5) * 0.94 || 1;
+        // Include ARC_PAD in height so the initial fit shows both the nodes
+        // (shifted down by ARC_PAD) and the backward arcs above them.
+        const totalH = H + ARC_PAD;
+        scale = Math.min(cw / W, ch / totalH, 1.5) * 0.94 || 1;
         tx = (cw - W * scale) / 2;
-        ty = (ch - H * scale) / 2;
+        ty = (ch - totalH * scale) / 2;
         didFit = true;
     }
     applyTransform();
