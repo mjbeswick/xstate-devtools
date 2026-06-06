@@ -59,8 +59,12 @@ const REGION_H      = 28;
 const MIN_W         = 110;
 
 function nw(label: string, entry: string[], exit: string[]): number {
-    const lines = [label, ...entry.map(a => `entry/ ${a}`), ...exit.map(a => `exit/ ${a}`)];
-    return Math.max(MIN_W, Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)) + 28)));
+    // Title is rendered at LABEL_PX (13) and centred; actions at ACTION_PX (11)
+    // and left-aligned. Measure each row at its real size + generous side pad.
+    const titleW = Math.ceil(textW(label, LABEL_PX, '500')) + 32;
+    const actionW = [...entry.map(a => `entry/ ${a}`), ...exit.map(a => `exit/ ${a}`)]
+        .map(l => Math.ceil(textW(l, ACTION_PX)) + 24);
+    return Math.max(MIN_W, titleW, ...actionW);
 }
 function nh(entry: string[], exit: string[]): number {
     const n = entry.length + exit.length;
@@ -95,9 +99,13 @@ function buildElkNode(id: string): ElkNode {
     const states = childStateIds(id);
     const isRegion = states.length > 0 && !collapsed.has(id);
     if (!isRegion) {
+        // Render appends a ' ⊕' affordance to collapsed parents — measure it
+        // too so the glyph never overflows the box border.
+        const isCollapsedParent = states.length > 0 && collapsed.has(id);
+        const display = d.label + (isCollapsedParent ? ' ⊕' : '');
         return {
             id,
-            width:  nw(d.label, d.entryActions ?? [], d.exitActions ?? []),
+            width:  nw(display, d.entryActions ?? [], d.exitActions ?? []),
             height: nh(d.entryActions ?? [], d.exitActions ?? []),
             labels: [{ text: d.label }],
         };
@@ -435,19 +443,42 @@ async function render(): Promise<void> {
         bezierEdges.push({ srcId, tgtId, label, sx, sy, cp1x, cp1y, cp2x, cp2y, ex, ey, lmx, lmy, lw, lh, lines });
     }
 
-    // ── Label overlap resolution: iterative push-apart ────────────────────
-    // Only label boxes participate; run up to 12 iterations.
+    // ── Label overlap resolution ──────────────────────────────────────────
+    // Many distinct edges can route between the same pair of collapsed nodes,
+    // so their label midpoints land in a tight cluster. The push-apart below
+    // separates them, but it stalls when boxes are perfectly co-located
+    // (dx≈dy≈0). Seed each cluster with a deterministic golden-angle spiral
+    // first so the iterative step has a direction to work with.
     const labelled = bezierEdges.filter(e => e.lines.length > 0);
-    for (let iter = 0; iter < 12; iter++) {
+
+    const clusters = new Map<string, BezierEdge[]>();
+    for (const e of labelled) {
+        const key = `${Math.round(e.lmx / 12)},${Math.round(e.lmy / 12)}`;
+        const arr = clusters.get(key) ?? [];
+        arr.push(e);
+        clusters.set(key, arr);
+    }
+    const GOLDEN = 2.399963229728653;
+    for (const arr of clusters.values()) {
+        if (arr.length < 2) { continue; }
+        arr.forEach((e, i) => {
+            const r = 8 + i * 3;
+            e.lmx += Math.cos(i * GOLDEN) * r;
+            e.lmy += Math.sin(i * GOLDEN) * r;
+        });
+    }
+
+    for (let iter = 0; iter < 80; iter++) {
         let moved = false;
         for (let i = 0; i < labelled.length; i++) {
             for (let j = i + 1; j < labelled.length; j++) {
                 const a = labelled[i], b = labelled[j];
-                const dx = b.lmx - a.lmx, dy = b.lmy - a.lmy;
+                let dx = b.lmx - a.lmx, dy = b.lmy - a.lmy;
                 const minSepX = (a.lw + b.lw) / 2 + 6;
-                const minSepY = (a.lh + b.lh) / 2 + 6;
+                const minSepY = (a.lh + b.lh) / 2 + 4;
                 if (Math.abs(dx) < minSepX && Math.abs(dy) < minSepY) {
-                    // Overlap: push apart along the axis with least separation
+                    // Break exact ties deterministically by index parity.
+                    if (dx === 0 && dy === 0) { dx = (i % 2 ? 1 : -1) * 0.5; dy = 0.5; }
                     const pushX = (minSepX - Math.abs(dx)) / 2 + 1;
                     const pushY = (minSepY - Math.abs(dy)) / 2 + 1;
                     const signX = dx >= 0 ? 1 : -1;
