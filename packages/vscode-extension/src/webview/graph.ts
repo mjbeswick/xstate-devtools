@@ -481,14 +481,21 @@ async function render(): Promise<void> {
             // two nodes and the diagram edge, so the loop stays short instead
             // of always sweeping the same way. Ties prefer the trailing side.
             kind = 'backward';
+            // Measure free space within the two nodes' common container (their
+            // shared parent region), not the whole diagram — sibling regions
+            // shouldn't drag the loop to the far side. Ties prefer left/top.
+            const pid = nodeById.get(srcId)?.parent;
+            const pr = pid ? geom.get(pid) : undefined;
             if (DOWN) {
-                const leftSpace  = Math.min(sg.x, tg.x);
-                const rightSpace = lastW - Math.max(sg.x + sg.w, tg.x + tg.w);
-                [sSide, tSide] = rightSpace >= leftSpace ? ['R', 'R'] : ['L', 'L'];
+                const lo = pr ? pr.x : 0, hi = pr ? pr.x + pr.w : lastW;
+                const leftSpace  = Math.min(sg.x, tg.x) - lo;
+                const rightSpace = hi - Math.max(sg.x + sg.w, tg.x + tg.w);
+                [sSide, tSide] = leftSpace >= rightSpace ? ['L', 'L'] : ['R', 'R'];
             } else {
-                const topSpace    = Math.min(sg.y, tg.y);
-                const bottomSpace = lastH - Math.max(sg.y + sg.h, tg.y + tg.h);
-                [sSide, tSide] = bottomSpace >= topSpace ? ['B', 'B'] : ['T', 'T'];
+                const lo = pr ? pr.y : 0, hi = pr ? pr.y + pr.h : lastH;
+                const topSpace    = Math.min(sg.y, tg.y) - lo;
+                const bottomSpace = hi - Math.max(sg.y + sg.h, tg.y + tg.h);
+                [sSide, tSide] = topSpace >= bottomSpace ? ['T', 'T'] : ['B', 'B'];
             }
         } else if (isLateral) {
             // Same layer → connect the facing cross sides.
@@ -547,6 +554,23 @@ async function render(): Promise<void> {
     distribute('src', s => s.sSide, s => s.sg, s => vert(s.sSide) ? cy(s.tg) : cx(s.tg));
     distribute('tgt', s => s.tSide, s => s.tg, s => vert(s.tSide) ? cy(s.sg) : cx(s.sg));
 
+    // Backward edges: pull both attachments into the gap between the nodes —
+    // source near its target-facing edge, target near its source-facing edge —
+    // so the loop is short and sits beside the gap instead of starting at a
+    // far node centre and sweeping across.
+    const GAPM = 10;
+    for (const s of specs) {
+        if (s.kind !== 'backward') { continue; }
+        const a = srcAt.get(s)!, b = tgtAt.get(s)!;
+        if (DOWN) {
+            a.x = s.sSide === 'L' ? s.sg.x : s.sg.x + s.sg.w; a.y = s.sg.y + GAPM;
+            b.x = s.tSide === 'L' ? s.tg.x : s.tg.x + s.tg.w; b.y = s.tg.y + s.tg.h - GAPM;
+        } else {
+            a.y = s.sSide === 'T' ? s.sg.y : s.sg.y + s.sg.h; a.x = s.sg.x + GAPM;
+            b.y = s.tSide === 'T' ? s.tg.y : s.tg.y + s.tg.h; b.x = s.tg.x + s.tg.w - GAPM;
+        }
+    }
+
     const bezierEdges: BezierEdge[] = [];
     // Control-point offset along the main axis. Clamped to ≤ half the span so
     // the two control points never cross — crossing produces a cusp/hook that
@@ -572,12 +596,11 @@ async function render(): Promise<void> {
 
         let bend: number;
         if (s.kind === 'backward') {
-            // Loop out on the cross side, proportional to how far apart the
-            // nodes are along the flow (small loop for neighbours, larger sweep
-            // for distant states).
-            const along    = Math.abs(mainC(s.sg) - mainC(s.tg));
-            const crossOff = Math.abs(crossC(s.sg) - crossC(s.tg));
-            bend = Math.min(150, Math.max(32, along * 0.45 + crossOff * 0.15));
+            // The attachments sit in the gap, so the loop only needs to reach
+            // out far enough to clear the node side — size it from the actual
+            // endpoint separation, with a small minimum.
+            const sep = Math.abs(ex - sx) + Math.abs(ey - sy);
+            bend = Math.min(120, Math.max(24, sep * 0.5));
         } else {
             // Clamp to half the span *along the normal axis* so the two control
             // points can never cross (which is what produced cusps/hooks).
