@@ -53,7 +53,7 @@ const SVGNS = 'http://www.w3.org/2000/svg';
 const vscode = acquireVsCodeApi();
 const payload: GraphPayload = (window as unknown as { __GRAPH__: GraphPayload }).__GRAPH__;
 const elk = new ELK();
-const DIRECTION = 'RIGHT';
+const DIRECTION = 'DOWN';
 
 // ── Theme ───────────────────────────────────────────────────────────────────
 const rootStyle = getComputedStyle(document.documentElement);
@@ -201,7 +201,7 @@ function text(content: string, x: number, y: number, attrs: Record<string, strin
     return t;
 }
 
-const ARC_PAD = 70; // vertical space reserved above ELK box for backward arcs
+const ARC_PAD = 70; // horizontal space reserved left of ELK box for backward arcs (DOWN layout)
 
 const container = document.getElementById('cy')!;
 const nameToRect = new Map<string, SVGElement>();
@@ -214,10 +214,10 @@ function applyTransform() { viewport.setAttribute('transform', `translate(${tx} 
 
 function fitToScreen() {
     const cw = container.clientWidth || 800, ch = container.clientHeight || 600;
-    const totalH = lastH + ARC_PAD;
-    scale = Math.min(cw / lastW, ch / totalH, 1.5) * 0.94 || 1;
-    tx = (cw - lastW * scale) / 2;
-    ty = (ch - totalH * scale) / 2;
+    const totalW = lastW + ARC_PAD;
+    scale = Math.min(cw / totalW, ch / lastH, 1.5) * 0.94 || 1;
+    tx = (cw - totalW * scale) / 2;
+    ty = (ch - lastH * scale) / 2;
     applyTransform();
 }
 
@@ -297,9 +297,8 @@ async function render(): Promise<void> {
         }
         for (const c of n.children ?? []) { drawNode(c, ax, ay); }
     };
-    // Pass ARC_PAD as the initial y-offset so all nodes shift down, leaving
-    // room at the top for feedback arcs that arc above the diagram.
-    drawNode(result, 0, ARC_PAD);
+    // Shift nodes right by ARC_PAD, leaving room on the left for backward arcs.
+    drawNode(result, ARC_PAD, 0);
 
     // Edges — ELK may place same-parent edges on their compound ancestor node
     // rather than the root (even with INCLUDE_CHILDREN).  Recurse through the
@@ -326,23 +325,23 @@ async function render(): Promise<void> {
 
             let d: string;
             let lblCx: number, lblCy: number; // label centre
-            if (ex < sx - 20) {
-                // Feedback (backward) edge — ELK's ORTHOGONAL routing produces
-                // a rectangular U-shape; replace with a bezier arc above the
-                // diagram.  Use node geometry so the arc joins state borders
-                // precisely: exit source LEFT-center, enter target RIGHT-center.
+            if (ey < sy - 20) {
+                // Feedback (backward) edge in DOWN layout — ELK's ORTHOGONAL
+                // routing produces a rectangular U-shape.  Replace with a cubic
+                // bezier arc that goes LEFT of the diagram.  Use node geometry
+                // so the arc joins state borders precisely: exit left-center of
+                // source, enter left-center of target.
                 const srcG = geom.get(e.sources[0]);
                 const tgtG = geom.get(e.targets[0]);
                 const arcSx = srcG ? srcG.x           : sx;
                 const arcSy = srcG ? srcG.y + srcG.h / 2 : sy;
-                const arcEx = tgtG ? tgtG.x + tgtG.w  : ex;
+                const arcEx = tgtG ? tgtG.x           : ex;
                 const arcEy = tgtG ? tgtG.y + tgtG.h / 2 : ey;
-                const arcH = Math.max(40, Math.abs(arcSx - arcEx) * 0.32);
-                // Cubic bezier: depart straight up from source, arrive straight
-                // down at target — gives consistent arrowhead direction.
-                d = `M ${arcSx} ${arcSy} C ${arcSx} ${arcSy - arcH} ${arcEx} ${arcEy - arcH} ${arcEx} ${arcEy}`;
-                lblCx = (arcSx + arcEx) / 2;
-                lblCy = (arcSy + arcEy) / 2 - arcH * 0.75;
+                const arcW = Math.max(40, Math.abs(arcSy - arcEy) * 0.32);
+                // Depart horizontally left from source, arrive horizontally at target.
+                d = `M ${arcSx} ${arcSy} C ${arcSx - arcW} ${arcSy} ${arcEx - arcW} ${arcEy} ${arcEx} ${arcEy}`;
+                lblCx = (arcSx + arcEx) / 2 - arcW * 0.75;
+                lblCy = (arcSy + arcEy) / 2;
             } else {
                 const pts = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint];
                 d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${ax + p.x} ${ay + p.y}`).join(' ');
@@ -357,9 +356,9 @@ async function render(): Promise<void> {
                 const lh = lbl.height ?? 16;
                 // Use arc midpoint for feedback edges (ELK's label position is on
                 // the rectangular path we discarded); ELK's position for others.
-                const lx = ex < sx - 20 ? lblCx - lw / 2
+                const lx = ey < sy - 20 ? lblCx - lw / 2
                     : ax + (lbl.x ?? s.startPoint.x + (s.endPoint.x - s.startPoint.x) / 2 - lw / 2);
-                const ly = ex < sx - 20 ? lblCy - lh / 2
+                const ly = ey < sy - 20 ? lblCy - lh / 2
                     : ay + (lbl.y ?? s.startPoint.y + (s.endPoint.y - s.startPoint.y) / 2 - lh / 2);
                 const g = el('g', { 'data-event': lbl.text });
                 (g as SVGElement).style.cursor = 'pointer';
@@ -370,8 +369,8 @@ async function render(): Promise<void> {
         }
         for (const c of n.children ?? []) { drawEdgesInNode(c, ax, ay); }
     };
-    // Same initial y-offset as drawNode so edge coordinates stay aligned.
-    drawEdgesInNode(result, 0, ARC_PAD);
+    // Same initial x-offset as drawNode so edge coordinates stay aligned.
+    drawEdgesInNode(result, ARC_PAD, 0);
 
     // Initial-state arrows: filled dot → initial substate, routed orthogonally
     // from the geometry ELK reserved for the start marker.
@@ -380,12 +379,13 @@ async function render(): Promise<void> {
         const sg = geom.get(e.data.source);
         const tg = geom.get(e.data.target);
         if (!sg || !tg) { continue; }
-        const sx = sg.x + sg.w / 2, sy = sg.y + sg.h / 2;
-        const tx2 = tg.x, ty2 = tg.y + tg.h / 2;
-        const midX = (sx + tx2) / 2;
-        const d = Math.abs(sy - ty2) < 1
+        // DOWN layout: start dot bottom-center → target top-center.
+        const sx = sg.x + sg.w / 2, sy = sg.y + sg.h;
+        const tx2 = tg.x + tg.w / 2, ty2 = tg.y;
+        const midY = (sy + ty2) / 2;
+        const d = Math.abs(sx - tx2) < 1
             ? `M ${sx} ${sy} L ${tx2} ${ty2}`
-            : `M ${sx} ${sy} L ${midX} ${sy} L ${midX} ${ty2} L ${tx2} ${ty2}`;
+            : `M ${sx} ${sy} L ${sx} ${midY} L ${tx2} ${midY} L ${tx2} ${ty2}`;
         gEdges.appendChild(el('path', { d, fill: 'none', stroke: C.fg, 'stroke-width': 1.4, 'stroke-linejoin': 'round', 'marker-end': 'url(#arrow)' }));
     }
 
