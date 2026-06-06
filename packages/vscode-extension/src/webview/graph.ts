@@ -245,10 +245,6 @@ async function render(): Promise<void> {
     };
     collectGeom(result, 0, 0);
 
-    let leftBound = Infinity;
-    for (const r of geom.values()) { leftBound = Math.min(leftBound, r.x); }
-    const arcX = isFinite(leftBound) ? leftBound - 42 : -42;
-
     // Per-node edge lists populated during edge drawing — closures in drawNode
     // read these after edge drawing completes.
     interface EdgeEntry { path: SVGElement; labelG: SVGElement | null }
@@ -440,7 +436,16 @@ async function render(): Promise<void> {
         lmx: number; lmy: number; lw: number; lh: number; lines: string[];
     }
 
-    const bezierEdges: BezierEdge[] = [];
+    // Classify each edge and record which border side it attaches to at each
+    // end, so multiple edges sharing a node spread across that border instead
+    // of stacking on its centre.
+    type Side = 'T' | 'B' | 'L' | 'R';
+    interface Spec {
+        srcId: string; tgtId: string; label: string; lines: string[]; lw: number; lh: number;
+        kind: 'backward' | 'lateralR' | 'lateralL' | 'forward';
+        sg: Rect; tg: Rect; sSide: Side; tSide: Side;
+    }
+    const specs: Spec[] = [];
     for (const [key, label] of visEdges.entries()) {
         const sp = key.indexOf(' ');
         const srcId = key.slice(0, sp), tgtId = key.slice(sp + 1);
@@ -449,44 +454,95 @@ async function render(): Promise<void> {
 
         const scx = sg.x + sg.w/2, scy = sg.y + sg.h/2;
         const tcx = tg.x + tg.w/2, tcy = tg.y + tg.h/2;
-
         const isBackward = tcy < scy - 10;
         const isLateral  = !isBackward && Math.abs(tcy - scy) < Math.max(sg.h, tg.h) * 0.8;
 
-        let sx: number, sy: number, ex: number, ey: number;
+        let kind: Spec['kind'], sSide: Side, tSide: Side;
+        if (isBackward)            { kind = 'backward'; sSide = 'L'; tSide = 'L'; }
+        else if (isLateral && tcx >= scx) { kind = 'lateralR'; sSide = 'R'; tSide = 'L'; }
+        else if (isLateral)        { kind = 'lateralL'; sSide = 'L'; tSide = 'R'; }
+        else                       { kind = 'forward'; sSide = 'B'; tSide = 'T'; }
+
+        const lines = label ? label.split('\n').filter(Boolean) : [];
+        const lw = lines.length ? Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 16 : 0;
+        const lh = lines.length ? lines.length * ACTION_LINE_H + 4 : 0;
+        specs.push({ srcId, tgtId, label, lines, lw, lh, kind, sg, tg, sSide, tSide });
+    }
+
+    // Distribute attachment points: group every endpoint by (node, side), order
+    // them by the opposite end's cross-axis position (fewest crossings), then
+    // spread them evenly along that border.
+    const srcAt = new Map<Spec, { x: number; y: number }>();
+    const tgtAt = new Map<Spec, { x: number; y: number }>();
+    const vert = (s: Side) => s === 'L' || s === 'R';
+    const distribute = (
+        which: 'src' | 'tgt',
+        sideOf: (s: Spec) => Side,
+        rectOf: (s: Spec) => Rect,
+        order: (s: Spec) => number,
+    ) => {
+        const groups = new Map<string, Spec[]>();
+        for (const s of specs) {
+            const k = `${which === 'src' ? s.srcId : s.tgtId}:${sideOf(s)}`;
+            (groups.get(k) ?? groups.set(k, []).get(k)!).push(s);
+        }
+        for (const arr of groups.values()) {
+            arr.sort((a, b) => order(a) - order(b));
+            const n = arr.length;
+            arr.forEach((s, i) => {
+                const r = rectOf(s), side = sideOf(s), f = (i + 1) / (n + 1);
+                let x: number, y: number;
+                if (vert(side)) {
+                    const m = Math.min(12, r.h * 0.3);
+                    y = r.y + m + f * (r.h - 2 * m);
+                    x = side === 'L' ? r.x : r.x + r.w;
+                } else {
+                    const m = Math.min(16, r.w * 0.3);
+                    x = r.x + m + f * (r.w - 2 * m);
+                    y = side === 'T' ? r.y : r.y + r.h;
+                }
+                (which === 'src' ? srcAt : tgtAt).set(s, { x, y });
+            });
+        }
+    };
+    const cx = (r: Rect) => r.x + r.w / 2, cy = (r: Rect) => r.y + r.h / 2;
+    distribute('src', s => s.sSide, s => s.sg, s => vert(s.sSide) ? cy(s.tg) : cx(s.tg));
+    distribute('tgt', s => s.tSide, s => s.tg, s => vert(s.tSide) ? cy(s.sg) : cx(s.sg));
+
+    const bezierEdges: BezierEdge[] = [];
+    for (const s of specs) {
+        const a = srcAt.get(s)!, b = tgtAt.get(s)!;
+        const sx = a.x, sy = a.y, ex = b.x, ey = b.y;
         let cp1x: number, cp1y: number, cp2x: number, cp2y: number;
 
-        if (isBackward) {
-            sx = sg.x; sy = scy;
-            ex = tg.x; ey = tcy;
-            cp1x = arcX; cp1y = sy;
-            cp2x = arcX; cp2y = ey;
-        } else if (isLateral) {
-            if (tcx >= scx) {
-                sx = sg.x + sg.w; sy = scy; ex = tg.x;        ey = tcy;
-            } else {
-                sx = sg.x;        sy = scy; ex = tg.x + tg.w; ey = tcy;
-            }
-            const bend = Math.abs(sx - ex) * 0.35;
-            cp1x = sx + (ex > sx ?  bend : -bend); cp1y = sy;
-            cp2x = ex + (ex > sx ? -bend :  bend); cp2y = ey;
+        if (s.kind === 'backward') {
+            // Loop out to the LEFT, but only as far as the two nodes warrant —
+            // adjacent states get a small loop, distant ones a larger sweep.
+            const leftX = Math.min(s.sg.x, s.tg.x);
+            const bulge = Math.min(150, Math.max(32,
+                Math.abs(sy - ey) * 0.45 + Math.abs(s.sg.x - s.tg.x) * 0.15));
+            cp1x = leftX - bulge; cp1y = sy;
+            cp2x = leftX - bulge; cp2y = ey;
+        } else if (s.kind === 'lateralR') {
+            const bend = Math.max(20, Math.abs(ex - sx) * 0.4);
+            cp1x = sx + bend; cp1y = sy; cp2x = ex - bend; cp2y = ey;
+        } else if (s.kind === 'lateralL') {
+            const bend = Math.max(20, Math.abs(ex - sx) * 0.4);
+            cp1x = sx - bend; cp1y = sy; cp2x = ex + bend; cp2y = ey;
         } else {
-            sx = scx; sy = sg.y + sg.h;
-            ex = tcx; ey = tg.y;
             const bend = Math.max(20, (ey - sy) * 0.45);
-            cp1x = sx; cp1y = sy + bend;
-            cp2x = ex; cp2y = ey - bend;
+            cp1x = sx; cp1y = sy + bend; cp2x = ex; cp2y = ey - bend;
         }
 
         // Label midpoint at t=0.5 on the cubic bezier
         const lmx = 0.125*sx + 0.375*cp1x + 0.375*cp2x + 0.125*ex;
         const lmy = 0.125*sy + 0.375*cp1y + 0.375*cp2y + 0.125*ey;
 
-        const lines = label ? label.split('\n').filter(Boolean) : [];
-        const lw = lines.length ? Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 16 : 0;
-        const lh = lines.length ? lines.length * ACTION_LINE_H + 4 : 0;
-
-        bezierEdges.push({ srcId, tgtId, label, sx, sy, cp1x, cp1y, cp2x, cp2y, ex, ey, lmx, lmy, lw, lh, lines });
+        bezierEdges.push({
+            srcId: s.srcId, tgtId: s.tgtId, label: s.label,
+            sx, sy, cp1x, cp1y, cp2x, cp2y, ex, ey,
+            lmx, lmy, lw: s.lw, lh: s.lh, lines: s.lines,
+        });
     }
 
     // ── Label overlap resolution ──────────────────────────────────────────
