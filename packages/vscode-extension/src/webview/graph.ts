@@ -494,6 +494,15 @@ async function render(): Promise<void> {
     distribute('tgt', s => s.tSide, s => s.tg, s => vert(s.tSide) ? cy(s.sg) : cx(s.sg));
 
     const bezierEdges: BezierEdge[] = [];
+    // Control-point offset along the main axis. Clamped to ≤ half the span so
+    // the two control points never cross — crossing produces a cusp/hook that
+    // renders as a kinked arrowhead. Degenerate (tiny/negative) spans collapse
+    // to a near-straight line.
+    const lerpBend = (span: number) => {
+        const d = Math.max(0, span);
+        return Math.min(d * 0.5, Math.max(14, d * 0.4));
+    };
+
     for (const s of specs) {
         const a = srcAt.get(s)!, b = tgtAt.get(s)!;
         const sx = a.x, sy = a.y, ex = b.x, ey = b.y;
@@ -508,13 +517,13 @@ async function render(): Promise<void> {
             cp1x = leftX - bulge; cp1y = sy;
             cp2x = leftX - bulge; cp2y = ey;
         } else if (s.kind === 'lateralR') {
-            const bend = Math.max(20, Math.abs(ex - sx) * 0.4);
+            const bend = lerpBend(Math.abs(ex - sx));
             cp1x = sx + bend; cp1y = sy; cp2x = ex - bend; cp2y = ey;
         } else if (s.kind === 'lateralL') {
-            const bend = Math.max(20, Math.abs(ex - sx) * 0.4);
+            const bend = lerpBend(Math.abs(ex - sx));
             cp1x = sx - bend; cp1y = sy; cp2x = ex + bend; cp2y = ey;
         } else {
-            const bend = Math.max(20, (ey - sy) * 0.45);
+            const bend = lerpBend(ey - sy);
             cp1x = sx; cp1y = sy + bend; cp2x = ex; cp2y = ey - bend;
         }
 
@@ -689,7 +698,7 @@ async function render(): Promise<void> {
         if (!sg || !tg) { continue; }
         const sx = sg.x + sg.w/2, sy = sg.y + sg.h;
         const ex = tg.x + tg.w/2, ey = tg.y;
-        const bend = Math.max(15, (ey - sy) * 0.45);
+        const bend = lerpBend(ey - sy);
         gEdges.appendChild(el('path', {
             d: `M ${sx} ${sy} C ${sx} ${sy+bend} ${ex} ${ey-bend} ${ex} ${ey}`,
             fill: 'none', stroke: C.fg, 'stroke-width': 1.5, 'marker-end': 'url(#arr)',
