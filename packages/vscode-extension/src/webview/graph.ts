@@ -137,7 +137,7 @@ function buildElkGraph(): ElkNode {
         if (seen.has(key)) { continue; }
         seen.add(key);
         edges.push({
-            id: e.id,
+            id: e.data.id,
             sources: [s],
             targets: [t],
             labels: e.data.label ? [{ text: e.data.label, width: Math.ceil(textWidth(e.data.label, 11)) + 10, height: 16 }] : [],
@@ -294,7 +294,7 @@ container.addEventListener('click', (ev) => {
     if (kind === 'start') { return; }
     if (kind === 'region' || collapsed.has(id)) {
         if (collapsed.has(id)) { collapsed.delete(id); } else { collapsed.add(id); }
-        void render();
+        render().catch(showError);
         return;
     }
     vscode.postMessage({ command: 'stateClicked', id });
@@ -340,4 +340,14 @@ window.addEventListener('message', (event: MessageEvent) => {
     }
 });
 
-void render();
+function showError(err: unknown): void {
+    const msg = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err);
+    container.replaceChildren();
+    const pre = document.createElement('pre');
+    pre.textContent = `Failed to render statechart:\n\n${msg}`;
+    pre.style.cssText = 'padding:16px;color:var(--vscode-errorForeground);white-space:pre-wrap;font-family:var(--vscode-editor-font-family);font-size:12px;';
+    container.appendChild(pre);
+    console.error('[xstate graph]', err);
+}
+
+render().catch(showError);
