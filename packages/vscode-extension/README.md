@@ -39,7 +39,11 @@
 
 ## Reading the diagram
 
+![A parallel checkout machine rendered as a statechart, with two concurrent regions, entry/exit actions, guarded transitions, and final states](https://github.com/mjbeswick/xstate-devtools/raw/main/packages/vscode-extension/images/checkout.png)
+
 The diagrams **intentionally follow [Harel statechart](https://en.wikipedia.org/wiki/State_diagram#Harel_statechart) conventions** — the same notation XState itself is based on. Initial-state arrows, nested regions, dashed boundaries for parallel (orthogonal) states, and `EVENT [guard] / action` transition labels are all standard Harel/SCXML notation, so the diagrams read the way a statechart is meant to.
+
+The example above shows a parallel `checkout` machine: the dashed outer box with the `parallel` tag runs its two regions — `payment` and `fulfilment` — concurrently, each with its own initial state (the filled dot), entry/exit actions inside the boxes, guarded transitions like `ADDRESS_VALID [inDeliveryZone]`, and final states (double outline).
 
 | You'll see | Meaning |
 | --- | --- |
