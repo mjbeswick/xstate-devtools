@@ -148,7 +148,9 @@ export class XStateGraphViewProvider {
             const name = sanitize(n.label);
             nameToId.set(name, id);
 
-            const childStates = (n.children ?? []).filter(c => c.type === 'state');
+            // Exclude the synthetic `type: …` marker — the graph shows
+            // parallel-ness via the state's own styling, not a child node.
+            const childStates = (n.children ?? []).filter(c => c.type === 'state' && !c.isTypeMarker);
             const entryActions = (n.children ?? []).filter(c => c.type === 'entry').map(c => c.label);
             const exitActions  = (n.children ?? []).filter(c => c.type === 'exit').map(c => c.label);
             nodes.push({
@@ -158,6 +160,7 @@ export class XStateGraphViewProvider {
                     compound: childStates.length > 0,
                     initial: !!n.isInitial,
                     final: !!n.isFinal,
+                    parallel: !!n.isParallel,
                     entryActions,
                     exitActions,
                 },
@@ -181,7 +184,7 @@ export class XStateGraphViewProvider {
         const isSubDiagram = machine.type === 'state';
         const rootStates = isSubDiagram
             ? [machine]
-            : (machine.children ?? []).filter(c => c.type === 'state');
+            : (machine.children ?? []).filter(c => c.type === 'state' && !c.isTypeMarker);
         for (const r of rootStates) { collect(r, undefined, isSubDiagram); }
 
         // Edges: merge transitions between the same source→target pair so multiple
@@ -311,7 +314,7 @@ interface GraphNode {
     data: {
         id: string; label: string; name: string;
         parent?: string; compound?: boolean;
-        initial?: boolean; final?: boolean; start?: boolean;
+        initial?: boolean; final?: boolean; start?: boolean; parallel?: boolean;
         entryActions?: string[]; exitActions?: string[];
     };
 }

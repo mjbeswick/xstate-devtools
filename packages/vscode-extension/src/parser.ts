@@ -17,6 +17,8 @@ export interface MachineNode {
     isStateConfig?: boolean; // Flag for createStateConfig/stateConfig patterns
     isInitial?: boolean; // Flag for initial state
     isFinal?: boolean; // Flag for final state
+    isParallel?: boolean; // Flag for parallel (orthogonal) state
+    isTypeMarker?: boolean; // Synthetic `type: …` child — shown in the tree, hidden in the graph
     description?: string; // XState `description` property, shown on hover
 }
 
@@ -391,14 +393,18 @@ export class XStateMachineParser {
         // Parse type (final, parallel, etc)
         const typeProp = this.findProperty(config, 'type');
         const isFinal = typeProp && ts.isStringLiteral(typeProp) && typeProp.text === 'final';
-        
+        const isParallel = !!(typeProp && ts.isStringLiteral(typeProp) && typeProp.text === 'parallel');
+
         if (typeProp && ts.isStringLiteral(typeProp) && typeProp.text !== 'final') {
-            // Show non-final types as children
+            // Surface the type in the tree outline as a child marker. It is
+            // flagged so the visual graph can exclude it (the graph conveys
+            // `parallel` via the state's own styling instead of a child node).
             children.unshift({
                 type: 'state',
                 label: `type: ${typeProp.text}`,
                 range: this.nodeToRange(typeProp, document),
-                uri: document.uri
+                uri: document.uri,
+                isTypeMarker: true
             });
         }
 
@@ -414,6 +420,7 @@ export class XStateMachineParser {
             children: children.length > 0 ? children : undefined,
             isInitial,
             isFinal: isFinal || undefined,
+            isParallel: isParallel || undefined,
             description: this.extractDescription(config)
         };
     }

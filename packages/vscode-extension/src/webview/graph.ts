@@ -6,7 +6,7 @@ declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 
 interface NodeData {
     id: string; label: string; name: string;
-    parent?: string; initial?: boolean; final?: boolean; start?: boolean;
+    parent?: string; initial?: boolean; final?: boolean; start?: boolean; parallel?: boolean;
     entryActions?: string[]; exitActions?: string[];
 }
 interface GraphPayload {
@@ -40,6 +40,7 @@ const C = {
     focus:  themeVar('--vscode-focusBorder',                    '#0090f1'),
     selBg:  themeVar('--vscode-list-activeSelectionBackground', '#cce5ff'),
     desc:   themeVar('--vscode-descriptionForeground',          '#717171'),
+    accent: themeVar('--vscode-charts-purple',                  '#9b59b6'),
 };
 const fontFamily = themeVar('--vscode-font-family', 'system-ui, sans-serif');
 
@@ -272,19 +273,36 @@ async function render(): Promise<void> {
                 g.appendChild(el('circle', { cx: ax + w/2, cy: ay + h/2, r: 6, fill: C.fg }));
                 gNodes.appendChild(g);
             } else if (isRegion) {
+                const isParallel = !!d.parallel;
+                const parent = d.parent ? nodeById.get(d.parent) : undefined;
+                const inParallel = !!parent?.parallel;
                 const regionRect = el('rect', {
                     x: ax, y: ay, width: w, height: h, rx: 14, ry: 14,
-                    fill: C.nodeBg, 'fill-opacity': 0.5,
-                    stroke: C.fg, 'stroke-width': 1.5, 'stroke-opacity': 0.6,
+                    // Orthogonal regions of a parallel state get a faint accent
+                    // tint so the concurrent regions read as a group.
+                    fill: inParallel ? C.accent : C.nodeBg,
+                    'fill-opacity': inParallel ? 0.08 : 0.5,
+                    stroke: isParallel ? C.accent : C.fg,
+                    'stroke-width': isParallel ? 1.8 : 1.5,
+                    'stroke-opacity': isParallel ? 0.85 : 0.6,
+                    // Parallel state: dashed border (UML orthogonal convention).
+                    ...(isParallel ? { 'stroke-dasharray': '7 4' } : {}),
                 });
                 g.appendChild(regionRect);
                 g.appendChild(el('line', {
                     x1: ax+1, y1: ay+REGION_H, x2: ax+w-1, y2: ay+REGION_H,
-                    stroke: C.fg, 'stroke-width': 0.75, 'stroke-opacity': 0.35,
+                    stroke: isParallel ? C.accent : C.fg,
+                    'stroke-width': 0.75, 'stroke-opacity': isParallel ? 0.5 : 0.35,
                 }));
                 g.appendChild(txt(d.label, ax+w/2, ay+REGION_H-9, {
                     'text-anchor': 'middle', 'font-size': 12, 'font-weight': 'bold',
                 }));
+                if (isParallel) {
+                    // "∥ parallel" marker, right-aligned in the title bar.
+                    g.appendChild(txt('∥ parallel', ax+w-8, ay+REGION_H-9, {
+                        'text-anchor': 'end', 'font-size': 10, fill: C.accent, 'font-weight': 'bold',
+                    }));
+                }
                 // Hover: highlight connected edges (closure reads nodeEdgeMap after fill)
                 g.addEventListener('mouseenter', () => {
                     regionRect.setAttribute('stroke-width', '2');
@@ -300,16 +318,26 @@ async function render(): Promise<void> {
                         }
                     }
                 });
+                const restW = isParallel ? '1.8' : '1.5';
+                const restO = isParallel ? '0.85' : '0.6';
                 g.addEventListener('mouseleave', () => {
-                    regionRect.setAttribute('stroke-width', '1.5');
-                    regionRect.setAttribute('stroke-opacity', '0.6');
+                    regionRect.setAttribute('stroke-width', restW);
+                    regionRect.setAttribute('stroke-opacity', restO);
                     resetEdgeStyles();
                 });
                 gBack.appendChild(g);
             } else {
+                const isParallel = !!d.parallel; // a collapsed parallel state
+                const parent = d.parent ? nodeById.get(d.parent) : undefined;
+                const inParallel = !!parent?.parallel;
                 const rect = el('rect', {
                     x: ax, y: ay, width: w, height: h, rx: 8, ry: 8,
-                    fill: C.nodeBg, stroke: C.fg, 'stroke-width': 1.5, 'stroke-opacity': 0.8,
+                    fill: inParallel ? C.accent : C.nodeBg,
+                    'fill-opacity': inParallel ? 0.08 : 1,
+                    stroke: isParallel ? C.accent : C.fg,
+                    'stroke-width': isParallel ? 1.8 : 1.5,
+                    'stroke-opacity': isParallel ? 0.85 : 0.8,
+                    ...(isParallel ? { 'stroke-dasharray': '7 4' } : {}),
                 });
                 nameToRect.set(d.name, rect);
                 g.appendChild(rect);
