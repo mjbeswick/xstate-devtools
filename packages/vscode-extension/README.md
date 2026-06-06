@@ -136,6 +136,17 @@ const machine = setup({
 - Tree editing focuses on common object/string forms; advanced shapes may still need manual source edits
 - In a focused sub-diagram, transitions whose target lies outside the selected subtree are not drawn
 
+## Credits & acknowledgements
+
+This extension exists because of [**XState**](https://github.com/statelyai/xstate) and the team at [**Stately**](https://stately.ai). XState is a wonderful, rigorous library — it brings real statecharts to JavaScript and TypeScript, with first-class support for hierarchy, parallel regions, guards, actors, and more, all grounded in decades-old, battle-tested theory. It makes complex application logic predictable, testable, and a genuine pleasure to work with.
+
+xState Devtools is an **independent, community project** and is not affiliated with or endorsed by Stately. All credit for XState, the statechart model, and the broader ecosystem belongs to Stately and the XState contributors. If you build state machines, do yourself a favor and explore the official tooling too:
+
+- 🌐 [Stately](https://stately.ai) — the company and platform behind XState
+- 📚 [XState documentation](https://stately.ai/docs)
+- 🎨 [Stately Studio — visual statechart editor](https://stately.ai/editor)
+- 💻 [XState on GitHub](https://github.com/statelyai/xstate)
+
 ## Links
 
 - [Report an issue](https://github.com/mjbeswick/xstate-devtools/issues)
@@ -143,4 +154,4 @@ const machine = setup({
 
 ## License
 
-MIT
+MIT — and with gratitude to [Stately](https://stately.ai) and the XState community.
