@@ -29,7 +29,9 @@ const elk = new ELK();
 
 // Layout flow direction, toggled from the toolbar. 'DOWN' = top-to-bottom,
 // 'RIGHT' = left-to-right. Edge routing adapts via per-side outward normals.
-let direction: 'DOWN' | 'RIGHT' = 'DOWN';
+// Initialised from the host (persisted per panel, so it survives refreshes).
+let direction: 'DOWN' | 'RIGHT' =
+    (window as unknown as { __DIRECTION__?: string }).__DIRECTION__ === 'RIGHT' ? 'RIGHT' : 'DOWN';
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 const rootStyle = getComputedStyle(document.documentElement);
@@ -871,6 +873,8 @@ syncDirBtn();
 dirBtn?.addEventListener('click', () => {
     direction = direction === 'DOWN' ? 'RIGHT' : 'DOWN';
     syncDirBtn();
+    // Persist host-side so the choice survives refreshes/re-renders.
+    vscode.postMessage({ command: 'setDirection', direction });
     render().catch(showError);
 });
 

@@ -7,6 +7,7 @@ interface PanelEntry {
     machine: MachineNode;
     nodeById: Map<string, MachineNode>;
     title: string;
+    direction: 'DOWN' | 'RIGHT';
 }
 
 export class XStateGraphViewProvider {
@@ -52,7 +53,7 @@ export class XStateGraphViewProvider {
             { enableScripts: true, localResourceRoots: [this.extensionUri] }
         );
 
-        const entry: PanelEntry = { panel, machine: machineNode, nodeById: new Map(), title };
+        const entry: PanelEntry = { panel, machine: machineNode, nodeById: new Map(), title, direction: 'DOWN' };
         this.panels.set(key, entry);
         this.activeKey = key;
 
@@ -71,6 +72,7 @@ export class XStateGraphViewProvider {
             switch (message.command) {
                 case 'stateClicked': this.selectInTree(message.id, entry); return;
                 case 'eventClicked': this.selectEventInTree(message.src, message.eventName, entry); return;
+                case 'setDirection': entry.direction = message.direction === 'RIGHT' ? 'RIGHT' : 'DOWN'; return;
                 case 'exportSvg':   this.saveExport(message.data, 'svg', title); return;
                 case 'exportPng':   this.saveExport(message.data, 'png', title); return;
             }
@@ -134,7 +136,7 @@ export class XStateGraphViewProvider {
         const config = vscode.workspace.getConfiguration('xstateOutline');
         const reflectExpansion = config.get<boolean>('graphReflectsTreeExpansion', true);
         const payload = this.buildElements(entry.machine, reflectExpansion, entry.nodeById);
-        entry.panel.webview.html = this.getHtmlForWebview(entry.panel.webview, payload);
+        entry.panel.webview.html = this.getHtmlForWebview(entry.panel.webview, payload, entry.direction);
     }
 
     private buildElements(
@@ -264,7 +266,7 @@ export class XStateGraphViewProvider {
         return { nodes, edges, collapsedIds };
     }
 
-    private getHtmlForWebview(webview: vscode.Webview, payload: GraphPayload): string {
+    private getHtmlForWebview(webview: vscode.Webview, payload: GraphPayload, direction: 'DOWN' | 'RIGHT'): string {
         const scriptUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this.extensionUri, 'out', 'webview', 'graph.js')
         );
@@ -332,7 +334,7 @@ export class XStateGraphViewProvider {
         <button id="btn-export-svg" title="Export as SVG">SVG</button>
         <button id="btn-export-png" title="Export as PNG">PNG</button>
     </div>
-    <script nonce="${nonce}">window.__GRAPH__ = ${json};</script>
+    <script nonce="${nonce}">window.__GRAPH__ = ${json}; window.__DIRECTION__ = ${JSON.stringify(direction)};</script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
