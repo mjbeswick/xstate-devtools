@@ -324,6 +324,7 @@ export class XStateGraphViewProvider {
         <button id="btn-zoom-in"  title="Zoom in">+</button>
         <button id="btn-zoom-out" title="Zoom out">−</button>
         <button id="btn-fit"      title="Fit to screen">⊡</button>
+        <button id="btn-direction" title="Toggle layout direction (top-down / left-right)">↧</button>
         <div class="tb-sep"></div>
         <button id="btn-expand-all"   title="Expand all states">⊞</button>
         <button id="btn-collapse-all" title="Collapse all states">⊟</button>

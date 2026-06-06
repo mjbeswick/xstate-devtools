@@ -27,6 +27,10 @@ const vscode = acquireVsCodeApi();
 const payload: GraphPayload = (window as unknown as { __GRAPH__: GraphPayload }).__GRAPH__;
 const elk = new ELK();
 
+// Layout flow direction, toggled from the toolbar. 'DOWN' = top-to-bottom,
+// 'RIGHT' = left-to-right. Edge routing adapts via per-side outward normals.
+let direction: 'DOWN' | 'RIGHT' = 'DOWN';
+
 // ── Theme ─────────────────────────────────────────────────────────────────────
 const rootStyle = getComputedStyle(document.documentElement);
 const bodyStyle  = getComputedStyle(document.body);
@@ -121,11 +125,11 @@ function buildElkNode(id: string): ElkNode {
         }],
         layoutOptions: {
             'elk.algorithm': 'layered',
-            'elk.direction': 'DOWN',
-            // Generous vertical gap between layers so transition arrows and the
-            // labels riding on them have room to breathe.
-            'elk.layered.spacing.nodeNodeBetweenLayers': '104',
-            'elk.spacing.nodeNode': '50',
+            'elk.direction': direction,
+            // Enough between-layer gap for arrows and their labels, without the
+            // diagram becoming needlessly long.
+            'elk.layered.spacing.nodeNodeBetweenLayers': '70',
+            'elk.spacing.nodeNode': '44',
             'elk.padding': `[top=${REGION_H + 24},left=22,bottom=22,right=22]`,
         },
         children: (childrenOf.get(id) ?? []).map(buildElkNode),
@@ -147,10 +151,10 @@ function buildElkGraph(): ElkNode {
         id: 'root',
         layoutOptions: {
             'elk.algorithm': 'layered',
-            'elk.direction': 'DOWN',
+            'elk.direction': direction,
             'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
-            'elk.layered.spacing.nodeNodeBetweenLayers': '104',
-            'elk.spacing.nodeNode': '50',
+            'elk.layered.spacing.nodeNodeBetweenLayers': '70',
+            'elk.spacing.nodeNode': '44',
             'elk.layered.thoroughness': '12',
             'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
             'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
@@ -426,9 +430,16 @@ async function render(): Promise<void> {
     type Side = 'T' | 'B' | 'L' | 'R';
     interface Spec {
         srcId: string; tgtId: string; label: string; lines: string[]; lw: number; lh: number;
-        kind: 'backward' | 'lateralR' | 'lateralL' | 'forward';
+        kind: 'backward' | 'lateral' | 'forward';
         sg: Rect; tg: Rect; sSide: Side; tSide: Side;
     }
+    // Project onto flow (main) and perpendicular (cross) axes per direction so
+    // the same classification works for both DOWN and RIGHT layouts.
+    const DOWN = direction === 'DOWN';
+    const mainC  = (r: Rect) => DOWN ? r.y + r.h/2 : r.x + r.w/2;
+    const crossC = (r: Rect) => DOWN ? r.x + r.w/2 : r.y + r.h/2;
+    const mainSize = (r: Rect) => DOWN ? r.h : r.w;
+
     const specs: Spec[] = [];
     for (const [key, label] of visEdges.entries()) {
         const sp = key.indexOf(' ');
@@ -436,16 +447,26 @@ async function render(): Promise<void> {
         const sg = geom.get(srcId), tg = geom.get(tgtId);
         if (!sg || !tg) { continue; }
 
-        const scx = sg.x + sg.w/2, scy = sg.y + sg.h/2;
-        const tcx = tg.x + tg.w/2, tcy = tg.y + tg.h/2;
-        const isBackward = tcy < scy - 10;
-        const isLateral  = !isBackward && Math.abs(tcy - scy) < Math.max(sg.h, tg.h) * 0.8;
+        const ms = mainC(sg), mt = mainC(tg);
+        const cs = crossC(sg), ct = crossC(tg);
+        const isBackward = mt < ms - 10;
+        const isLateral  = !isBackward && Math.abs(mt - ms) < Math.max(mainSize(sg), mainSize(tg)) * 0.8;
 
         let kind: Spec['kind'], sSide: Side, tSide: Side;
-        if (isBackward)            { kind = 'backward'; sSide = 'L'; tSide = 'L'; }
-        else if (isLateral && tcx >= scx) { kind = 'lateralR'; sSide = 'R'; tSide = 'L'; }
-        else if (isLateral)        { kind = 'lateralL'; sSide = 'L'; tSide = 'R'; }
-        else                       { kind = 'forward'; sSide = 'B'; tSide = 'T'; }
+        if (isBackward) {
+            // Loop back on the "negative cross" face (left for DOWN, top for RIGHT).
+            kind = 'backward';
+            [sSide, tSide] = DOWN ? ['L', 'L'] : ['T', 'T'];
+        } else if (isLateral) {
+            // Same layer → connect the facing cross sides.
+            kind = 'lateral';
+            if (DOWN) { [sSide, tSide] = ct >= cs ? ['R', 'L'] : ['L', 'R']; }
+            else      { [sSide, tSide] = ct >= cs ? ['B', 'T'] : ['T', 'B']; }
+        } else {
+            // Forward along the flow: exit the leading face, enter the trailing one.
+            kind = 'forward';
+            [sSide, tSide] = DOWN ? ['B', 'T'] : ['R', 'L'];
+        }
 
         const lines = label ? label.split('\n').filter(Boolean) : [];
         const lw = lines.length ? Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 16 : 0;
@@ -503,29 +524,35 @@ async function render(): Promise<void> {
         return Math.min(d * 0.5, Math.max(14, d * 0.4));
     };
 
+    // Unit outward normal of a border side — control points extend along it so
+    // the curve leaves/enters each node perpendicular to its face. Offsetting
+    // each control point along its own normal (rather than to a shared column)
+    // keeps the curve smooth and cusp-free.
+    const outward = (side: Side): [number, number] =>
+        side === 'T' ? [0, -1] : side === 'B' ? [0, 1] : side === 'L' ? [-1, 0] : [1, 0];
+
     for (const s of specs) {
         const a = srcAt.get(s)!, b = tgtAt.get(s)!;
         const sx = a.x, sy = a.y, ex = b.x, ey = b.y;
-        let cp1x: number, cp1y: number, cp2x: number, cp2y: number;
+        const [snx, sny] = outward(s.sSide);
+        const [tnx, tny] = outward(s.tSide);
 
+        let bend: number;
         if (s.kind === 'backward') {
-            // Loop out to the LEFT, but only as far as the two nodes warrant —
-            // adjacent states get a small loop, distant ones a larger sweep.
-            const leftX = Math.min(s.sg.x, s.tg.x);
-            const bulge = Math.min(150, Math.max(32,
-                Math.abs(sy - ey) * 0.45 + Math.abs(s.sg.x - s.tg.x) * 0.15));
-            cp1x = leftX - bulge; cp1y = sy;
-            cp2x = leftX - bulge; cp2y = ey;
-        } else if (s.kind === 'lateralR') {
-            const bend = lerpBend(Math.abs(ex - sx));
-            cp1x = sx + bend; cp1y = sy; cp2x = ex - bend; cp2y = ey;
-        } else if (s.kind === 'lateralL') {
-            const bend = lerpBend(Math.abs(ex - sx));
-            cp1x = sx - bend; cp1y = sy; cp2x = ex + bend; cp2y = ey;
+            // Loop out on the cross side, proportional to how far apart the
+            // nodes are along the flow (small loop for neighbours, larger sweep
+            // for distant states).
+            const along    = Math.abs(mainC(s.sg) - mainC(s.tg));
+            const crossOff = Math.abs(crossC(s.sg) - crossC(s.tg));
+            bend = Math.min(150, Math.max(32, along * 0.45 + crossOff * 0.15));
         } else {
-            const bend = lerpBend(ey - sy);
-            cp1x = sx; cp1y = sy + bend; cp2x = ex; cp2y = ey - bend;
+            // Clamp to half the span *along the normal axis* so the two control
+            // points can never cross (which is what produced cusps/hooks).
+            const span = vert(s.sSide) ? Math.abs(ex - sx) : Math.abs(ey - sy);
+            bend = lerpBend(span);
         }
+        const cp1x = sx + snx * bend, cp1y = sy + sny * bend;
+        const cp2x = ex + tnx * bend, cp2y = ey + tny * bend;
 
         // Label midpoint at t=0.5 on the cubic bezier
         const lmx = 0.125*sx + 0.375*cp1x + 0.375*cp2x + 0.125*ex;
@@ -696,11 +723,19 @@ async function render(): Promise<void> {
         if (!e.data.source.startsWith('start_')) { continue; }
         const sg = geom.get(e.data.source), tg = geom.get(e.data.target);
         if (!sg || !tg) { continue; }
-        const sx = sg.x + sg.w/2, sy = sg.y + sg.h;
-        const ex = tg.x + tg.w/2, ey = tg.y;
-        const bend = lerpBend(ey - sy);
+        // DOWN: dot bottom → state top. RIGHT: dot right → state left.
+        let sx: number, sy: number, ex: number, ey: number, c1x: number, c1y: number, c2x: number, c2y: number;
+        if (DOWN) {
+            sx = sg.x + sg.w/2; sy = sg.y + sg.h; ex = tg.x + tg.w/2; ey = tg.y;
+            const bend = lerpBend(ey - sy);
+            c1x = sx; c1y = sy + bend; c2x = ex; c2y = ey - bend;
+        } else {
+            sx = sg.x + sg.w; sy = sg.y + sg.h/2; ex = tg.x; ey = tg.y + tg.h/2;
+            const bend = lerpBend(ex - sx);
+            c1x = sx + bend; c1y = sy; c2x = ex - bend; c2y = ey;
+        }
         gEdges.appendChild(el('path', {
-            d: `M ${sx} ${sy} C ${sx} ${sy+bend} ${ex} ${ey-bend} ${ex} ${ey}`,
+            d: `M ${sx} ${sy} C ${c1x} ${c1y} ${c2x} ${c2y} ${ex} ${ey}`,
             fill: 'none', stroke: C.fg, 'stroke-width': 1.5, 'marker-end': 'url(#arr)',
         }));
     }
@@ -833,6 +868,17 @@ function collapseAll() {
     for (const id of compoundIds()) { collapsed.add(id); }
     render().catch(showError);
 }
+
+const dirBtn = document.getElementById('btn-direction');
+function syncDirBtn() {
+    if (dirBtn) { dirBtn.textContent = direction === 'DOWN' ? '↧' : '↦'; }
+}
+syncDirBtn();
+dirBtn?.addEventListener('click', () => {
+    direction = direction === 'DOWN' ? 'RIGHT' : 'DOWN';
+    syncDirBtn();
+    render().catch(showError);
+});
 
 document.getElementById('btn-zoom-in')?.addEventListener('click',    () => zoomAround(1.25));
 document.getElementById('btn-zoom-out')?.addEventListener('click',   () => zoomAround(1/1.25));
