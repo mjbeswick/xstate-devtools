@@ -299,6 +299,11 @@ export class XStateGraphViewProvider {
         }
         #toolbar button:hover { background: var(--vscode-toolbar-hoverBackground, rgba(127,127,127,0.1)); }
         #toolbar button:active { background: var(--vscode-toolbar-activeBackground, rgba(127,127,127,0.2)); }
+        #toolbar button.toggled {
+            background: var(--vscode-inputOption-activeBackground, rgba(14,99,156,0.4));
+            color: var(--vscode-inputOption-activeForeground, inherit);
+            box-shadow: inset 0 0 0 1px var(--vscode-inputOption-activeBorder, var(--vscode-focusBorder));
+        }
         .tb-sep { width: 1px; height: 14px; background: var(--vscode-widget-border, rgba(127,127,127,0.3)); margin: 0 2px; }
     </style>
 </head>
@@ -308,6 +313,10 @@ export class XStateGraphViewProvider {
         <button id="btn-zoom-in"  title="Zoom in">+</button>
         <button id="btn-zoom-out" title="Zoom out">−</button>
         <button id="btn-fit"      title="Fit to screen">⊡</button>
+        <div class="tb-sep"></div>
+        <button id="btn-expand-all"   title="Expand all states">⊞</button>
+        <button id="btn-collapse-all" title="Collapse all states">⊟</button>
+        <button id="btn-autofit"      title="Auto-fit on expand/collapse">⤢</button>
         <div class="tb-sep"></div>
         <button id="btn-export-svg" title="Export as SVG">SVG</button>
         <button id="btn-export-png" title="Export as PNG">PNG</button>

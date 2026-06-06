@@ -2,7 +2,11 @@
 // ELK computes node positions; all edge paths are drawn from node geometry.
 import ELK from 'elkjs/lib/elk.bundled.js';
 
-declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
+declare function acquireVsCodeApi(): {
+    postMessage(message: unknown): void;
+    getState(): any;
+    setState(state: any): void;
+};
 
 interface NodeData {
     id: string; label: string; name: string;
@@ -178,9 +182,23 @@ let viewport: SVGElement;
 let scale = 1, tx = 0, ty = 0;
 let lastW = 100, lastH = 100;
 let didFit = false;
+// When on, the view re-fits after each expand/collapse. When off (default), the
+// pan/zoom is preserved so expanding a node never jolts the diagram.
+let autoFit = false;
+
+// Restore pan/zoom + autoFit across HTML reloads (tree-driven refreshes reassign
+// the webview html), so those refreshes don't reset the user's view.
+let restoredView = false;
+const savedState = vscode.getState();
+if (savedState && typeof savedState.scale === 'number') {
+    scale = savedState.scale; tx = savedState.tx; ty = savedState.ty;
+    autoFit = !!savedState.autoFit;
+    restoredView = true;
+}
 
 function applyTransform() {
     viewport.setAttribute('transform', `translate(${tx} ${ty}) scale(${scale})`);
+    vscode.setState({ scale, tx, ty, autoFit });
 }
 function fitToScreen() {
     const cw = container.clientWidth || 800, ch = container.clientHeight || 600;
@@ -596,7 +614,13 @@ async function render(): Promise<void> {
         }));
     }
 
-    if (!didFit) { fitToScreen(); didFit = true; }
+    if (autoFit) {
+        fitToScreen();
+    } else if (!didFit && !restoredView) {
+        // First ever render with no saved view → fit once.
+        fitToScreen();
+    }
+    didFit = true;
     applyTransform();
 }
 
@@ -714,9 +738,31 @@ function zoomAround(factor: number) {
     scale = ns;
     applyTransform();
 }
+// Every node that has child states is a candidate for collapsing.
+function compoundIds(): string[] {
+    return [...nodeById.keys()].filter(id => childStateIds(id).length > 0);
+}
+function expandAll() { collapsed.clear(); render().catch(showError); }
+function collapseAll() {
+    collapsed.clear();
+    for (const id of compoundIds()) { collapsed.add(id); }
+    render().catch(showError);
+}
+const autofitBtn = document.getElementById('btn-autofit');
+function syncAutofitBtn() { autofitBtn?.classList.toggle('toggled', autoFit); }
+syncAutofitBtn();
+
 document.getElementById('btn-zoom-in')?.addEventListener('click',    () => zoomAround(1.25));
 document.getElementById('btn-zoom-out')?.addEventListener('click',   () => zoomAround(1/1.25));
 document.getElementById('btn-fit')?.addEventListener('click',        fitToScreen);
+document.getElementById('btn-expand-all')?.addEventListener('click', expandAll);
+document.getElementById('btn-collapse-all')?.addEventListener('click', collapseAll);
+autofitBtn?.addEventListener('click', () => {
+    autoFit = !autoFit;
+    syncAutofitBtn();
+    applyTransform(); // persist the toggle
+    if (autoFit) { fitToScreen(); }
+});
 document.getElementById('btn-export-svg')?.addEventListener('click', exportSvg);
 document.getElementById('btn-export-png')?.addEventListener('click', exportPng);
 
