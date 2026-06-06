@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.5.0] - 2026-06-06
+
+### Added
+- **Statechart diagram** — render any machine, or any compound state, as an interactive Harel-style statechart in its own editor tab (**View State Diagram**)
+  - Automatic hierarchical (ELK "layered") layout with smooth, cusp-free curved transitions and distributed connection points
+  - **Top-down / left-right** layout toggle, persisted per diagram
+  - Pan, zoom, fit, and **expand all / collapse all**
+  - Reflects the outline's expansion state; click a region to expand/collapse it
+  - **Two-way sync** — click a state to select it in the tree, click an event label to select its transition; selecting in the tree highlights it in the diagram
+  - Hover a state to emphasize its transitions and dim the rest
+  - Export the diagram as **SVG** or **PNG**
+  - One tab per machine, each remembering its own layout direction
+- Harel/SCXML conventions: initial-state arrows, nested regions, a labelled machine root box, dashed boundaries with a `parallel` tag for orthogonal states, final-state double outlines, and `EVENT [guard] / action` transition labels
+- Parallel states are marked with a hollow blue circle in the tree
+- New settings: `graphReflectsTreeExpansion`, `groupEventHandlers`, `sortChildren`
+
+### Changed
+- Rewrote the README as a Marketplace listing with diagram screenshot, icon/color legend, and credit to XState & Stately
+
 ## [0.1.0] - 2024-06-03
 
 ### Added
