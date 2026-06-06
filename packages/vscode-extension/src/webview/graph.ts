@@ -277,25 +277,24 @@ async function render(): Promise<void> {
                     // tint so the concurrent regions read as a group.
                     fill: inParallel ? C.accent : C.nodeBg,
                     'fill-opacity': inParallel ? 0.08 : 0.5,
-                    stroke: isParallel ? C.accent : C.fg,
-                    'stroke-width': isParallel ? 1.8 : 1.5,
-                    'stroke-opacity': isParallel ? 0.85 : 0.6,
-                    // Parallel state: dashed border (UML orthogonal convention).
+                    // Parallel state: dark dashed border (UML orthogonal convention).
+                    stroke: C.fg,
+                    'stroke-width': isParallel ? 1.6 : 1.5,
+                    'stroke-opacity': isParallel ? 0.75 : 0.6,
                     ...(isParallel ? { 'stroke-dasharray': '7 4' } : {}),
                 });
                 g.appendChild(regionRect);
                 g.appendChild(el('line', {
                     x1: ax+1, y1: ay+REGION_H, x2: ax+w-1, y2: ay+REGION_H,
-                    stroke: isParallel ? C.accent : C.fg,
-                    'stroke-width': 0.75, 'stroke-opacity': isParallel ? 0.5 : 0.35,
+                    stroke: C.fg, 'stroke-width': 0.75, 'stroke-opacity': 0.35,
                 }));
                 g.appendChild(txt(d.label, ax+w/2, ay+REGION_H-9, {
                     'text-anchor': 'middle', 'font-size': 12, 'font-weight': 'bold',
                 }));
                 if (isParallel) {
-                    // "∥ parallel" marker, right-aligned in the title bar.
-                    g.appendChild(txt('∥ parallel', ax+w-8, ay+REGION_H-9, {
-                        'text-anchor': 'end', 'font-size': 10, fill: C.accent, 'font-weight': 'bold',
+                    // Plain "parallel" tag, right-aligned in the title bar.
+                    g.appendChild(txt('parallel', ax+w-8, ay+REGION_H-9, {
+                        'text-anchor': 'end', 'font-size': 10, fill: C.desc, 'font-style': 'italic',
                     }));
                 }
                 // Hover: highlight connected edges (closure reads nodeEdgeMap after fill)
@@ -313,8 +312,8 @@ async function render(): Promise<void> {
                         }
                     }
                 });
-                const restW = isParallel ? '1.8' : '1.5';
-                const restO = isParallel ? '0.85' : '0.6';
+                const restW = isParallel ? '1.6' : '1.5';
+                const restO = isParallel ? '0.75' : '0.6';
                 g.addEventListener('mouseleave', () => {
                     regionRect.setAttribute('stroke-width', restW);
                     regionRect.setAttribute('stroke-opacity', restO);
@@ -329,9 +328,9 @@ async function render(): Promise<void> {
                     x: ax, y: ay, width: w, height: h, rx: 8, ry: 8,
                     fill: inParallel ? C.accent : C.nodeBg,
                     'fill-opacity': inParallel ? 0.08 : 1,
-                    stroke: isParallel ? C.accent : C.fg,
-                    'stroke-width': isParallel ? 1.8 : 1.5,
-                    'stroke-opacity': isParallel ? 0.85 : 0.8,
+                    stroke: C.fg,
+                    'stroke-width': isParallel ? 1.6 : 1.5,
+                    'stroke-opacity': isParallel ? 0.75 : 0.8,
                     ...(isParallel ? { 'stroke-dasharray': '7 4' } : {}),
                 });
                 nameToRect.set(d.name, rect);
