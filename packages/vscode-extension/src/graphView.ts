@@ -16,11 +16,19 @@ export class XStateGraphViewProvider {
     private panels = new Map<string, PanelEntry>();
     // The key of the panel the user most recently focused, used for highlight/simulate.
     private activeKey: string | undefined;
+    // Invoked when a diagram node is clicked, so the host can select the
+    // matching item in the tree outline (set from activate()).
+    private revealInTree?: (node: MachineNode) => void;
 
     constructor(
         private readonly extensionUri: vscode.Uri,
         private readonly treeProvider: XStateMachineTreeProvider
     ) {}
+
+    /** Register a callback that selects the given node in the tree outline. */
+    public setRevealInTreeHandler(fn: (node: MachineNode) => void) {
+        this.revealInTree = fn;
+    }
 
     private machineKey(machine: MachineNode): string {
         const path = machine.uri?.fsPath ?? '';
@@ -61,7 +69,7 @@ export class XStateGraphViewProvider {
 
         panel.webview.onDidReceiveMessage(message => {
             switch (message.command) {
-                case 'stateClicked': this.navigateToState(message.id, entry); return;
+                case 'stateClicked': this.selectInTree(message.id, entry); return;
                 case 'eventClicked': this.simulateEvent(message.eventName); return;
                 case 'exportSvg':   this.saveExport(message.data, 'svg', title); return;
                 case 'exportPng':   this.saveExport(message.data, 'png', title); return;
@@ -89,14 +97,11 @@ export class XStateGraphViewProvider {
         );
     }
 
-    private navigateToState(id: string, entry: PanelEntry) {
-        if (!entry.machine.uri) { return; }
-        const foundNode = entry.nodeById.get(id);
-        if (foundNode?.range) {
-            vscode.workspace.openTextDocument(entry.machine.uri).then(doc => {
-                vscode.window.showTextDocument(doc, { selection: foundNode.range, preserveFocus: true });
-            });
-        }
+    // Diagram node clicked → select the matching item in the tree outline.
+    // (Does NOT open source code; the tree's own navigation handles that.)
+    private selectInTree(id: string, entry: PanelEntry) {
+        const node = entry.nodeById.get(id);
+        if (node) { this.revealInTree?.(node); }
     }
 
     private async saveExport(data: string, format: 'svg' | 'png', machineTitle: string) {

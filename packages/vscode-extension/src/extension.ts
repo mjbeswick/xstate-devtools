@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { XStateMachineTreeProvider } from './treeProvider';
+import { MachineNode } from './parser';
 import { ImplementationFinder } from './implementationFinder';
 import { FilterWebviewViewProvider } from './filterView';
 import { XStateCompletionProvider } from './completionProvider';
@@ -614,6 +615,16 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const graphViewProvider = new XStateGraphViewProvider(context.extensionUri, treeProvider);
 
+    // When the user clicks a node in the diagram, select the matching item in
+    // the tree outline (instead of jumping to source). Revealing the item fires
+    // onDidChangeSelection below, which in turn highlights it in the diagram.
+    graphViewProvider.setRevealInTreeHandler(node => {
+        const item = treeProvider.getTreeItemForNode(node);
+        if (item && treeView.visible) {
+            treeView.reveal(item, { select: true, focus: false, expand: true });
+        }
+    });
+
     // When the user selects a node in the tree, sync the diagram:
     // - state node  → highlight it in the current graph
     // - machine node → switch the graph to show that machine
@@ -632,23 +643,27 @@ export async function activate(context: vscode.ExtensionContext) {
         'xstateMachineOutline.openGraphView',
         (treeItem) => {
             if (!treeItem?.node) { return; }
-            
-            let machineNode = treeItem.node;
-            
-            // If they clicked on a state, find the root machine using the workspaceScanner cache
-            if (machineNode.type === 'state' && treeItem.uri) {
+
+            const node = treeItem.node;
+
+            // Root the diagram at whatever was selected:
+            //  - a machine node → the whole machine
+            //  - a (compound) state node → a focused sub-diagram of that subtree
+            // buildElements() already treats a `state` node as a valid root, so
+            // a compound state renders as its own statechart. A leaf state has no
+            // children to draw, so fall back to the enclosing machine.
+            let root = node;
+            const hasChildStates = (node.children ?? []).some((c: MachineNode) => c.type === 'state');
+            if (node.type === 'state' && !hasChildStates && treeItem.uri) {
                 const fileMachines = workspaceScanner.getFile(treeItem.uri);
                 if (fileMachines) {
                     for (const m of fileMachines.machines) {
-                        if (m.range.contains(machineNode.range)) {
-                            machineNode = m;
-                            break;
-                        }
+                        if (m.range.contains(node.range)) { root = m; break; }
                     }
                 }
             }
-            
-            graphViewProvider.show(machineNode, machineNode.label);
+
+            graphViewProvider.show(root, root.label);
         }
     );
 
