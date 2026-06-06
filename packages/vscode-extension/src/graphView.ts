@@ -218,6 +218,10 @@ export class XStateGraphViewProvider {
         // Edges: merge transitions between the same source→target pair so multiple
         // events on one arrow don't stack into an unreadable blob.
         const edgeMap = new Map<string, { source: string; target: string; labels: string[] }>();
+        // In a focused sub-diagram, transitions can target a state outside the
+        // shown subtree. Rather than dropping them, point them at a faded ghost
+        // "exit" stub labelled with the external target.
+        const ghostByName = new Map<string, string>();
         const addEdges = (n: MachineNode) => {
             if (n.type === 'state') {
                 const sourceId = idByNode.get(n);
@@ -226,8 +230,17 @@ export class XStateGraphViewProvider {
                         const target = t.children?.find(c => c.type === 'target');
                         if (!target) { continue; }
                         const targetName = sanitize(target.label.replace(/^#/, '').split('.').pop() ?? '');
-                        const targetId = nameToId.get(targetName);
-                        if (!targetId) { continue; }
+                        let targetId = nameToId.get(targetName);
+                        if (!targetId) {
+                            if (!isSubDiagram) { continue; }
+                            const display = target.label.replace(/^#/, '');
+                            targetId = ghostByName.get(targetName);
+                            if (!targetId) {
+                                targetId = `n${counter++}`;
+                                ghostByName.set(targetName, targetId);
+                                nodes.push({ data: { id: targetId, label: display, name: sanitize(display), parent: undefined, ghost: true } });
+                            }
+                        }
                         const key = `${sourceId} ${targetId}`;
                         let entry = edgeMap.get(key);
                         if (!entry) {
@@ -347,7 +360,7 @@ interface GraphNode {
         id: string; label: string; name: string;
         parent?: string; compound?: boolean;
         initial?: boolean; final?: boolean; start?: boolean; parallel?: boolean;
-        history?: 'shallow' | 'deep';
+        history?: 'shallow' | 'deep'; ghost?: boolean;
         entryActions?: string[]; exitActions?: string[];
     };
 }

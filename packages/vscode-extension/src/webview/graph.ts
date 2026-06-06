@@ -7,7 +7,7 @@ declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 interface NodeData {
     id: string; label: string; name: string;
     parent?: string; initial?: boolean; final?: boolean; start?: boolean; parallel?: boolean;
-    history?: 'shallow' | 'deep';
+    history?: 'shallow' | 'deep'; ghost?: boolean;
     entryActions?: string[]; exitActions?: string[];
 }
 interface GraphPayload {
@@ -336,6 +336,18 @@ async function render(): Promise<void> {
                     resetEdgeStyles();
                 });
                 gBack.appendChild(g);
+            } else if (d.ghost) {
+                // Exit stub: a transition target outside the focused subtree.
+                g.appendChild(el('rect', {
+                    x: ax, y: ay, width: w, height: h, rx: 8, ry: 8,
+                    fill: 'none', stroke: C.fg, 'stroke-width': 1.2,
+                    'stroke-opacity': 0.45, 'stroke-dasharray': '4 4',
+                }));
+                g.appendChild(txt('→ ' + d.label, ax + w/2, ay + h/2, {
+                    'text-anchor': 'middle', 'dominant-baseline': 'central',
+                    'font-size': 11, 'font-style': 'italic', fill: C.desc,
+                }));
+                gNodes.appendChild(g);
             } else {
                 const isParallel = !!d.parallel; // a collapsed parallel state
                 const rect = el('rect', {
