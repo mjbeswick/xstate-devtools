@@ -191,10 +191,26 @@ export class XStateGraphViewProvider {
         // state is always shown expanded. When rooted at a machine, its
         // top-level states respect their own tree expansion state.
         const isSubDiagram = machine.type === 'state';
+
+        // Frame an actual machine in a labelled root box (Harel convention).
+        // This also lets a parallel machine root carry its parallel styling,
+        // which would otherwise be lost (the machine node isn't a state).
+        let rootParentId: string | undefined;
+        if (!isSubDiagram) {
+            rootParentId = `n${counter++}`;
+            nodeById.set(rootParentId, machine);
+            nodes.push({
+                data: {
+                    id: rootParentId, label: machine.label, name: sanitize(machine.label),
+                    parent: undefined, compound: true, parallel: !!machine.isParallel,
+                },
+            });
+        }
+
         const rootStates = isSubDiagram
             ? [machine]
             : (machine.children ?? []).filter(c => c.type === 'state' && !c.isTypeMarker);
-        for (const r of rootStates) { collect(r, undefined, isSubDiagram); }
+        for (const r of rootStates) { collect(r, rootParentId, isSubDiagram); }
 
         // Edges: merge transitions between the same source→target pair so multiple
         // events on one arrow don't stack into an unreadable blob.

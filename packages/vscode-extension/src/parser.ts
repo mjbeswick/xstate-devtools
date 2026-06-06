@@ -230,12 +230,16 @@ export class XStateMachineParser {
 
         children.push(...this.parseInvalidProperties(config, document, this.MACHINE_PROPERTIES));
 
+        const machineTypeProp = this.findProperty(config, 'type');
+        const machineIsParallel = !!(machineTypeProp && ts.isStringLiteral(machineTypeProp) && machineTypeProp.text === 'parallel');
+
         return {
             type: 'machine',
             label: machineId,
             range,
             uri: document.uri,
             children,
+            isParallel: machineIsParallel || undefined,
             description: this.extractDescription(config)
         };
     }
