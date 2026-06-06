@@ -120,7 +120,8 @@ function buildElkNode(id: string): ElkNode {
         layoutOptions: {
             'elk.algorithm': 'layered',
             'elk.direction': DIRECTION,
-            'elk.padding': `[top=${REGION_TITLE_H + 14},left=18,bottom=18,right=18]`,
+            // Extra top room so transitions/initial arrows clear the title bar.
+            'elk.padding': `[top=${REGION_TITLE_H + 22},left=20,bottom=20,right=20]`,
         },
         children: (childrenOf.get(id) ?? []).map(buildElkNode),
     };
@@ -150,11 +151,12 @@ function buildElkGraph(): ElkNode {
             'elk.direction': DIRECTION,
             'elk.edgeRouting': 'ORTHOGONAL',
             'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
-            'elk.layered.spacing.nodeNodeBetweenLayers': '76',
+            'elk.layered.spacing.nodeNodeBetweenLayers': '80',
             'elk.spacing.nodeNode': '46',
             'elk.spacing.edgeNode': '28',
-            'elk.spacing.edgeEdge': '20',
+            'elk.spacing.edgeEdge': '28',
             'elk.layered.spacing.edgeNodeBetweenLayers': '28',
+            'elk.layered.spacing.edgeEdgeBetweenLayers': '16',
             'elk.layered.thoroughness': '14',
             'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
             'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
