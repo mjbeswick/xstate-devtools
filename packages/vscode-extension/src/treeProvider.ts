@@ -843,7 +843,10 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
                 iconColor = new vscode.ThemeColor('charts.blue');
                 break;
             case 'state':
-                if (this.node.isParallel) {
+                if (this.node.historyType) {
+                    iconName = 'history';
+                    iconColor = new vscode.ThemeColor('charts.purple');
+                } else if (this.node.isParallel) {
                     // Hollow blue circle marks an orthogonal (parallel) state —
                     // no redundant child marker needed.
                     iconName = 'circle-outline';

@@ -18,6 +18,7 @@ export interface MachineNode {
     isInitial?: boolean; // Flag for initial state
     isFinal?: boolean; // Flag for final state
     isParallel?: boolean; // Flag for parallel (orthogonal) state
+    historyType?: 'shallow' | 'deep'; // Set for `type: 'history'` states
     isTypeMarker?: boolean; // Synthetic `type: …` child — shown in the tree, hidden in the graph
     description?: string; // XState `description` property, shown on hover
 }
@@ -394,10 +395,17 @@ export class XStateMachineParser {
             children.push(...invokeNodes);
         }
 
-        // Parse type (final, parallel, etc)
+        // Parse type (final, parallel, history, etc)
         const typeProp = this.findProperty(config, 'type');
         const isFinal = typeProp && ts.isStringLiteral(typeProp) && typeProp.text === 'final';
         const isParallel = !!(typeProp && ts.isStringLiteral(typeProp) && typeProp.text === 'parallel');
+        const isHistory = !!(typeProp && ts.isStringLiteral(typeProp) && typeProp.text === 'history');
+        let historyType: 'shallow' | 'deep' | undefined;
+        if (isHistory) {
+            const historyProp = this.findProperty(config, 'history');
+            historyType = historyProp && ts.isStringLiteral(historyProp) && historyProp.text === 'deep'
+                ? 'deep' : 'shallow';
+        }
 
         if (typeProp && ts.isStringLiteral(typeProp) && typeProp.text !== 'final' && typeProp.text !== 'parallel') {
             // Surface uncommon types (e.g. `history`) in the tree as a child
@@ -426,6 +434,7 @@ export class XStateMachineParser {
             isInitial,
             isFinal: isFinal || undefined,
             isParallel: isParallel || undefined,
+            historyType,
             description: this.extractDescription(config)
         };
     }

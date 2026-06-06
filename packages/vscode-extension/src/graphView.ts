@@ -172,6 +172,7 @@ export class XStateGraphViewProvider {
                     initial: !!n.isInitial,
                     final: !!n.isFinal,
                     parallel: !!n.isParallel,
+                    history: n.historyType,
                     entryActions,
                     exitActions,
                 },
@@ -346,6 +347,7 @@ interface GraphNode {
         id: string; label: string; name: string;
         parent?: string; compound?: boolean;
         initial?: boolean; final?: boolean; start?: boolean; parallel?: boolean;
+        history?: 'shallow' | 'deep';
         entryActions?: string[]; exitActions?: string[];
     };
 }

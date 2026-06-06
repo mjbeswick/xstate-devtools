@@ -7,6 +7,7 @@ declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 interface NodeData {
     id: string; label: string; name: string;
     parent?: string; initial?: boolean; final?: boolean; start?: boolean; parallel?: boolean;
+    history?: 'shallow' | 'deep';
     entryActions?: string[]; exitActions?: string[];
 }
 interface GraphPayload {
@@ -103,6 +104,7 @@ function visibleEndpoint(id: string): string {
 function buildElkNode(id: string): ElkNode {
     const d = nodeById.get(id)!;
     if (d.start) { return { id, width: 14, height: 14 }; }
+    if (d.history) { return { id, width: 30, height: 30 }; }
     const states = childStateIds(id);
     const isRegion = states.length > 0 && !collapsed.has(id);
     if (!isRegion) {
@@ -276,6 +278,13 @@ async function render(): Promise<void> {
 
             if (d.start) {
                 g.appendChild(el('circle', { cx: ax + w/2, cy: ay + h/2, r: 6, fill: C.fg }));
+                gNodes.appendChild(g);
+            } else if (d.history) {
+                // History pseudostate: circle with H (shallow) or H* (deep).
+                const cxp = ax + w/2, cyp = ay + h/2;
+                g.appendChild(el('circle', { cx: cxp, cy: cyp, r: w/2 - 1, fill: C.nodeBg, stroke: C.fg, 'stroke-width': 1.5, 'stroke-opacity': 0.8 }));
+                g.appendChild(txt(d.history === 'deep' ? 'H*' : 'H', cxp, cyp, { 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 13, 'font-weight': 'bold' }));
+                nameToRect.set(d.name, g.firstChild as SVGElement);
                 gNodes.appendChild(g);
             } else if (isRegion) {
                 const isParallel = !!d.parallel;
