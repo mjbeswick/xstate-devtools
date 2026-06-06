@@ -402,12 +402,18 @@ async function render(): Promise<void> {
 
     // ── Pass 3: compute edge bezier params ────────────────────────────────
     // Deduplicate edges after visibility transform, merging labels.
-    const visEdges = new Map<string, string>(); // "srcId tgtId" → merged label
+    const visEdges = new Map<string, string>();   // "srcId tgtId" → merged label
+    const selfEdges = new Map<string, string>();  // nodeId → merged label (self-transitions)
     for (const e of payload.edges) {
         if (e.data.source.startsWith('start_')) { continue; }
         const s = visibleEndpoint(e.data.source), t = visibleEndpoint(e.data.target);
-        if (s === t) { continue; }
-        const key = `${s} ${t}`, lbl = e.data.label.trim();
+        const lbl = e.data.label.trim();
+        if (s === t) {
+            const prev = selfEdges.get(s);
+            selfEdges.set(s, prev ? (lbl ? `${prev}\n${lbl}` : prev) : lbl);
+            continue;
+        }
+        const key = `${s} ${t}`;
         const prev = visEdges.get(key);
         visEdges.set(key, prev ? (lbl ? `${prev}\n${lbl}` : prev) : lbl);
     }
@@ -734,6 +740,37 @@ async function render(): Promise<void> {
             d: `M ${sx} ${sy} C ${c1x} ${c1y} ${c2x} ${c2y} ${ex} ${ey}`,
             fill: 'none', stroke: C.fg, 'stroke-width': 1.5, 'marker-end': 'url(#arr)',
         }));
+    }
+
+    // ── Self-transitions ──────────────────────────────────────────────────
+    // A transition back to its own state: draw a small loop off the top-right
+    // corner (leaves the top edge, returns to the right edge) with its label.
+    for (const [id, label] of selfEdges.entries()) {
+        const r = geom.get(id);
+        if (!r) { continue; }
+        const lx = r.x + r.w * 0.72, ly = r.y;          // exit point on top edge
+        const rx = r.x + r.w,        ry = r.y + r.h * 0.28; // entry point on right edge
+        const k = 22;                                    // loop reach
+        gEdges.appendChild(el('path', {
+            d: `M ${lx} ${ly} C ${lx} ${ly - k} ${rx + k} ${ry - k} ${rx + k} ${ry} `
+             + `C ${rx + k} ${ry + 6} ${rx + 4} ${ry} ${rx} ${ry}`,
+            fill: 'none', stroke: C.fg, 'stroke-width': 1.4, 'stroke-opacity': 0.7,
+            'marker-end': 'url(#arr)',
+        }));
+        const lines = label ? label.split('\n').filter(Boolean) : [];
+        if (lines.length) {
+            const lw = Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 12;
+            const bx = rx + k - lw / 2, by = ry - k - lines.length * ACTION_LINE_H;
+            const g = el('g', { 'data-src': id });
+            (g as SVGElement).style.cursor = 'pointer';
+            g.appendChild(el('rect', { x: bx - 2, y: by, width: lw + 4, height: lines.length * ACTION_LINE_H + 4, rx: 3, ry: 3, fill: C.bg, 'fill-opacity': 1, stroke: C.fg, 'stroke-width': 0.5, 'stroke-opacity': 0.12 }));
+            for (let i = 0; i < lines.length; i++) {
+                const t = txt(lines[i], bx + lw / 2, by + (i + 0.5) * ACTION_LINE_H + ACTION_LINE_H / 2, { 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': ACTION_PX, fill: C.desc });
+                t.setAttribute('data-event', lines[i]);
+                g.appendChild(t);
+            }
+            gLabels.appendChild(g);
+        }
     }
 
     // Always re-fit so expanding/collapsing a node reveals the full diagram.
