@@ -1,105 +1,81 @@
 # xState Devtools
 
-A Visual Studio Code extension that displays XState state machines as an interactive **tree outline** and an interactive **statechart diagram**, with search and smart navigation. It analyzes your source statically (no need to run your app) and works with both XState v4 and v5.
+**Explore, navigate, and visualize your [XState](https://stately.ai/docs) machines without leaving VS Code.** xState Devtools turns your state machines into an interactive **outline** and a live **statechart diagram**, analyzing your source statically — no need to run your app. Works with XState **v4 and v5**, in JavaScript and TypeScript.
 
 ![xState Devtools showing the machine outline, search, and source navigation](https://github.com/mjbeswick/xstate-devtools/raw/main/packages/vscode-extension/images/screenshot.png)
 
+## Quick start
+
+1. Install the extension and open a JavaScript/TypeScript project that uses XState.
+2. Click the **xState Devtools** icon in the activity bar to open the **Search** and **Outline** views.
+3. Click any node to jump to its source, or use **View State Diagram** to open a machine as a statechart.
+
+> No configuration required — machines are discovered automatically as you edit.
+
 ## Features
 
-### Outline & analysis
-- 📦 **Workspace scanning** — finds all XState machines across your project, updating live as you edit
-- 🌲 **Machine outline** — nested/parallel states, transitions, targets, entry/exit/transition actions, guards, invokes, actors, delays, context, and XState v5 `setup` implementations
-- 🧠 **Context-aware autocomplete** — suggests valid machine, state, transition, invoke, and setup properties, plus valid target/action/guard/actor references
-- ✅ **Invalid property highlighting** — unknown config properties appear directly in the tree with red error styling
-- ✏️ **Tree editing** — context-menu actions let you add/remove nodes, rename items, and change supported property values from the outline
-- 🔍 **Search** — a dedicated search box (styled like the Extensions view) with type filtering and keyboard navigation
-- 🎯 **Smart navigation** — click to jump to source; double-click an action/guard to jump to its implementation, or a transition target to jump to the target state
-- 🧭 **Cursor sync** — highlights the tree node matching your editor cursor
-- 🎨 **Theme-aware icons** — node icons use VS Code codicons and theme colors
+### 🌲 Interactive outline
+- **Workspace scanning** — finds every XState machine in your project and updates live as you type
+- **Full machine tree** — nested & parallel states, transitions, targets, entry/exit/transition actions, guards, invokes, actors, delays, context, and XState v5 `setup` implementations
+- **Smart navigation** — click to jump to source; double-click an action or guard to jump to its implementation, or a transition target to jump to the destination state (or press **F12**)
+- **Cursor sync** — the tree highlights the node matching your editor cursor
+- **Search** — a dedicated search box (styled like the Extensions view) with type filtering and keyboard navigation
 
-### Statechart diagram
-- 🗺️ **Visual statechart** — render any machine (or any compound state) as a Harel-style diagram in its own editor tab. Use **View State Diagram** from a tree item's context menu / inline action.
-- 🧱 **One tab per machine** — each machine opens in its own tab and remembers its own layout direction
-- 🤖 **Automatic layout** — hierarchical (Sugiyama / ELK "layered") layout with smooth, cusp-free bezier transitions and distributed connection points
-- ↧ / ↦ **Top-down / left-right toggle** — switch flow direction per diagram; the choice persists across refreshes
-- 🔭 **Pan & zoom** — drag to pan, scroll to zoom, plus toolbar **zoom in / out / fit**
-- 🌳 **Reflects tree expansion** — collapsed states render as single blocks; **expand all / collapse all** from the toolbar, or expand/collapse individual regions by clicking them
-- 🎯 **Sub-diagrams** — open **View State Diagram** on a compound state to focus on just that subtree
-- 🔗 **Two-way sync** — click a state in the diagram to select it in the tree; click an event label to select that transition; selecting in the tree highlights the node in the diagram
-- ✨ **Hover highlighting** — hovering a state emphasizes its connected transitions and dims the rest
-- 🖼️ **Export** — save the current diagram as **SVG** or **PNG**
+### ✏️ Editing & authoring
+- **Context-aware autocomplete** — suggests valid machine, state, transition, invoke, and setup properties, plus valid target / action / guard / actor references
+- **Tree editing** — add, rename, and delete states, transitions, and references straight from the outline
+- **Invalid property highlighting** — unknown config properties show up in the tree with a red error icon
 
-## Statechart diagram conventions
+### 🗺️ Statechart diagram
+- **Visual statechart** — render any machine (or any compound state) as a Harel-style diagram in its own editor tab via **View State Diagram**
+- **Automatic layout** — clean hierarchical layout with smooth, curved transitions
+- **Top-down ↔ left-right** — flip the flow direction to suit each machine; your choice is remembered
+- **Pan, zoom & fit**, plus **expand all / collapse all**
+- **Reflects the outline** — collapsed states render as single blocks; click a region to expand it
+- **Two-way sync** — click a state to select it in the tree, click an event to select its transition, and selecting in the tree highlights it in the diagram
+- **Hover to focus** — hovering a state emphasizes its transitions and dims the rest
+- **Export** the diagram as **SVG** or **PNG**
+- **Focus mode** — open the diagram on a compound state to see just that subtree
 
-| Element | Rendering |
+## Reading the diagram
+
+The diagrams **intentionally follow [Harel statechart](https://en.wikipedia.org/wiki/State_diagram#Harel_statechart) conventions** — the same notation XState itself is based on. Initial-state arrows, nested regions, dashed boundaries for parallel (orthogonal) states, and `EVENT [guard] / action` transition labels are all standard Harel/SCXML notation, so the diagrams read the way a statechart is meant to.
+
+| You'll see | Meaning |
 | --- | --- |
-| **State** | Rounded rectangle |
-| **Initial state** | Filled dot with an arrow into the state |
-| **Final state** | Rounded rectangle with a second inner outline |
-| **Parallel (orthogonal) state** | Dark **dashed** border with an italic `parallel` tag in the title bar |
-| **Compound state (collapsed)** | Single box marked with `⊕` |
-| **Region (expanded compound state)** | Outline box with a title bar (no fill) |
-| **Machine root** | Labelled root box framing the whole chart |
-| **Transition** | Curved arrow labelled `EVENT [guard] / action1, action2` |
-| **Entry / exit actions** | Listed inside the state box below a divider (`entry/ …`, `exit/ …`) |
-| **Selected / highlighted state** | Filled with the selection color and outlined with the focus color |
+| Rounded box | A state |
+| Filled dot → state | The initial state of a region |
+| Box with a double outline | A final state |
+| **Dashed** box with a `parallel` tag | A parallel (orthogonal) state — its regions run concurrently |
+| Box marked `⊕` | A collapsed compound state (click to expand) |
+| Outline box with a title bar | An expanded region |
+| Outer titled box | The machine itself |
+| Curved arrow with a label | A transition, labelled `EVENT [guard] / actions` |
+| `entry/ …` and `exit/ …` inside a box | The state's entry/exit actions |
 
-### Diagram toolbar
+**Diagram toolbar:** zoom in `+` / out `−`, fit `⊡`, toggle direction `↧`/`↦`, expand all `⊞`, collapse all `⊟`, and export `SVG` / `PNG`.
 
-| Button | Action |
+## Icon & color legend
+
+Every icon and color is drawn from your **active VS Code theme**, so the extension looks at home in light, dark, and high-contrast themes alike.
+
+| Symbol | Meaning |
 | --- | --- |
-| `+` / `−` | Zoom in / out |
-| `⊡` | Fit to screen |
-| `↧` / `↦` | Toggle layout direction (top-down ↔ left-right) |
-| `⊞` / `⊟` | Expand all / collapse all states |
-| `SVG` / `PNG` | Export the diagram as an image |
+| 📦 Blue box | Machine |
+| 🟢 Green dot | Initial state |
+| 🔴 Red dot | Final state |
+| ⚪ Hollow blue circle | Parallel state |
+| 🔵 Filled dot | State |
+| 🟠 Orange event | Transition (orange inbox = an `on` handler group) |
+| 🎯 Magenta target | Transition target |
+| 🚀 Action · ⤓ entry · ⤒ exit | Actions (entry/exit/transition) |
+| 🛡️ Cyan shield | Guard |
+| 🔌 Yellow board | Invoke · ▶️ actor |
+| 🕘 Delay · ⚙️ setup section | Timing & v5 `setup` blocks |
+| 🔤 Context · 🔧 context property | Machine context |
+| ❌ Red error | Invalid / unknown property |
 
-## Tree icons
-
-| Node type | Icon (codicon) | Color token |
-| --- | --- | --- |
-| Machine | `package` | `charts.blue` |
-| State (normal) | `circle-filled` | `symbolIcon.fieldForeground` |
-| State (initial) | `circle-filled` | `charts.green` |
-| State (final) | `circle-filled` | `charts.red` |
-| State (parallel) | `circle-outline` (hollow) | `charts.blue` |
-| File group | `file-code` | default |
-| Loading | `loading~spin` | default |
-| `on` handler group | `inbox` | `charts.orange` |
-| Transition (event) | `symbol-event` | `charts.orange` |
-| Transition (`onDone` / `onError`) | `circle-filled` | `charts.orange` |
-| Transition target | `target` | `terminal.ansiBrightMagenta` |
-| Action | `rocket` | `symbolIcon.methodForeground` |
-| Entry action | `debug-step-into` | `symbolIcon.methodForeground` |
-| Exit action | `debug-step-out` | `symbolIcon.methodForeground` |
-| Guard | `shield` | `terminal.ansiCyan` |
-| Invoke | `circuit-board` | `charts.yellow` |
-| Actor | `play-circle` | `charts.yellow` |
-| Delay | `history` | `terminal.ansiYellow` |
-| Setup section | `settings-gear` | `terminal.ansiBlue` |
-| Context | `symbol-variable` | `symbolIcon.variableForeground` |
-| Context property | `symbol-property` | `symbolIcon.propertyForeground` |
-| Invalid property | `error` | `terminal.ansiRed` |
-
-Nodes with diagnostics override the color: **errors** use `testing.iconFailed` (red) and **warnings** use `testing.iconQueued` (orange/yellow).
-
-## Colors
-
-All colors are VS Code theme tokens, so the extension matches your active theme (light, dark, or high-contrast).
-
-**Tree** uses the icon color tokens listed above — chiefly `charts.blue` (machines, parallel states), `charts.green` (initial), `charts.red` (final), and `charts.orange` (transitions / handlers).
-
-**Diagram** derives every color from the editor theme:
-
-| Theme token | Used for |
-| --- | --- |
-| `--vscode-editor-foreground` | State / region borders, transition arrows, and node labels |
-| `--vscode-editor-background` | Canvas background and transition-label backgrounds |
-| `--vscode-editorWidget-background` | State box fill |
-| `--vscode-descriptionForeground` | Transition labels and entry/exit action text |
-| `--vscode-list-activeSelectionBackground` | Fill of a highlighted (selected) state |
-| `--vscode-focusBorder` | Border of a highlighted (selected) state |
-| `--vscode-charts-blue` | Parallel-state icon in the tree |
+In the diagram, state borders, arrows, and labels follow your editor's foreground color; state fills use the editor widget background; a **selected** state is filled with your theme's selection color and outlined with the focus color; and **parallel** states use a dark dashed border.
 
 ## Supported patterns
 
@@ -119,7 +95,7 @@ const config  = createStateConfig({ ... });
 const config  = stateConfig({ ... });
 ```
 
-The outline also detects XState v5 setup sections such as:
+It also surfaces v5 `setup` sections:
 
 ```typescript
 const machine = setup({
@@ -130,23 +106,11 @@ const machine = setup({
 }).createMachine({ ... });
 ```
 
-## Usage
+## Tips
 
-1. Open a JavaScript or TypeScript project that uses XState.
-2. Click the **xState Devtools** icon in the activity bar to open the **Search** and **Outline** views.
-3. Navigate the outline:
-   - **Click** any node to jump to its source.
-   - **Double-click** an action, guard, entry, exit, or invoke to go to its implementation (or press **F12** with the node focused).
-   - **Double-click** a transition target to jump to the target state's definition.
-   - **Right-click** tree nodes to edit them from the outline, add child states/transitions/references, delete supported nodes, or open **Go to Implementation**.
-   - Type in the **Search** box and use ↑/↓/Enter to move through results; the funnel button filters results by node type.
-4. Open the diagram:
-   - Use **View State Diagram** (inline icon or right-click) on a machine or compound state to open the statechart in a new tab.
-   - Click states/events to sync back to the tree, drag to pan, scroll to zoom, and use the toolbar to change direction, expand/collapse, fit, or export.
-
-The Outline view's title bar exposes toggles for scope (file/workspace), view mode (grouped/flat), showing state configs, cursor following, whether the diagram reflects tree expansion, grouping event handlers under `on`, and child sort order.
-
-Autocomplete works in JavaScript and TypeScript machine configs, and uses dropdowns for supported value selections such as valid target states and setup-defined actions/guards/actors.
+- The Outline title bar has toggles for **scope** (file/workspace), **view mode** (grouped/flat), **state configs**, **cursor following**, whether the **diagram reflects tree expansion**, **grouping event handlers** under `on`, and **child sort order**.
+- **Right-click** any tree node for editing actions and **Go to Implementation**.
+- In **Search**, use ↑/↓/Enter to move through results and the funnel button to filter by node type.
 
 ## Settings
 
@@ -162,15 +126,20 @@ Autocomplete works in JavaScript and TypeScript machine configs, and uses dropdo
 
 ## Requirements
 
-- Visual Studio Code 1.78.0 or higher
+- Visual Studio Code **1.78.0** or higher
 - A JavaScript or TypeScript project using XState
 
 ## Known limitations
 
-- Only detects statically defined machines (not dynamically generated ones)
+- Detects statically defined machines only (not dynamically generated ones)
 - Context values are shown one level deep to avoid clutter
-- Tree editing currently focuses on the common object/string forms; complex conditional transition arrays and other advanced shapes may still fall back to manual source editing
+- Tree editing focuses on common object/string forms; advanced shapes may still need manual source edits
 - In a focused sub-diagram, transitions whose target lies outside the selected subtree are not drawn
+
+## Links
+
+- [Report an issue](https://github.com/mjbeswick/xstate-devtools/issues)
+- [Source on GitHub](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension)
 
 ## License
 
