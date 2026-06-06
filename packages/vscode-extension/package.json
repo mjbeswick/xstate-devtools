@@ -187,7 +187,7 @@
       },
       {
         "command": "xstateMachineOutline.openGraphView",
-        "title": "Open Visual Graph",
+        "title": "View State Diagram",
         "icon": "$(git-merge)"
       }
     ],
