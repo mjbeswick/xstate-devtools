@@ -6,7 +6,7 @@ import { createMachine, assign } from 'xstate';
  */
 export const complexMachine = createMachine(
   {
-    id: 'complex-root',
+    id: 'applicationOrchestrator',
     initial: 'root',
     context: {
       count: 0,
@@ -41,7 +41,7 @@ export const complexMachine = createMachine(
                       },
                       loadingAssets: {
                         on: {
-                          ASSETS_READY: '#complex-root.root.applicationLayer.authenticated',
+                          ASSETS_READY: '#applicationOrchestrator.root.applicationLayer.authenticated',
                         },
                       },
                     },
@@ -115,7 +115,7 @@ export const complexMachine = createMachine(
                           },
                           renderComplete: {
                             on: {
-                              RENDER_DONE: '#complex-root.root.applicationLayer.authenticated.uiEngine.idle',
+                              RENDER_DONE: '#applicationOrchestrator.root.applicationLayer.authenticated.uiEngine.idle',
                             },
                           },
                         },
@@ -135,7 +135,7 @@ export const complexMachine = createMachine(
                           },
                           displayModal: {
                             on: {
-                              MODAL_CLOSED: '#complex-root.root.applicationLayer.authenticated.uiEngine.idle',
+                              MODAL_CLOSED: '#applicationOrchestrator.root.applicationLayer.authenticated.uiEngine.idle',
                             },
                           },
                         },
