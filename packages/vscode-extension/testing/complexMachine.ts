@@ -360,7 +360,7 @@ export const complexMachine = createMachine(
             },
           },
           userInterface: {
-            type: 'parallel',
+            initial: 'navigation',
             states: {
               navigation: {
                 initial: 'home',
