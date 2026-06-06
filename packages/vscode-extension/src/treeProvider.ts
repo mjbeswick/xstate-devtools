@@ -844,10 +844,10 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
                 break;
             case 'state':
                 if (this.node.isParallel) {
-                    // Hollow circle marks an orthogonal (parallel) state, matching
-                    // the diagram's parallel styling — no child marker needed.
+                    // Hollow blue circle marks an orthogonal (parallel) state —
+                    // no redundant child marker needed.
                     iconName = 'circle-outline';
-                    iconColor = new vscode.ThemeColor('charts.purple');
+                    iconColor = new vscode.ThemeColor('charts.blue');
                 } else if (this.node.isInitial) {
                     iconName = 'circle-filled';
                     iconColor = new vscode.ThemeColor('charts.green');
