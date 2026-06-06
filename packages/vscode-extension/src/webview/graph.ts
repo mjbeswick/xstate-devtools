@@ -649,11 +649,15 @@ async function render(): Promise<void> {
                 rx: 3, ry: 3, fill: C.bg, 'fill-opacity': 1,
                 stroke: C.fg, 'stroke-width': 0.5, 'stroke-opacity': 0.12,
             }));
+            // Box inner padding is (lh+2) − lines·lineH split top/bottom; centre
+            // each line in its slot so vertical padding is symmetric.
+            const padTop = ((e.lh + 2) - e.lines.length * ACTION_LINE_H) / 2;
             for (let i = 0; i < e.lines.length; i++) {
                 // Each line is a distinct event → individually clickable so it
                 // can reveal that specific transition in the tree.
-                const lineEl = txt(e.lines[i], e.lmx, by + (i+1)*ACTION_LINE_H - 3, {
-                    'text-anchor': 'middle', 'font-size': ACTION_PX, fill: C.desc,
+                const lineEl = txt(e.lines[i], e.lmx, by + padTop + (i + 0.5) * ACTION_LINE_H, {
+                    'text-anchor': 'middle', 'dominant-baseline': 'central',
+                    'font-size': ACTION_PX, fill: C.desc,
                 });
                 lineEl.setAttribute('data-event', e.lines[i]);
                 labelG.appendChild(lineEl);
