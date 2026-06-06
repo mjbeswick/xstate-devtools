@@ -122,6 +122,10 @@ function buildElkNode(id: string): ElkNode {
         layoutOptions: {
             'elk.algorithm': 'layered',
             'elk.direction': 'DOWN',
+            // Generous vertical gap between layers so transition arrows and the
+            // labels riding on them have room to breathe.
+            'elk.layered.spacing.nodeNodeBetweenLayers': '104',
+            'elk.spacing.nodeNode': '50',
             'elk.padding': `[top=${REGION_H + 24},left=22,bottom=22,right=22]`,
         },
         children: (childrenOf.get(id) ?? []).map(buildElkNode),
@@ -145,7 +149,7 @@ function buildElkGraph(): ElkNode {
             'elk.algorithm': 'layered',
             'elk.direction': 'DOWN',
             'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
-            'elk.layered.spacing.nodeNodeBetweenLayers': '72',
+            'elk.layered.spacing.nodeNodeBetweenLayers': '104',
             'elk.spacing.nodeNode': '50',
             'elk.layered.thoroughness': '12',
             'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
