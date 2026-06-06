@@ -519,7 +519,38 @@ async function render(): Promise<void> {
         Math.abs(a.lmx - b.lmx) < (a.lw + b.lw) / 2 + 6 &&
         Math.abs(a.lmy - b.lmy) < (a.lh + b.lh) / 2 + 4;
 
-    for (let iter = 0; iter < 160; iter++) {
+    // Node boxes the labels must avoid. Region containers are excluded — a
+    // transition between siblings legitimately has its label inside the region.
+    // Only leaf states and collapsed compound boxes act as obstacles.
+    const RPAD = 4;
+    const obstacles: Rect[] = [];
+    for (const [id, r] of geom.entries()) {
+        const d = nodeById.get(id);
+        if (!d || d.start) { continue; }
+        const isRegion = childStateIds(id).length > 0 && !collapsed.has(id);
+        if (isRegion) { continue; }
+        obstacles.push(r);
+    }
+    // Push a label out of any obstacle rect it overlaps, along the cheaper axis.
+    const pushOutOfNodes = (e: BezierEdge) => {
+        let moved = false;
+        for (const r of obstacles) {
+            const ncx = r.x + r.w / 2, ncy = r.y + r.h / 2;
+            const dx = e.lmx - ncx, dy = e.lmy - ncy;
+            const minX = e.lw / 2 + r.w / 2 + RPAD;
+            const minY = e.lh / 2 + r.h / 2 + RPAD;
+            if (Math.abs(dx) < minX && Math.abs(dy) < minY) {
+                const pushX = minX - Math.abs(dx);
+                const pushY = minY - Math.abs(dy);
+                if (pushY <= pushX) { e.lmy += (dy >= 0 ? 1 : -1) * pushY; }
+                else { e.lmx += (dx >= 0 ? 1 : -1) * pushX; }
+                moved = true;
+            }
+        }
+        return moved;
+    };
+
+    for (let iter = 0; iter < 200; iter++) {
         let moved = false;
         for (let i = 0; i < labelled.length; i++) {
             for (let j = i + 1; j < labelled.length; j++) {
@@ -543,15 +574,19 @@ async function render(): Promise<void> {
                 }
             }
         }
+        for (const e of labelled) { if (pushOutOfNodes(e)) { moved = true; } }
         if (!moved) { break; }
     }
 
     // Guaranteed final pass: place labels top-to-bottom; nudge any still-
-    // colliding box straight down until it clears everything already placed.
+    // colliding box (against placed labels OR node boxes) straight down.
+    const hitsNode = (e: BezierEdge) => obstacles.some(r =>
+        Math.abs(e.lmx - (r.x + r.w/2)) < e.lw/2 + r.w/2 + RPAD &&
+        Math.abs(e.lmy - (r.y + r.h/2)) < e.lh/2 + r.h/2 + RPAD);
     const placed: BezierEdge[] = [];
     for (const e of [...labelled].sort((a, b) => a.lmy - b.lmy || a.lmx - b.lmx)) {
         let guard = 0;
-        while (placed.some(p => overlaps(e, p)) && guard++ < 400) {
+        while ((placed.some(p => overlaps(e, p)) || hitsNode(e)) && guard++ < 600) {
             e.lmy += 4;
         }
         placed.push(e);
@@ -571,9 +606,12 @@ async function render(): Promise<void> {
             const bx = e.lmx - e.lw/2, by = e.lmy - e.lh/2 - 1;
             labelG = el('g', { 'data-src': e.srcId });
             (labelG as SVGElement).style.cursor = 'pointer';
+            // Fully opaque background so a label reads cleanly where it sits
+            // over an edge; faint border crisps it against the line underneath.
             labelG.appendChild(el('rect', {
                 x: bx - 2, y: by, width: e.lw + 4, height: e.lh + 2,
-                rx: 3, ry: 3, fill: C.bg, 'fill-opacity': 0.9,
+                rx: 3, ry: 3, fill: C.bg, 'fill-opacity': 1,
+                stroke: C.fg, 'stroke-width': 0.5, 'stroke-opacity': 0.12,
             }));
             for (let i = 0; i < e.lines.length; i++) {
                 // Each line is a distinct event → individually clickable so it
