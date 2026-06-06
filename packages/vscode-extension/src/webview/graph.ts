@@ -40,7 +40,7 @@ const C = {
     focus:  themeVar('--vscode-focusBorder',                    '#0090f1'),
     selBg:  themeVar('--vscode-list-activeSelectionBackground', '#cce5ff'),
     desc:   themeVar('--vscode-descriptionForeground',          '#717171'),
-    accent: themeVar('--vscode-charts-purple',                  '#9b59b6'),
+    accent: themeVar('--vscode-charts-blue',                    '#3b82f6'),
 };
 const fontFamily = themeVar('--vscode-font-family', 'system-ui, sans-serif');
 
