@@ -141,7 +141,7 @@ export class XStateGraphViewProvider {
 
         const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9_]/g, '_');
 
-        const collect = (n: MachineNode, parentId?: string) => {
+        const collect = (n: MachineNode, parentId: string | undefined, isRoot: boolean) => {
             const id = `n${counter++}`;
             idByNode.set(n, id);
             nodeById.set(id, n);
@@ -163,20 +163,26 @@ export class XStateGraphViewProvider {
                 },
             });
 
-            if (reflectExpansion && childStates.length > 0) {
-                const treeItem = this.treeProvider.getTreeItemForNode(n);
-                if (treeItem && treeItem.collapsibleState === vscode.TreeItemCollapsibleState.Collapsed) {
-                    collapsedIds.push(id);
-                }
+            // A compound state renders as a single collapsed block unless it is
+            // currently expanded in the tree. Using the live expansion set (not
+            // the cached tree item) means this is correct even for nodes whose
+            // tree items have never been rendered. Root states are never
+            // collapsed — a diagram rooted at a state must always show it open.
+            if (reflectExpansion && !isRoot && childStates.length > 0 && !this.treeProvider.isNodeExpanded(n)) {
+                collapsedIds.push(id);
             }
 
-            for (const c of childStates) { collect(c, id); }
+            for (const c of childStates) { collect(c, id, false); }
         };
 
-        const rootStates = machine.type === 'state'
+        // When the diagram is rooted at a single state (a sub-diagram), that
+        // state is always shown expanded. When rooted at a machine, its
+        // top-level states respect their own tree expansion state.
+        const isSubDiagram = machine.type === 'state';
+        const rootStates = isSubDiagram
             ? [machine]
             : (machine.children ?? []).filter(c => c.type === 'state');
-        for (const r of rootStates) { collect(r, undefined); }
+        for (const r of rootStates) { collect(r, undefined, isSubDiagram); }
 
         // Edges: merge transitions between the same source→target pair so multiple
         // events on one arrow don't stack into an unreadable blob.

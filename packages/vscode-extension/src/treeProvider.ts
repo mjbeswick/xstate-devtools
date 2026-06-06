@@ -27,6 +27,10 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
     private cachedItems: XStateMachineTreeItem[] = [];
     private nodeItemCache = new Map<string, XStateMachineTreeItem>();
     private parentMap = new Map<XStateMachineTreeItem, XStateMachineTreeItem | undefined>();
+    // Live set of expanded nodes, keyed by node identity. Tracked independently
+    // of nodeItemCache so the graph can reflect expansion even for nodes whose
+    // tree items have not been rendered yet.
+    private expandedNodeKeys = new Set<string>();
     private currentScope: ViewScope = 'file';
     private viewMode: ViewMode = 'grouped';
     private isLoading: boolean = false;
@@ -72,6 +76,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         // Listen for expand/collapse to update item state
         this.treeView.onDidExpandElement(e => {
             e.element.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+            this.expandedNodeKeys.add(this.itemKey(e.element.node));
             const config = vscode.workspace.getConfiguration('xstateOutline');
             if (config.get<boolean>('graphReflectsTreeExpansion', true)) {
                 vscode.commands.executeCommand('xstateMachineOutline.refreshGraphOnly');
@@ -80,6 +85,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
 
         this.treeView.onDidCollapseElement(e => {
             e.element.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+            this.expandedNodeKeys.delete(this.itemKey(e.element.node));
             const config = vscode.workspace.getConfiguration('xstateOutline');
             if (config.get<boolean>('graphReflectsTreeExpansion', true)) {
                 vscode.commands.executeCommand('xstateMachineOutline.refreshGraphOnly');
@@ -443,6 +449,15 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
 
     public getTreeItemForNode(node: MachineNode): XStateMachineTreeItem | undefined {
         return this.nodeItemCache.get(this.itemKey(node));
+    }
+
+    /**
+     * Whether the given node is currently expanded in the tree. Backed by a
+     * live key set, so it is accurate even for nodes whose tree items have not
+     * been rendered (i.e. their parent is collapsed) — those report false.
+     */
+    public isNodeExpanded(node: MachineNode): boolean {
+        return this.expandedNodeKeys.has(this.itemKey(node));
     }
 
     private itemKey(node: MachineNode): string {
