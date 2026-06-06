@@ -211,11 +211,13 @@ async function render(): Promise<void> {
     container.appendChild(svg);
 
     // Nodes (absolute geometry).
+    const geom = new Map<string, { x: number; y: number; w: number; h: number }>();
     const drawNode = (n: ElkNode, ox: number, oy: number) => {
         const ax = ox + (n.x ?? 0), ay = oy + (n.y ?? 0);
         if (n.id !== 'root') {
             const d = nodeById.get(n.id)!;
             const w = n.width ?? 64, h = n.height ?? 36;
+            geom.set(n.id, { x: ax, y: ay, w, h });
             const isCollapsed = collapsed.has(n.id);
             const isRegion = childStateIds(n.id).length > 0 && !isCollapsed;
             const g = el('g', { 'data-id': n.id, 'data-kind': isRegion ? 'region' : d.start ? 'start' : 'state', 'data-name': d.name });
@@ -247,6 +249,9 @@ async function render(): Promise<void> {
 
     // Edges (sections root-relative == absolute under INCLUDE_CHILDREN).
     for (const e of result.edges ?? []) {
+        // Initial-marker edges are drawn deterministically below — ELK's routing
+        // of the tiny start node leaves them invisible.
+        if (e.sources[0]?.startsWith('start_')) { continue; }
         const s = e.sections?.[0];
         if (!s) { continue; }
         const pts = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint];
@@ -265,6 +270,22 @@ async function render(): Promise<void> {
             g.appendChild(text(lbl.text, lx + lw / 2, ly + lh - 4, { 'text-anchor': 'middle', 'font-size': 11, fill: C.desc }));
             gLabels.appendChild(g);
         }
+    }
+
+    // Initial-state arrows: filled dot → initial substate, routed orthogonally
+    // from the geometry ELK reserved for the start marker.
+    for (const e of payload.edges) {
+        if (!e.data.source.startsWith('start_')) { continue; }
+        const sg = geom.get(e.data.source);
+        const tg = geom.get(e.data.target);
+        if (!sg || !tg) { continue; }
+        const sx = sg.x + sg.w / 2, sy = sg.y + sg.h / 2;
+        const tx2 = tg.x, ty2 = tg.y + tg.h / 2;
+        const midX = (sx + tx2) / 2;
+        const d = Math.abs(sy - ty2) < 1
+            ? `M ${sx} ${sy} L ${tx2} ${ty2}`
+            : `M ${sx} ${sy} L ${midX} ${sy} L ${midX} ${ty2} L ${tx2} ${ty2}`;
+        gEdges.appendChild(el('path', { d, fill: 'none', stroke: C.fg, 'stroke-width': 1.4, 'stroke-linejoin': 'round', 'marker-end': 'url(#arrow)' }));
     }
 
     if (!didFit) {
