@@ -53,7 +53,7 @@ export class XStateGraphViewProvider {
             { enableScripts: true, localResourceRoots: [this.extensionUri] }
         );
 
-        const entry: PanelEntry = { panel, machine: machineNode, nodeById: new Map(), title, direction: 'DOWN' };
+        const entry: PanelEntry = { panel, machine: machineNode, nodeById: new Map(), title, direction: this.autoDirection(machineNode) };
         this.panels.set(key, entry);
         this.activeKey = key;
 
@@ -79,6 +79,25 @@ export class XStateGraphViewProvider {
         });
 
         this.updatePanel(key);
+    }
+
+    // Pick a starting layout direction from the machine's shape. Small,
+    // mostly-linear machines (e.g. a traffic light) read naturally left-to-right
+    // as a flow; parallel, large, or wide machines read better top-down — their
+    // regions sit side by side and a wide machine laid horizontally gets
+    // unwieldy. This is only the initial default; the toolbar toggle (persisted
+    // per panel in entry.direction) always wins after that.
+    private autoDirection(machine: MachineNode): 'DOWN' | 'RIGHT' {
+        let hasParallel = false, stateCount = 0, maxSiblings = 0;
+        const visit = (n: MachineNode) => {
+            if (n.isParallel) { hasParallel = true; }
+            const childStates = (n.children ?? []).filter(c => c.type === 'state' && !c.isTypeMarker);
+            maxSiblings = Math.max(maxSiblings, childStates.length);
+            for (const c of childStates) { stateCount++; visit(c); }
+        };
+        visit(machine);
+        if (hasParallel || stateCount > 24 || maxSiblings > 6) { return 'DOWN'; }
+        return 'RIGHT';
     }
 
     public highlightState(stateName: string) {
