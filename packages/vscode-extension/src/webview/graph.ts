@@ -531,6 +531,9 @@ async function render(): Promise<void> {
     };
 
     // Smooth a routed polyline by rounding each corner with a quadratic curve.
+    // The corner before the endpoint keeps a straight run-in (>= END_STRAIGHT)
+    // so the arrowhead is never pinched against a rounded corner.
+    const END_STRAIGHT = 10;
     const roundedPath = (p: XY[], r: number): string => {
         if (p.length < 2) { return ''; }
         if (p.length === 2) { return `M ${p[0].x} ${p[0].y} L ${p[1].x} ${p[1].y}`; }
@@ -539,7 +542,10 @@ async function render(): Promise<void> {
             const a = p[i - 1], c = p[i], b = p[i + 1];
             const d1 = Math.hypot(c.x - a.x, c.y - a.y) || 1;
             const d2 = Math.hypot(b.x - c.x, b.y - c.y) || 1;
-            const r1 = Math.min(r, d1 / 2), r2 = Math.min(r, d2 / 2);
+            const r1 = Math.min(r, d1 / 2);
+            let r2 = Math.min(r, d2 / 2);
+            // Last corner: cap the radius so a straight run remains before the end.
+            if (i === p.length - 2) { r2 = Math.min(r2, Math.max(0, d2 - END_STRAIGHT)); }
             const ix = c.x + (a.x - c.x) / d1 * r1, iy = c.y + (a.y - c.y) / d1 * r1;
             const ox = c.x + (b.x - c.x) / d2 * r2, oy = c.y + (b.y - c.y) / d2 * r2;
             d += ` L ${ix} ${iy} Q ${c.x} ${c.y} ${ox} ${oy}`;
@@ -583,7 +589,7 @@ async function render(): Promise<void> {
             }
             const lb = e.labels?.[0];
             const label = (lb && lb.x != null && lb.y != null) ? { x: o.x + lb.x, y: o.y + lb.y } : undefined;
-            const clean = withEndStub(simplify(pts), geom.get(e.targets[0]), 12);
+            const clean = withEndStub(simplify(pts), geom.get(e.targets[0]), 16);
             routed.push({ id: e.id, pts: clean, label });
         }
         for (const c of n.children ?? []) { collectEdges(c); }
