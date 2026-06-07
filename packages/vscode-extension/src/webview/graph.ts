@@ -154,8 +154,8 @@ const ROUTING_OPTS: Record<string, string> = {
     'elk.edgeRouting': 'ORTHOGONAL',
     // Base spacing is kept tight — ELK adds its own room for the reserved edge
     // labels on top of this, so a large base would double up.
-    'elk.layered.spacing.nodeNodeBetweenLayers': '38',
-    'elk.spacing.nodeNode': '28',
+    'elk.layered.spacing.nodeNodeBetweenLayers': '30',
+    'elk.spacing.nodeNode': '22',
     'elk.spacing.edgeNode': '12',
     'elk.spacing.edgeEdge': '8',
     'elk.layered.spacing.edgeNodeBetweenLayers': '12',
@@ -480,6 +480,17 @@ async function render(): Promise<void> {
         selfEdges.set(s, prev ? (lbl ? `${prev}\n${lbl}` : prev) : lbl);
     }
 
+    // Point on a rectangle's border along the ray from its centre toward `to`.
+    const borderPoint = (rect: Rect, to: XY): XY => {
+        const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+        const dx = to.x - cx, dy = to.y - cy;
+        if (dx === 0 && dy === 0) { return { x: cx, y: cy }; }
+        const tx = dx !== 0 ? (rect.w / 2) / Math.abs(dx) : Infinity;
+        const ty = dy !== 0 ? (rect.h / 2) / Math.abs(dy) : Infinity;
+        const k = Math.min(tx, ty);
+        return { x: cx + dx * k, y: cy + dy * k };
+    };
+
     // Smooth a routed polyline by rounding each corner with a quadratic curve.
     const roundedPath = (p: XY[], r: number): string => {
         if (p.length < 2) { return ''; }
@@ -522,11 +533,14 @@ async function render(): Promise<void> {
                 pts = [sec.startPoint, ...(sec.bendPoints ?? []), sec.endPoint]
                     .map(pt => ({ x: o.x + pt.x, y: o.y + pt.y }));
             } else {
-                // ELK gave no route — fall back to a straight centre-to-centre
-                // line (absolute geometry) so the edge is never dropped.
+                // ELK gave no route — fall back to a straight line clipped to
+                // each node's border (so the arrowhead lands on the edge, not
+                // inside the box).
                 const sg = geom.get(e.sources[0]), tg = geom.get(e.targets[0]);
                 if (!sg || !tg) { continue; }
-                pts = [{ x: sg.x + sg.w / 2, y: sg.y + sg.h / 2 }, { x: tg.x + tg.w / 2, y: tg.y + tg.h / 2 }];
+                const sc = { x: sg.x + sg.w / 2, y: sg.y + sg.h / 2 };
+                const tc = { x: tg.x + tg.w / 2, y: tg.y + tg.h / 2 };
+                pts = [borderPoint(sg, tc), borderPoint(tg, sc)];
             }
             const lb = e.labels?.[0];
             const label = (lb && lb.x != null && lb.y != null) ? { x: o.x + lb.x, y: o.y + lb.y } : undefined;
@@ -559,7 +573,7 @@ async function render(): Promise<void> {
         if (r.pts.length < 2) { continue; }
         const meta = edgeMeta.get(r.id);
         const path = el('path', {
-            d: roundedPath(r.pts, 18),
+            d: roundedPath(r.pts, 12),
             fill: 'none', stroke: C.fg, 'stroke-width': 1.5, 'stroke-opacity': 0.7,
             'marker-end': 'url(#arr)',
         });
