@@ -152,16 +152,18 @@ function buildElkNode(id: string): ElkNode {
 // free space instead of us stacking them at curve midpoints.
 const ROUTING_OPTS: Record<string, string> = {
     'elk.edgeRouting': 'ORTHOGONAL',
-    'elk.layered.spacing.nodeNodeBetweenLayers': '70',
-    'elk.spacing.nodeNode': '44',
-    'elk.spacing.edgeNode': '20',
-    'elk.spacing.edgeEdge': '14',
-    'elk.layered.spacing.edgeNodeBetweenLayers': '22',
-    'elk.layered.spacing.edgeEdgeBetweenLayers': '12',
+    // Base spacing is kept tight — ELK adds its own room for the reserved edge
+    // labels on top of this, so a large base would double up.
+    'elk.layered.spacing.nodeNodeBetweenLayers': '38',
+    'elk.spacing.nodeNode': '28',
+    'elk.spacing.edgeNode': '12',
+    'elk.spacing.edgeEdge': '8',
+    'elk.layered.spacing.edgeNodeBetweenLayers': '12',
+    'elk.layered.spacing.edgeEdgeBetweenLayers': '8',
     // Give ELK the labels so it reserves space and places them in gaps,
     // spreading nodes apart rather than letting labels pile onto each other.
     'elk.edgeLabels.placement': 'CENTER',
-    'elk.spacing.edgeLabel': '6',
+    'elk.spacing.edgeLabel': '3',
     'elk.layered.thoroughness': '12',
     'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
     'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
