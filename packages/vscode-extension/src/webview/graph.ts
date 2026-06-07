@@ -231,8 +231,10 @@ function fitToScreen() {
 
 // ── Render ────────────────────────────────────────────────────────────────────
 async function render(): Promise<void> {
-    const layout = elk.layout as (g: unknown) => Promise<unknown>;
-    const result = await layout(buildElkGraph()) as ElkNode;
+    // Call as a method so elkjs keeps its `this` binding; cast the argument
+    // through unknown since our ElkNode shape differs from elkjs's typings.
+    const graph = buildElkGraph() as unknown as Parameters<typeof elk.layout>[0];
+    const result = await elk.layout(graph) as unknown as ElkNode;
     lastW = result.width ?? 100;
     lastH = result.height ?? 100;
 
