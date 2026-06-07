@@ -235,6 +235,14 @@ let viewport: SVGElement;
 let scale = 1, tx = 0, ty = 0;
 let lastW = 100, lastH = 100;
 
+// Keyboard navigation: the currently-selected state and the overlay group its
+// focus ring is drawn into (recreated each render). Container is focusable so
+// it receives keydown.
+container.tabIndex = 0;
+(container as HTMLElement).style.outline = 'none';
+let selectedId: string | null = null;
+let gSel: SVGElement | null = null;
+
 function applyTransform() {
     viewport.setAttribute('transform', `translate(${tx} ${ty}) scale(${scale})`);
 }
@@ -274,7 +282,8 @@ async function render(): Promise<void> {
     const gEdges  = el('g'); // edge paths
     const gNodes  = el('g'); // leaf state boxes
     const gLabels = el('g'); // edge labels (topmost)
-    viewport.append(gBack, gEdges, gNodes, gLabels);
+    gSel = el('g');          // selection focus ring (above everything)
+    viewport.append(gBack, gEdges, gNodes, gLabels, gSel);
     svg.appendChild(viewport);
     container.appendChild(svg);
 
@@ -723,11 +732,126 @@ async function render(): Promise<void> {
 
     // Always re-fit so expanding/collapsing a node reveals the full diagram.
     fitToScreen();
+    // A selected node that survived this render keeps its focus ring; one that
+    // vanished (e.g. hidden inside a state that was just collapsed) is dropped.
+    if (selectedId && !geom.has(selectedId)) { selectedId = null; }
+    drawSelection();
 }
+
+// ── Keyboard navigation ─────────────────────────────────────────────────────
+// Every node with geometry is selectable except the initial-state dots.
+const selectableIds = (): string[] =>
+    [...geom.keys()].filter(id => !nodeById.get(id)?.start);
+const centerOf = (id: string) => {
+    const r = geom.get(id)!;
+    return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
+};
+
+// Draw (or clear) the focus ring around the selected node.
+function drawSelection() {
+    if (!gSel) { return; }
+    gSel.replaceChildren();
+    if (!selectedId) { return; }
+    const r = geom.get(selectedId);
+    if (!r) { return; }
+    gSel.appendChild(el('rect', {
+        x: r.x - 3, y: r.y - 3, width: r.w + 6, height: r.h + 6, rx: 11, ry: 11,
+        fill: 'none', stroke: C.focus, 'stroke-width': 2.5, 'stroke-opacity': 0.95,
+        'pointer-events': 'none',
+    }));
+}
+
+// Pan the minimum amount so the selected node sits inside the viewport (margin
+// of 48px). Keeps the focus ring on screen as selection moves.
+function ensureSelectedVisible() {
+    if (!selectedId) { return; }
+    const r = geom.get(selectedId);
+    if (!r) { return; }
+    const cw = container.clientWidth, ch = container.clientHeight, m = 48;
+    const sx = r.x * scale + tx, sy = r.y * scale + ty, sw = r.w * scale, sh = r.h * scale;
+    if (sx < m) { tx += m - sx; } else if (sx + sw > cw - m) { tx -= sx + sw - (cw - m); }
+    if (sy < m) { ty += m - sy; } else if (sy + sh > ch - m) { ty -= sy + sh - (ch - m); }
+    applyTransform();
+}
+
+function selectNode(id: string | null) {
+    selectedId = id;
+    drawSelection();
+    ensureSelectedVisible();
+}
+
+// Move selection to the nearest selectable node in `dir`. Score favours travel
+// along the axis of motion over perpendicular drift, so e.g. ArrowRight prefers
+// a node to the right and roughly level over one far off-axis.
+function navSelect(dir: 'up' | 'down' | 'left' | 'right') {
+    const ids = selectableIds();
+    if (!ids.length) { return; }
+    if (!selectedId || !geom.has(selectedId)) {
+        // First press: enter at the top-most, then left-most node.
+        const start = ids.slice().sort((a, b) => {
+            const ca = centerOf(a), cb = centerOf(b);
+            return ca.y - cb.y || ca.x - cb.x;
+        })[0];
+        selectNode(start);
+        return;
+    }
+    const a = centerOf(selectedId);
+    let best: string | null = null, bestScore = Infinity;
+    for (const id of ids) {
+        if (id === selectedId) { continue; }
+        const b = centerOf(id);
+        const dx = b.x - a.x, dy = b.y - a.y;
+        let along: number, perp: number;
+        if (dir === 'right') { if (dx <= 1) { continue; } along = dx; perp = Math.abs(dy); }
+        else if (dir === 'left') { if (dx >= -1) { continue; } along = -dx; perp = Math.abs(dy); }
+        else if (dir === 'down') { if (dy <= 1) { continue; } along = dy; perp = Math.abs(dx); }
+        else { if (dy >= -1) { continue; } along = -dy; perp = Math.abs(dx); }
+        const score = along + perp * 2;
+        if (score < bestScore) { bestScore = score; best = id; }
+    }
+    if (best) { selectNode(best); }
+}
+
+// Enter on the selected node: toggle a compound (region or collapsed box) or
+// jump to a leaf state's source — mirrors a click.
+function activateSelected() {
+    if (!selectedId) { return; }
+    const hasChildren = childStateIds(selectedId).length > 0;
+    if (hasChildren) {
+        if (collapsed.has(selectedId)) { collapsed.delete(selectedId); } else { collapsed.add(selectedId); }
+        render().catch(showError);
+        return;
+    }
+    vscode.postMessage({ command: 'stateClicked', id: selectedId });
+}
+
+function panBy(dir: 'up' | 'down' | 'left' | 'right', step = 90) {
+    if (dir === 'right') { tx -= step; } else if (dir === 'left') { tx += step; }
+    else if (dir === 'down') { ty -= step; } else { ty += step; }
+    applyTransform();
+}
+
+const ARROW: Record<string, 'up' | 'down' | 'left' | 'right'> = {
+    ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+};
+container.addEventListener('keydown', (ev) => {
+    const k = ev.key;
+    if (k === ']' || k === '+' || k === '=') { zoomAround(1.25); ev.preventDefault(); return; }
+    if (k === '[' || k === '-' || k === '_') { zoomAround(1 / 1.25); ev.preventDefault(); return; }
+    if (k === '0') { fitToScreen(); ev.preventDefault(); return; }
+    const dir = ARROW[k];
+    if (dir) {
+        ev.preventDefault();
+        if (ev.shiftKey) { panBy(dir); } else { navSelect(dir); }
+        return;
+    }
+    if (k === 'Enter' || k === ' ') { ev.preventDefault(); activateSelected(); }
+});
 
 // ── Interaction ───────────────────────────────────────────────────────────────
 let panMoved = false;
 container.addEventListener('click', (ev) => {
+    container.focus();
     if (panMoved) { return; }
     const target = ev.target as Element;
     const lineEl = target.closest('[data-event]');
@@ -745,6 +869,8 @@ container.addEventListener('click', (ev) => {
     const kind = nodeG.getAttribute('data-kind');
     const id = nodeG.getAttribute('data-id')!;
     if (kind === 'start') { return; }
+    // Keep keyboard nav in sync with what was clicked.
+    selectNode(id);
     if (kind === 'region' || collapsed.has(id)) {
         if (collapsed.has(id)) { collapsed.delete(id); } else { collapsed.add(id); }
         render().catch(showError);
@@ -881,4 +1007,4 @@ function showError(err: unknown): void {
     container.appendChild(pre);
 }
 
-render().catch(showError);
+render().then(() => container.focus()).catch(showError);

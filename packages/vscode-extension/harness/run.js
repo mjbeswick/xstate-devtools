@@ -73,6 +73,19 @@ async function main() {
         // (not the border) of the region whose title matches CLICK_REGION, to
         // prove interior clicks now collapse a region.
         const CLICK = ${JSON.stringify(process.env.CLICK_REGION || '')};
+        // KEYS="ArrowDown ArrowDown Enter" dispatches a keydown sequence on the
+        // container (prefix a token with Shift+ for shiftKey). Drives keyboard nav.
+        const KEYS = ${JSON.stringify(process.env.KEYS || '')};
+        if (KEYS) {
+          const cy = document.getElementById('cy');
+          cy.focus();
+          const toks = KEYS.split(/\\s+/).filter(Boolean);
+          toks.forEach((tok, i) => setTimeout(() => {
+            const shift = tok.startsWith('Shift+');
+            const key = shift ? tok.slice(6) : tok;
+            cy.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey: shift, bubbles: true }));
+          }, 400 + i * 180));
+        }
         // COLLAPSE_ALL=1 clicks the collapse-all toolbar button after render.
         if (${JSON.stringify(process.env.COLLAPSE_ALL || '')}) {
           setTimeout(() => document.getElementById('btn-collapse-all').click(), 300);
@@ -108,7 +121,7 @@ async function main() {
         '--headless', '--disable-gpu', '--no-sandbox', '--hide-scrollbars',
         '--force-device-scale-factor=2',
         '--window-size=1400,1000',
-        '--virtual-time-budget=4000',
+        '--virtual-time-budget=6000',
         `--screenshot=${pngPath}`,
         `file://${htmlPath}`,
     ], { encoding: 'utf8' });
