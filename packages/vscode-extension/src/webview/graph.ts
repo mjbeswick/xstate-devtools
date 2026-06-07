@@ -15,13 +15,23 @@ interface GraphPayload {
     edges: { data: { id: string; source: string; target: string; label: string } }[];
     collapsedIds?: string[];
 }
+interface XY { x: number; y: number }
+interface ElkEdgeLabel { text?: string; width?: number; height?: number; x?: number; y?: number }
+interface ElkEdge {
+    id: string; sources: string[]; targets: string[];
+    labels?: ElkEdgeLabel[];
+    sections?: { startPoint: XY; endPoint: XY; bendPoints?: XY[] }[];
+}
 interface ElkNode {
     id: string; width?: number; height?: number; x?: number; y?: number;
-    labels?: { text: string; width?: number; height?: number; layoutOptions?: Record<string, string> }[];
+    labels?: { text: string; width?: number; height?: number; x?: number; y?: number; layoutOptions?: Record<string, string> }[];
     layoutOptions?: Record<string, string>;
     children?: ElkNode[];
-    edges?: { id: string; sources: string[]; targets: string[] }[];
+    edges?: ElkEdge[];
 }
+
+// Per-routed-edge metadata, populated by buildElkGraph and read while drawing.
+const edgeMeta = new Map<string, { srcId: string; tgtId: string; lines: string[] }>();
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const vscode = acquireVsCodeApi();
@@ -130,26 +140,56 @@ function buildElkNode(id: string): ElkNode {
         layoutOptions: {
             'elk.algorithm': 'layered',
             'elk.direction': direction,
-            // Enough between-layer gap for arrows and their labels, without the
-            // diagram becoming needlessly long.
-            'elk.layered.spacing.nodeNodeBetweenLayers': '70',
-            'elk.spacing.nodeNode': '44',
+            ...ROUTING_OPTS,
             'elk.padding': `[top=${REGION_H + 24},left=22,bottom=22,right=22]`,
         },
         children: (childrenOf.get(id) ?? []).map(buildElkNode),
     };
 }
 
+// Shared routing/spacing options applied at every hierarchy level so ELK
+// routes edges (avoiding nodes, spacing parallels) and places their labels in
+// free space instead of us stacking them at curve midpoints.
+const ROUTING_OPTS: Record<string, string> = {
+    'elk.edgeRouting': 'ORTHOGONAL',
+    'elk.layered.spacing.nodeNodeBetweenLayers': '70',
+    'elk.spacing.nodeNode': '44',
+    'elk.spacing.edgeNode': '20',
+    'elk.spacing.edgeEdge': '14',
+    'elk.layered.spacing.edgeNodeBetweenLayers': '22',
+    'elk.layered.spacing.edgeEdgeBetweenLayers': '12',
+    'elk.edgeLabels.placement': 'CENTER',
+    'elk.spacing.edgeLabel': '6',
+    'elk.layered.thoroughness': '12',
+    'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+    'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+    'elk.layered.cycleBreaking.strategy': 'DEPTH_FIRST',
+};
+
 function buildElkGraph(): ElkNode {
-    const seen = new Set<string>();
-    const edges: { id: string; sources: string[]; targets: string[] }[] = [];
+    edgeMeta.clear();
+    // Merge transitions sharing a visible source→target pair into one routed
+    // edge (skip self-loops and initial-marker edges — drawn separately).
+    const merged = new Map<string, { id: string; s: string; t: string; lines: string[] }>();
     for (const e of payload.edges) {
+        if (e.data.source.startsWith('start_')) { continue; }
         const s = visibleEndpoint(e.data.source), t = visibleEndpoint(e.data.target);
         if (s === t) { continue; }
         const key = `${s} ${t}`;
-        if (seen.has(key)) { continue; }
-        seen.add(key);
-        edges.push({ id: e.data.id, sources: [s], targets: [t] });
+        const lines = e.data.label ? e.data.label.split('\n').filter(Boolean) : [];
+        const ex = merged.get(key);
+        if (ex) { for (const l of lines) { if (!ex.lines.includes(l)) { ex.lines.push(l); } } }
+        else { merged.set(key, { id: e.data.id, s, t, lines: [...lines] }); }
+    }
+    const edges: ElkEdge[] = [];
+    for (const m of merged.values()) {
+        edgeMeta.set(m.id, { srcId: m.s, tgtId: m.t, lines: m.lines });
+        const labels: ElkEdgeLabel[] = m.lines.length ? [{
+            text: m.lines.join('\n'),
+            width: Math.max(...m.lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 12,
+            height: m.lines.length * ACTION_LINE_H + 4,
+        }] : [];
+        edges.push({ id: m.id, sources: [m.s], targets: [m.t], labels });
     }
     return {
         id: 'root',
@@ -157,12 +197,7 @@ function buildElkGraph(): ElkNode {
             'elk.algorithm': 'layered',
             'elk.direction': direction,
             'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
-            'elk.layered.spacing.nodeNodeBetweenLayers': '70',
-            'elk.spacing.nodeNode': '44',
-            'elk.layered.thoroughness': '12',
-            'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
-            'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
-            'elk.layered.cycleBreaking.strategy': 'DEPTH_FIRST',
+            ...ROUTING_OPTS,
         },
         children: (childrenOf.get('__root__') ?? []).map(buildElkNode),
         edges,
@@ -203,7 +238,8 @@ function fitToScreen() {
 
 // ── Render ────────────────────────────────────────────────────────────────────
 async function render(): Promise<void> {
-    const result = await elk.layout(buildElkGraph()) as ElkNode;
+    const layout = elk.layout as (g: unknown) => Promise<unknown>;
+    const result = await layout(buildElkGraph()) as ElkNode;
     lastW = result.width ?? 100;
     lastH = result.height ?? 100;
 
@@ -421,344 +457,107 @@ async function render(): Promise<void> {
     };
     drawNode(result, 0, 0);
 
-    // ── Pass 3: compute edge bezier params ────────────────────────────────
-    // Deduplicate edges after visibility transform, merging labels.
-    const visEdges = new Map<string, string>();   // "srcId tgtId" → merged label
-    const selfEdges = new Map<string, string>();  // nodeId → merged label (self-transitions)
+    // ── Self-transitions: kept aside, drawn as corner loops below ─────────
+    const selfEdges = new Map<string, string>();  // nodeId → merged label
     for (const e of payload.edges) {
         if (e.data.source.startsWith('start_')) { continue; }
         const s = visibleEndpoint(e.data.source), t = visibleEndpoint(e.data.target);
+        if (s !== t) { continue; }
         const lbl = e.data.label.trim();
-        if (s === t) {
-            const prev = selfEdges.get(s);
-            selfEdges.set(s, prev ? (lbl ? `${prev}\n${lbl}` : prev) : lbl);
-            continue;
-        }
-        const key = `${s} ${t}`;
-        const prev = visEdges.get(key);
-        visEdges.set(key, prev ? (lbl ? `${prev}\n${lbl}` : prev) : lbl);
+        const prev = selfEdges.get(s);
+        selfEdges.set(s, prev ? (lbl ? `${prev}\n${lbl}` : prev) : lbl);
     }
 
-    interface BezierEdge {
-        srcId: string; tgtId: string; label: string;
-        sx: number; sy: number; cp1x: number; cp1y: number;
-        cp2x: number; cp2y: number; ex: number; ey: number;
-        // Label geometry — resolved by push-apart
-        lmx: number; lmy: number; lw: number; lh: number; lines: string[];
-    }
-
-    // Classify each edge and record which border side it attaches to at each
-    // end, so multiple edges sharing a node spread across that border instead
-    // of stacking on its centre.
-    type Side = 'T' | 'B' | 'L' | 'R';
-    interface Spec {
-        srcId: string; tgtId: string; label: string; lines: string[]; lw: number; lh: number;
-        kind: 'backward' | 'lateral' | 'forward';
-        sg: Rect; tg: Rect; sSide: Side; tSide: Side;
-    }
-    // Project onto flow (main) and perpendicular (cross) axes per direction so
-    // the same classification works for both DOWN and RIGHT layouts.
+    // Used by the initial-state arrows below.
     const DOWN = direction === 'DOWN';
-    const mainC  = (r: Rect) => DOWN ? r.y + r.h/2 : r.x + r.w/2;
-    const crossC = (r: Rect) => DOWN ? r.x + r.w/2 : r.y + r.h/2;
-    const mainSize = (r: Rect) => DOWN ? r.h : r.w;
-
-    const specs: Spec[] = [];
-    for (const [key, label] of visEdges.entries()) {
-        const sp = key.indexOf(' ');
-        const srcId = key.slice(0, sp), tgtId = key.slice(sp + 1);
-        const sg = geom.get(srcId), tg = geom.get(tgtId);
-        if (!sg || !tg) { continue; }
-
-        const ms = mainC(sg), mt = mainC(tg);
-        const cs = crossC(sg), ct = crossC(tg);
-        const isBackward = mt < ms - 10;
-        const isLateral  = !isBackward && Math.abs(mt - ms) < Math.max(mainSize(sg), mainSize(tg)) * 0.8;
-
-        let kind: Spec['kind'], sSide: Side, tSide: Side;
-        if (isBackward) {
-            // Loop back around whichever side has more free space between the
-            // two nodes and the diagram edge, so the loop stays short instead
-            // of always sweeping the same way. Ties prefer the trailing side.
-            kind = 'backward';
-            // Measure free space within the two nodes' common container (their
-            // shared parent region), not the whole diagram — sibling regions
-            // shouldn't drag the loop to the far side. Ties prefer left/top.
-            const pid = nodeById.get(srcId)?.parent;
-            const pr = pid ? geom.get(pid) : undefined;
-            if (DOWN) {
-                const lo = pr ? pr.x : 0, hi = pr ? pr.x + pr.w : lastW;
-                const leftSpace  = Math.min(sg.x, tg.x) - lo;
-                const rightSpace = hi - Math.max(sg.x + sg.w, tg.x + tg.w);
-                [sSide, tSide] = leftSpace >= rightSpace ? ['L', 'L'] : ['R', 'R'];
-            } else {
-                const lo = pr ? pr.y : 0, hi = pr ? pr.y + pr.h : lastH;
-                const topSpace    = Math.min(sg.y, tg.y) - lo;
-                const bottomSpace = hi - Math.max(sg.y + sg.h, tg.y + tg.h);
-                [sSide, tSide] = topSpace >= bottomSpace ? ['T', 'T'] : ['B', 'B'];
-            }
-        } else if (isLateral) {
-            // Same layer → connect the facing cross sides.
-            kind = 'lateral';
-            if (DOWN) { [sSide, tSide] = ct >= cs ? ['R', 'L'] : ['L', 'R']; }
-            else      { [sSide, tSide] = ct >= cs ? ['B', 'T'] : ['T', 'B']; }
-        } else {
-            // Forward along the flow: exit the leading face, enter the trailing one.
-            kind = 'forward';
-            [sSide, tSide] = DOWN ? ['B', 'T'] : ['R', 'L'];
-        }
-
-        const lines = label ? label.split('\n').filter(Boolean) : [];
-        const lw = lines.length ? Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 16 : 0;
-        const lh = lines.length ? lines.length * ACTION_LINE_H + 4 : 0;
-        specs.push({ srcId, tgtId, label, lines, lw, lh, kind, sg, tg, sSide, tSide });
-    }
-
-    // Distribute attachment points: group every endpoint by (node, side), order
-    // them by the opposite end's cross-axis position (fewest crossings), then
-    // spread them evenly along that border.
-    const srcAt = new Map<Spec, { x: number; y: number }>();
-    const tgtAt = new Map<Spec, { x: number; y: number }>();
-    const vert = (s: Side) => s === 'L' || s === 'R';
-    const distribute = (
-        which: 'src' | 'tgt',
-        sideOf: (s: Spec) => Side,
-        rectOf: (s: Spec) => Rect,
-        order: (s: Spec) => number,
-    ) => {
-        const groups = new Map<string, Spec[]>();
-        for (const s of specs) {
-            const k = `${which === 'src' ? s.srcId : s.tgtId}:${sideOf(s)}`;
-            (groups.get(k) ?? groups.set(k, []).get(k)!).push(s);
-        }
-        for (const arr of groups.values()) {
-            arr.sort((a, b) => order(a) - order(b));
-            const n = arr.length;
-            arr.forEach((s, i) => {
-                const r = rectOf(s), side = sideOf(s), f = (i + 1) / (n + 1);
-                let x: number, y: number;
-                if (vert(side)) {
-                    const m = Math.min(12, r.h * 0.3);
-                    y = r.y + m + f * (r.h - 2 * m);
-                    x = side === 'L' ? r.x : r.x + r.w;
-                } else {
-                    const m = Math.min(16, r.w * 0.3);
-                    x = r.x + m + f * (r.w - 2 * m);
-                    y = side === 'T' ? r.y : r.y + r.h;
-                }
-                (which === 'src' ? srcAt : tgtAt).set(s, { x, y });
-            });
-        }
-    };
-    const cx = (r: Rect) => r.x + r.w / 2, cy = (r: Rect) => r.y + r.h / 2;
-    distribute('src', s => s.sSide, s => s.sg, s => vert(s.sSide) ? cy(s.tg) : cx(s.tg));
-    distribute('tgt', s => s.tSide, s => s.tg, s => vert(s.tSide) ? cy(s.sg) : cx(s.sg));
-
-    // Backward edges: pull both attachments into the gap between the nodes —
-    // source near its target-facing edge, target near its source-facing edge —
-    // so the loop is short and sits beside the gap instead of starting at a
-    // far node centre and sweeping across.
-    const GAPM = 10;
-    for (const s of specs) {
-        if (s.kind !== 'backward') { continue; }
-        const a = srcAt.get(s)!, b = tgtAt.get(s)!;
-        if (DOWN) {
-            a.x = s.sSide === 'L' ? s.sg.x : s.sg.x + s.sg.w; a.y = s.sg.y + GAPM;
-            b.x = s.tSide === 'L' ? s.tg.x : s.tg.x + s.tg.w; b.y = s.tg.y + s.tg.h - GAPM;
-        } else {
-            a.y = s.sSide === 'T' ? s.sg.y : s.sg.y + s.sg.h; a.x = s.sg.x + GAPM;
-            b.y = s.tSide === 'T' ? s.tg.y : s.tg.y + s.tg.h; b.x = s.tg.x + s.tg.w - GAPM;
-        }
-    }
-
-    const bezierEdges: BezierEdge[] = [];
-    // Control-point offset along the main axis. Clamped to ≤ half the span so
-    // the two control points never cross — crossing produces a cusp/hook that
-    // renders as a kinked arrowhead. Degenerate (tiny/negative) spans collapse
-    // to a near-straight line.
     const lerpBend = (span: number) => {
         const d = Math.max(0, span);
         return Math.min(d * 0.5, Math.max(14, d * 0.4));
     };
 
-    // Unit outward normal of a border side — control points extend along it so
-    // the curve leaves/enters each node perpendicular to its face. Offsetting
-    // each control point along its own normal (rather than to a shared column)
-    // keeps the curve smooth and cusp-free.
-    const outward = (side: Side): [number, number] =>
-        side === 'T' ? [0, -1] : side === 'B' ? [0, 1] : side === 'L' ? [-1, 0] : [1, 0];
-
-    for (const s of specs) {
-        const a = srcAt.get(s)!, b = tgtAt.get(s)!;
-        const sx = a.x, sy = a.y, ex = b.x, ey = b.y;
-        const [snx, sny] = outward(s.sSide);
-        const [tnx, tny] = outward(s.tSide);
-
-        let bend: number;
-        if (s.kind === 'backward') {
-            // The attachments sit in the gap, so the loop only needs to reach
-            // out far enough to clear the node side — size it from the actual
-            // endpoint separation, with a small minimum.
-            const sep = Math.abs(ex - sx) + Math.abs(ey - sy);
-            bend = Math.min(120, Math.max(24, sep * 0.5));
-        } else {
-            // Clamp to half the span *along the normal axis* so the two control
-            // points can never cross (which is what produced cusps/hooks).
-            const span = vert(s.sSide) ? Math.abs(ex - sx) : Math.abs(ey - sy);
-            bend = lerpBend(span);
+    // Smooth a routed polyline by rounding each corner with a quadratic curve.
+    const roundedPath = (p: XY[], r: number): string => {
+        if (p.length < 2) { return ''; }
+        if (p.length === 2) { return `M ${p[0].x} ${p[0].y} L ${p[1].x} ${p[1].y}`; }
+        let d = `M ${p[0].x} ${p[0].y}`;
+        for (let i = 1; i < p.length - 1; i++) {
+            const a = p[i - 1], c = p[i], b = p[i + 1];
+            const d1 = Math.hypot(c.x - a.x, c.y - a.y) || 1;
+            const d2 = Math.hypot(b.x - c.x, b.y - c.y) || 1;
+            const r1 = Math.min(r, d1 / 2), r2 = Math.min(r, d2 / 2);
+            const ix = c.x + (a.x - c.x) / d1 * r1, iy = c.y + (a.y - c.y) / d1 * r1;
+            const ox = c.x + (b.x - c.x) / d2 * r2, oy = c.y + (b.y - c.y) / d2 * r2;
+            d += ` L ${ix} ${iy} Q ${c.x} ${c.y} ${ox} ${oy}`;
         }
-        const cp1x = sx + snx * bend, cp1y = sy + sny * bend;
-        const cp2x = ex + tnx * bend, cp2y = ey + tny * bend;
-
-        // Label midpoint at t=0.5 on the cubic bezier
-        const lmx = 0.125*sx + 0.375*cp1x + 0.375*cp2x + 0.125*ex;
-        const lmy = 0.125*sy + 0.375*cp1y + 0.375*cp2y + 0.125*ey;
-
-        bezierEdges.push({
-            srcId: s.srcId, tgtId: s.tgtId, label: s.label,
-            sx, sy, cp1x, cp1y, cp2x, cp2y, ex, ey,
-            lmx, lmy, lw: s.lw, lh: s.lh, lines: s.lines,
-        });
-    }
-
-    // ── Label overlap resolution ──────────────────────────────────────────
-    // Many distinct edges can route between the same pair of collapsed nodes,
-    // so their label midpoints land in a tight cluster. Event labels are wide
-    // but short, so separating them vertically is far cheaper than horizontally
-    // (~17px vs ~120px). Seed co-located clusters as a centred vertical stack,
-    // then run an iterative push-apart, then a guaranteed greedy stack pass so
-    // no residual overlap can survive.
-    const labelled = bezierEdges.filter(e => e.lines.length > 0);
-
-    const clusters = new Map<string, BezierEdge[]>();
-    for (const e of labelled) {
-        const key = `${Math.round(e.lmx / 14)},${Math.round(e.lmy / 14)}`;
-        const arr = clusters.get(key) ?? [];
-        arr.push(e);
-        clusters.set(key, arr);
-    }
-    for (const arr of clusters.values()) {
-        if (arr.length < 2) { continue; }
-        // Stable order top-to-bottom by source y, then stack vertically centred.
-        arr.sort((p, q) => p.sy - q.sy);
-        const meanY = arr.reduce((s, e) => s + e.lmy, 0) / arr.length;
-        arr.forEach((e, i) => {
-            e.lmy = meanY + (i - (arr.length - 1) / 2) * (e.lh + 5);
-        });
-    }
-
-    const overlaps = (a: BezierEdge, b: BezierEdge) =>
-        Math.abs(a.lmx - b.lmx) < (a.lw + b.lw) / 2 + 6 &&
-        Math.abs(a.lmy - b.lmy) < (a.lh + b.lh) / 2 + 4;
-
-    // Node boxes the labels must avoid. Region containers are excluded — a
-    // transition between siblings legitimately has its label inside the region.
-    // Only leaf states and collapsed compound boxes act as obstacles.
-    const RPAD = 4;
-    const obstacles: Rect[] = [];
-    for (const [id, r] of geom.entries()) {
-        const d = nodeById.get(id);
-        if (!d || d.start) { continue; }
-        const isRegion = childStateIds(id).length > 0 && !collapsed.has(id);
-        if (isRegion) { continue; }
-        obstacles.push(r);
-    }
-    // Push a label out of any obstacle rect it overlaps, along the cheaper axis.
-    const pushOutOfNodes = (e: BezierEdge) => {
-        let moved = false;
-        for (const r of obstacles) {
-            const ncx = r.x + r.w / 2, ncy = r.y + r.h / 2;
-            const dx = e.lmx - ncx, dy = e.lmy - ncy;
-            const minX = e.lw / 2 + r.w / 2 + RPAD;
-            const minY = e.lh / 2 + r.h / 2 + RPAD;
-            if (Math.abs(dx) < minX && Math.abs(dy) < minY) {
-                const pushX = minX - Math.abs(dx);
-                const pushY = minY - Math.abs(dy);
-                if (pushY <= pushX) { e.lmy += (dy >= 0 ? 1 : -1) * pushY; }
-                else { e.lmx += (dx >= 0 ? 1 : -1) * pushX; }
-                moved = true;
-            }
-        }
-        return moved;
+        const last = p[p.length - 1];
+        d += ` L ${last.x} ${last.y}`;
+        return d;
     };
 
-    for (let iter = 0; iter < 200; iter++) {
-        let moved = false;
-        for (let i = 0; i < labelled.length; i++) {
-            for (let j = i + 1; j < labelled.length; j++) {
-                const a = labelled[i], b = labelled[j];
-                let dx = b.lmx - a.lmx, dy = b.lmy - a.lmy;
-                const minSepX = (a.lw + b.lw) / 2 + 6;
-                const minSepY = (a.lh + b.lh) / 2 + 4;
-                if (Math.abs(dx) < minSepX && Math.abs(dy) < minSepY) {
-                    if (dx === 0 && dy === 0) { dx = (i % 2 ? 1 : -1) * 0.5; dy = 0.5; }
-                    const pushX = (minSepX - Math.abs(dx)) / 2 + 1;
-                    const pushY = (minSepY - Math.abs(dy)) / 2 + 1;
-                    const signX = dx >= 0 ? 1 : -1;
-                    const signY = dy >= 0 ? 1 : -1;
-                    // Prefer the cheaper (usually vertical) separation.
-                    if (pushY <= pushX) {
-                        a.lmy -= pushY * signY; b.lmy += pushY * signY;
-                    } else {
-                        a.lmx -= pushX * signX; b.lmx += pushX * signX;
-                    }
-                    moved = true;
-                }
+    // ── Collect ELK-routed edges (sections live on their container node) ──
+    interface Routed { id: string; pts: XY[]; label?: { x: number; y: number; w: number; h: number } }
+    const routed: Routed[] = [];
+    const collectEdges = (n: ElkNode, ox: number, oy: number) => {
+        const ax = ox + (n.x ?? 0), ay = oy + (n.y ?? 0);
+        for (const e of n.edges ?? []) {
+            const sec = e.sections?.[0];
+            let pts: XY[];
+            if (sec) {
+                pts = [sec.startPoint, ...(sec.bendPoints ?? []), sec.endPoint]
+                    .map(pt => ({ x: ax + pt.x, y: ay + pt.y }));
+            } else {
+                // ELK gave no route — fall back to a straight centre-to-centre
+                // line (absolute geometry) so the edge is never dropped.
+                const sg = geom.get(e.sources[0]), tg = geom.get(e.targets[0]);
+                if (!sg || !tg) { continue; }
+                pts = [{ x: sg.x + sg.w / 2, y: sg.y + sg.h / 2 }, { x: tg.x + tg.w / 2, y: tg.y + tg.h / 2 }];
             }
+            const lb = e.labels?.[0];
+            const label = (lb && lb.x != null && lb.y != null)
+                ? { x: ax + lb.x, y: ay + lb.y, w: lb.width ?? 0, h: lb.height ?? 0 }
+                : undefined;
+            routed.push({ id: e.id, pts, label });
         }
-        for (const e of labelled) { if (pushOutOfNodes(e)) { moved = true; } }
-        if (!moved) { break; }
-    }
+        for (const c of n.children ?? []) { collectEdges(c, ax, ay); }
+    };
+    collectEdges(result, 0, 0);
 
-    // Guaranteed final pass: place labels top-to-bottom; nudge any still-
-    // colliding box (against placed labels OR node boxes) straight down.
-    const hitsNode = (e: BezierEdge) => obstacles.some(r =>
-        Math.abs(e.lmx - (r.x + r.w/2)) < e.lw/2 + r.w/2 + RPAD &&
-        Math.abs(e.lmy - (r.y + r.h/2)) < e.lh/2 + r.h/2 + RPAD);
-    const placed: BezierEdge[] = [];
-    for (const e of [...labelled].sort((a, b) => a.lmy - b.lmy || a.lmx - b.lmx)) {
-        let guard = 0;
-        while ((placed.some(p => overlaps(e, p)) || hitsNode(e)) && guard++ < 600) {
-            e.lmy += 4;
-        }
-        placed.push(e);
-    }
-
-    // ── Pass 4: draw edges and labels ─────────────────────────────────────
-    for (const e of bezierEdges) {
+    // ── Draw routed edges + labels ───────────────────────────────────────
+    for (const r of routed) {
+        if (r.pts.length < 2) { continue; }
+        const meta = edgeMeta.get(r.id);
         const path = el('path', {
-            d: `M ${e.sx} ${e.sy} C ${e.cp1x} ${e.cp1y} ${e.cp2x} ${e.cp2y} ${e.ex} ${e.ey}`,
-            fill: 'none', stroke: C.fg,
-            'stroke-width': 1.5, 'stroke-opacity': 0.7,
+            d: roundedPath(r.pts, 9),
+            fill: 'none', stroke: C.fg, 'stroke-width': 1.5, 'stroke-opacity': 0.7,
             'marker-end': 'url(#arr)',
         });
+        gEdges.appendChild(path);
 
         let labelG: SVGElement | null = null;
-        if (e.lines.length > 0) {
-            const bx = e.lmx - e.lw/2, by = e.lmy - e.lh/2 - 1;
-            labelG = el('g', { 'data-src': e.srcId });
+        const lines = meta?.lines ?? [];
+        if (lines.length) {
+            // ELK reserved a slot for the label; fall back to the route midpoint.
+            const lw = Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 12;
+            const lh = lines.length * ACTION_LINE_H + 4;
+            const mid = r.pts[Math.floor(r.pts.length / 2)];
+            const bx = r.label ? r.label.x : mid.x - lw / 2;
+            const by = r.label ? r.label.y : mid.y - lh / 2;
+            labelG = el('g', { 'data-src': meta!.srcId });
             (labelG as SVGElement).style.cursor = 'pointer';
-            // Fully opaque background so a label reads cleanly where it sits
-            // over an edge; faint border crisps it against the line underneath.
             labelG.appendChild(el('rect', {
-                x: bx - 2, y: by, width: e.lw + 4, height: e.lh + 2,
+                x: bx - 2, y: by, width: lw + 4, height: lh + 2,
                 rx: 3, ry: 3, fill: C.bg, 'fill-opacity': 1,
                 stroke: C.fg, 'stroke-width': 0.5, 'stroke-opacity': 0.12,
             }));
-            // Box inner padding is (lh+2) − lines·lineH split top/bottom; centre
-            // each line in its slot so vertical padding is symmetric.
-            const padTop = ((e.lh + 2) - e.lines.length * ACTION_LINE_H) / 2;
-            for (let i = 0; i < e.lines.length; i++) {
-                // Each line is a distinct event → individually clickable so it
-                // can reveal that specific transition in the tree.
-                const lineEl = txt(e.lines[i], e.lmx, by + padTop + (i + 0.5) * ACTION_LINE_H, {
+            const padTop = ((lh + 2) - lines.length * ACTION_LINE_H) / 2;
+            for (let i = 0; i < lines.length; i++) {
+                const lineEl = txt(lines[i], bx + lw / 2, by + padTop + (i + 0.5) * ACTION_LINE_H, {
                     'text-anchor': 'middle', 'dominant-baseline': 'central',
                     'font-size': ACTION_PX, fill: C.desc,
                 });
-                lineEl.setAttribute('data-event', e.lines[i]);
+                lineEl.setAttribute('data-event', lines[i]);
                 labelG.appendChild(lineEl);
             }
-            // Edge hover: brighten this edge when its label is hovered
             labelG.addEventListener('mouseenter', () => {
                 path.setAttribute('stroke-opacity', '0.95');
                 path.setAttribute('stroke-width', '2');
@@ -770,8 +569,7 @@ async function render(): Promise<void> {
             gLabels.appendChild(labelG);
         }
 
-        gEdges.appendChild(path);
-        registerEdge(e.srcId, e.tgtId, { path, labelG });
+        if (meta) { registerEdge(meta.srcId, meta.tgtId, { path, labelG }); }
     }
 
     // ── Initial-state arrows ──────────────────────────────────────────────
