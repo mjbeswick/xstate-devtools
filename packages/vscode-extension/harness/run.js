@@ -73,6 +73,10 @@ async function main() {
         // (not the border) of the region whose title matches CLICK_REGION, to
         // prove interior clicks now collapse a region.
         const CLICK = ${JSON.stringify(process.env.CLICK_REGION || '')};
+        // COLLAPSE_ALL=1 clicks the collapse-all toolbar button after render.
+        if (${JSON.stringify(process.env.COLLAPSE_ALL || '')}) {
+          setTimeout(() => document.getElementById('btn-collapse-all').click(), 300);
+        }
         // CLICK_TARGET=title (default) clicks the title-bar centre; =body clicks
         // the region's interior centre. Both go through REAL hit-testing
         // (elementFromPoint), so this validates pointer-events, not just dispatch.

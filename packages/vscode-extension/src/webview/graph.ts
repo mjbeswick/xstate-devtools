@@ -485,11 +485,19 @@ async function render(): Promise<void> {
     const selfEdges = new Map<string, string>();  // nodeId → merged label
     for (const e of payload.edges) {
         if (e.data.source.startsWith('start_')) { continue; }
-        const s = visibleEndpoint(e.data.source), t = visibleEndpoint(e.data.target);
-        if (s !== t) { continue; }
+        // Only a GENUINE self-transition (same state at both ends) draws a loop.
+        // A transition between two distinct descendants of a collapsed state
+        // also lands on one node (both map to the collapsed box), but it is
+        // internal to the hidden subtree and must stay hidden — otherwise every
+        // internal event piles into one giant self-loop label beside the node.
+        if (e.data.source !== e.data.target) { continue; }
+        // And skip it if the state itself is hidden inside a collapsed ancestor
+        // (don't bubble a descendant's self-loop up onto the collapsed box).
+        const id = e.data.source;
+        if (visibleEndpoint(id) !== id) { continue; }
         const lbl = e.data.label.trim();
-        const prev = selfEdges.get(s);
-        selfEdges.set(s, prev ? (lbl ? `${prev}\n${lbl}` : prev) : lbl);
+        const prev = selfEdges.get(id);
+        selfEdges.set(id, prev ? (lbl ? `${prev}\n${lbl}` : prev) : lbl);
     }
 
     // Drop near-duplicate and near-collinear points so corner-rounding doesn't
