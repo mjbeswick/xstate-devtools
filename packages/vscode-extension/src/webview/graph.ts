@@ -80,7 +80,7 @@ function nw(label: string, entry: string[], exit: string[]): number {
     // Title is rendered at LABEL_PX (13) and centred; actions at ACTION_PX (11)
     // and left-aligned. Measure each row at its real size + generous side pad.
     const titleW = Math.ceil(textW(label, LABEL_PX, '500')) + 32;
-    const actionW = [...entry.map(a => `entry/ ${a}`), ...exit.map(a => `exit/ ${a}`)]
+    const actionW = [...entry.map(a => `entry / ${a}`), ...exit.map(a => `exit / ${a}`)]
         .map(l => Math.ceil(textW(l, ACTION_PX)) + 24);
     return Math.max(MIN_W, titleW, ...actionW);
 }
@@ -141,7 +141,7 @@ function buildElkNode(id: string): ElkNode {
             'elk.algorithm': 'layered',
             'elk.direction': direction,
             ...ROUTING_OPTS,
-            'elk.padding': `[top=${REGION_H + 24},left=22,bottom=22,right=22]`,
+            'elk.padding': `[top=${REGION_H + 12},left=22,bottom=22,right=22]`,
         },
         children: (childrenOf.get(id) ?? []).map(buildElkNode),
     };
@@ -430,11 +430,11 @@ async function render(): Promise<void> {
                     }));
                     let lineY = divY + ACTION_TOP + ACTION_PX;
                     for (const a of entry) {
-                        g.appendChild(txt(`entry/ ${a}`, ax+8, lineY, { 'font-size': ACTION_PX, fill: C.desc }));
+                        g.appendChild(txt(`entry / ${a}`, ax+8, lineY, { 'font-size': ACTION_PX, fill: C.desc }));
                         lineY += ACTION_LINE_H;
                     }
                     for (const a of exit) {
-                        g.appendChild(txt(`exit/ ${a}`, ax+8, lineY, { 'font-size': ACTION_PX, fill: C.desc }));
+                        g.appendChild(txt(`exit / ${a}`, ax+8, lineY, { 'font-size': ACTION_PX, fill: C.desc }));
                         lineY += ACTION_LINE_H;
                     }
                 } else {
@@ -502,19 +502,20 @@ async function render(): Promise<void> {
         return out;
     };
 
-    // Guarantee a straight perpendicular run of `minLen` into the target border
-    // so the arrowhead never sits right on a corner with no approach.
-    const withEndStub = (pts: XY[], rect: Rect | undefined, minLen: number): XY[] => {
-        if (!rect || pts.length < 2) { return pts; }
-        const end = pts[pts.length - 1];
-        const dL = Math.abs(end.x - rect.x), dR = Math.abs(end.x - (rect.x + rect.w));
-        const dT = Math.abs(end.y - rect.y), dB = Math.abs(end.y - (rect.y + rect.h));
-        const m = Math.min(dL, dR, dT, dB);
-        let nx = 0, ny = 0;
-        if (m === dT) { ny = -1; } else if (m === dB) { ny = 1; } else if (m === dL) { nx = -1; } else { nx = 1; }
-        const stub = { x: end.x + nx * minLen, y: end.y + ny * minLen };
+    // Guarantee a straight run of `minLen` into the endpoint — extended along
+    // the edge's ACTUAL final direction (not a guessed border normal), and only
+    // when the existing run-in is too short. Keeps the approach axis-aligned so
+    // the line never curves in to meet a perpendicular stub.
+    const withEndStub = (pts: XY[], minLen: number): XY[] => {
+        if (pts.length < 2) { return pts; }
+        const end = pts[pts.length - 1], prev = pts[pts.length - 2];
+        const dx = end.x - prev.x, dy = end.y - prev.y;
+        const len = Math.hypot(dx, dy);
+        if (len === 0 || len >= minLen) { return pts; }
+        const ux = dx / len, uy = dy / len;
+        const stub = { x: end.x - ux * minLen, y: end.y - uy * minLen };
         const out = pts.slice(0, -1);
-        while (out.length > 1 && Math.hypot(out[out.length - 1].x - end.x, out[out.length - 1].y - end.y) < minLen + 2) { out.pop(); }
+        while (out.length > 1 && Math.hypot(out[out.length - 1].x - end.x, out[out.length - 1].y - end.y) < minLen) { out.pop(); }
         out.push(stub, end);
         return out;
     };
@@ -589,7 +590,7 @@ async function render(): Promise<void> {
             }
             const lb = e.labels?.[0];
             const label = (lb && lb.x != null && lb.y != null) ? { x: o.x + lb.x, y: o.y + lb.y } : undefined;
-            const clean = withEndStub(simplify(pts), geom.get(e.targets[0]), 16);
+            const clean = withEndStub(simplify(pts), 14);
             routed.push({ id: e.id, pts: clean, label });
         }
         for (const c of n.children ?? []) { collectEdges(c); }
