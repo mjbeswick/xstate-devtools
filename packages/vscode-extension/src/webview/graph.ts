@@ -502,24 +502,6 @@ async function render(): Promise<void> {
         return out;
     };
 
-    // Guarantee a straight run of `minLen` into the endpoint — extended along
-    // the edge's ACTUAL final direction (not a guessed border normal), and only
-    // when the existing run-in is too short. Keeps the approach axis-aligned so
-    // the line never curves in to meet a perpendicular stub.
-    const withEndStub = (pts: XY[], minLen: number): XY[] => {
-        if (pts.length < 2) { return pts; }
-        const end = pts[pts.length - 1], prev = pts[pts.length - 2];
-        const dx = end.x - prev.x, dy = end.y - prev.y;
-        const len = Math.hypot(dx, dy);
-        if (len === 0 || len >= minLen) { return pts; }
-        const ux = dx / len, uy = dy / len;
-        const stub = { x: end.x - ux * minLen, y: end.y - uy * minLen };
-        const out = pts.slice(0, -1);
-        while (out.length > 1 && Math.hypot(out[out.length - 1].x - end.x, out[out.length - 1].y - end.y) < minLen) { out.pop(); }
-        out.push(stub, end);
-        return out;
-    };
-
     // Point on a rectangle's border along the ray from its centre toward `to`.
     const borderPoint = (rect: Rect, to: XY): XY => {
         const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
@@ -590,8 +572,7 @@ async function render(): Promise<void> {
             }
             const lb = e.labels?.[0];
             const label = (lb && lb.x != null && lb.y != null) ? { x: o.x + lb.x, y: o.y + lb.y } : undefined;
-            const clean = withEndStub(simplify(pts), 14);
-            routed.push({ id: e.id, pts: clean, label });
+            routed.push({ id: e.id, pts: simplify(pts), label });
         }
         for (const c of n.children ?? []) { collectEdges(c); }
     };
