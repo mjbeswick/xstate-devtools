@@ -480,6 +480,28 @@ async function render(): Promise<void> {
         selfEdges.set(s, prev ? (lbl ? `${prev}\n${lbl}` : prev) : lbl);
     }
 
+    // Drop near-duplicate and near-collinear points so corner-rounding doesn't
+    // turn ELK's tiny routing jogs into visible squiggles near the arrowhead.
+    const simplify = (p: XY[]): XY[] => {
+        const dedup: XY[] = [];
+        for (const pt of p) {
+            const last = dedup[dedup.length - 1];
+            if (last && Math.hypot(pt.x - last.x, pt.y - last.y) < 2) { continue; }
+            dedup.push(pt);
+        }
+        if (dedup.length <= 2) { return dedup; }
+        const out: XY[] = [dedup[0]];
+        for (let i = 1; i < dedup.length - 1; i++) {
+            const a = dedup[i - 1], b = dedup[i], c = dedup[i + 1];
+            const cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+            const len = Math.hypot(c.x - a.x, c.y - a.y) || 1;
+            if (Math.abs(cross) / len < 2) { continue; } // ~collinear → skip b
+            out.push(b);
+        }
+        out.push(dedup[dedup.length - 1]);
+        return out;
+    };
+
     // Point on a rectangle's border along the ray from its centre toward `to`.
     const borderPoint = (rect: Rect, to: XY): XY => {
         const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
@@ -544,7 +566,7 @@ async function render(): Promise<void> {
             }
             const lb = e.labels?.[0];
             const label = (lb && lb.x != null && lb.y != null) ? { x: o.x + lb.x, y: o.y + lb.y } : undefined;
-            routed.push({ id: e.id, pts, label });
+            routed.push({ id: e.id, pts: simplify(pts), label });
         }
         for (const c of n.children ?? []) { collectEdges(c); }
     };
