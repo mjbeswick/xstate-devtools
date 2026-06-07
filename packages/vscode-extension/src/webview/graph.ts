@@ -141,7 +141,7 @@ function buildElkNode(id: string): ElkNode {
             'elk.algorithm': 'layered',
             'elk.direction': direction,
             ...ROUTING_OPTS,
-            'elk.padding': `[top=${REGION_H + 12},left=22,bottom=22,right=22]`,
+            'elk.padding': `[top=${REGION_H + 6},left=18,bottom=14,right=18]`,
         },
         children: (childrenOf.get(id) ?? []).map(buildElkNode),
     };
@@ -154,8 +154,8 @@ const ROUTING_OPTS: Record<string, string> = {
     'elk.edgeRouting': 'ORTHOGONAL',
     // Base spacing is kept tight — ELK adds its own room for the reserved edge
     // labels on top of this, so a large base would double up.
-    'elk.layered.spacing.nodeNodeBetweenLayers': '18',
-    'elk.spacing.nodeNode': '22',
+    'elk.layered.spacing.nodeNodeBetweenLayers': '36',
+    'elk.spacing.nodeNode': '26',
     'elk.spacing.edgeNode': '12',
     'elk.spacing.edgeEdge': '8',
     'elk.layered.spacing.edgeNodeBetweenLayers': '12',
@@ -601,7 +601,7 @@ async function render(): Promise<void> {
         if (r.pts.length < 2) { continue; }
         const meta = edgeMeta.get(r.id);
         const path = el('path', {
-            d: roundedPath(r.pts, 12),
+            d: roundedPath(r.pts, 16),
             fill: 'none', stroke: C.fg, 'stroke-width': 1.5, 'stroke-opacity': 0.7,
             'marker-end': 'url(#arr)',
         });
