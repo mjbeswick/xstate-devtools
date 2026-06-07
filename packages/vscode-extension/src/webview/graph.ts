@@ -154,7 +154,7 @@ const ROUTING_OPTS: Record<string, string> = {
     'elk.edgeRouting': 'ORTHOGONAL',
     // Base spacing is kept tight — ELK adds its own room for the reserved edge
     // labels on top of this, so a large base would double up.
-    'elk.layered.spacing.nodeNodeBetweenLayers': '30',
+    'elk.layered.spacing.nodeNodeBetweenLayers': '18',
     'elk.spacing.nodeNode': '22',
     'elk.spacing.edgeNode': '12',
     'elk.spacing.edgeEdge': '8',
@@ -502,6 +502,23 @@ async function render(): Promise<void> {
         return out;
     };
 
+    // Guarantee a straight perpendicular run of `minLen` into the target border
+    // so the arrowhead never sits right on a corner with no approach.
+    const withEndStub = (pts: XY[], rect: Rect | undefined, minLen: number): XY[] => {
+        if (!rect || pts.length < 2) { return pts; }
+        const end = pts[pts.length - 1];
+        const dL = Math.abs(end.x - rect.x), dR = Math.abs(end.x - (rect.x + rect.w));
+        const dT = Math.abs(end.y - rect.y), dB = Math.abs(end.y - (rect.y + rect.h));
+        const m = Math.min(dL, dR, dT, dB);
+        let nx = 0, ny = 0;
+        if (m === dT) { ny = -1; } else if (m === dB) { ny = 1; } else if (m === dL) { nx = -1; } else { nx = 1; }
+        const stub = { x: end.x + nx * minLen, y: end.y + ny * minLen };
+        const out = pts.slice(0, -1);
+        while (out.length > 1 && Math.hypot(out[out.length - 1].x - end.x, out[out.length - 1].y - end.y) < minLen + 2) { out.pop(); }
+        out.push(stub, end);
+        return out;
+    };
+
     // Point on a rectangle's border along the ray from its centre toward `to`.
     const borderPoint = (rect: Rect, to: XY): XY => {
         const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
@@ -566,7 +583,8 @@ async function render(): Promise<void> {
             }
             const lb = e.labels?.[0];
             const label = (lb && lb.x != null && lb.y != null) ? { x: o.x + lb.x, y: o.y + lb.y } : undefined;
-            routed.push({ id: e.id, pts: simplify(pts), label });
+            const clean = withEndStub(simplify(pts), geom.get(e.targets[0]), 12);
+            routed.push({ id: e.id, pts: clean, label });
         }
         for (const c of n.children ?? []) { collectEdges(c); }
     };
