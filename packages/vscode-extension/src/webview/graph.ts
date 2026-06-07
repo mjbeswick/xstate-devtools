@@ -158,6 +158,10 @@ const ROUTING_OPTS: Record<string, string> = {
     'elk.spacing.edgeEdge': '14',
     'elk.layered.spacing.edgeNodeBetweenLayers': '22',
     'elk.layered.spacing.edgeEdgeBetweenLayers': '12',
+    // Give ELK the labels so it reserves space and places them in gaps,
+    // spreading nodes apart rather than letting labels pile onto each other.
+    'elk.edgeLabels.placement': 'CENTER',
+    'elk.spacing.edgeLabel': '6',
     'elk.layered.thoroughness': '12',
     'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
     'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
@@ -188,7 +192,12 @@ function buildElkGraph(): ElkNode {
     const edges: ElkEdge[] = [...startEdges];
     for (const m of merged.values()) {
         edgeMeta.set(m.id, { srcId: m.s, tgtId: m.t, lines: m.lines });
-        edges.push({ id: m.id, sources: [m.s], targets: [m.t] });
+        const labels: ElkEdgeLabel[] = m.lines.length ? [{
+            text: m.lines.join('\n'),
+            width: Math.max(...m.lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 12,
+            height: m.lines.length * ACTION_LINE_H + 4,
+        }] : [];
+        edges.push({ id: m.id, sources: [m.s], targets: [m.t], labels });
     }
     return {
         id: 'root',
@@ -489,7 +498,7 @@ async function render(): Promise<void> {
     };
 
     // ── Collect ELK-routed edges (sections live on their container node) ──
-    interface Routed { id: string; pts: XY[] }
+    interface Routed { id: string; pts: XY[]; label?: XY }
     const routed: Routed[] = [];
     // elkjs keeps every edge on root.edges, but its section coordinates are
     // relative to the lowest common ancestor of the two endpoints — so offset
@@ -505,9 +514,9 @@ async function render(): Promise<void> {
     const collectEdges = (n: ElkNode) => {
         for (const e of n.edges ?? []) {
             const sec = e.sections?.[0];
+            const o = lcaOffset(e.sources[0], e.targets[0]);
             let pts: XY[];
             if (sec) {
-                const o = lcaOffset(e.sources[0], e.targets[0]);
                 pts = [sec.startPoint, ...(sec.bendPoints ?? []), sec.endPoint]
                     .map(pt => ({ x: o.x + pt.x, y: o.y + pt.y }));
             } else {
@@ -517,7 +526,9 @@ async function render(): Promise<void> {
                 if (!sg || !tg) { continue; }
                 pts = [{ x: sg.x + sg.w / 2, y: sg.y + sg.h / 2 }, { x: tg.x + tg.w / 2, y: tg.y + tg.h / 2 }];
             }
-            routed.push({ id: e.id, pts });
+            const lb = e.labels?.[0];
+            const label = (lb && lb.x != null && lb.y != null) ? { x: o.x + lb.x, y: o.y + lb.y } : undefined;
+            routed.push({ id: e.id, pts, label });
         }
         for (const c of n.children ?? []) { collectEdges(c); }
     };
@@ -555,8 +566,10 @@ async function render(): Promise<void> {
         if (meta && lines.length) {
             const w = Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 12;
             const h = lines.length * ACTION_LINE_H + 4;
-            const mid = midAlong(r.pts);
-            lbls.push({ cx: mid.x, cy: mid.y, w, h, lines, srcId: meta.srcId, tgtId: meta.tgtId, path });
+            // Use ELK's reserved label slot (top-left → centre); else midpoint.
+            const cx = r.label ? r.label.x + w / 2 : midAlong(r.pts).x;
+            const cy = r.label ? r.label.y + h / 2 : midAlong(r.pts).y;
+            lbls.push({ cx, cy, w, h, lines, srcId: meta.srcId, tgtId: meta.tgtId, path });
         } else if (meta) {
             registerEdge(meta.srcId, meta.tgtId, { path, labelG: null });
         }
