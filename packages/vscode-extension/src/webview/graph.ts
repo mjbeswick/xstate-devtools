@@ -342,13 +342,6 @@ async function render(): Promise<void> {
                 const regionRect = el('rect', {
                     x: ax, y: ay, width: w, height: h, rx: 14, ry: 14,
                     fill: 'none',
-                    // Capture clicks across the whole box, not just the stroke.
-                    // Without this, fill:none makes the interior transparent to
-                    // pointer events, so a region could be expanded (collapsed
-                    // box has a fill) but never collapsed again by clicking it.
-                    // Leaf children live in a later-painted layer (gNodes), so
-                    // they still receive their own clicks on top of this.
-                    'pointer-events': 'all',
                     stroke: C.fg,
                     'stroke-width': isParallel ? 1.6 : 1.5,
                     'stroke-opacity': isParallel ? 0.75 : 0.6,
@@ -368,6 +361,18 @@ async function render(): Promise<void> {
                         'text-anchor': 'end', 'font-size': 10, fill: C.desc, 'font-style': 'italic',
                     }));
                 }
+                // Collapsing toggles on the title bar only — clicking the empty
+                // body would too easily collapse a region while reaching for a
+                // child. A transparent hit-rect over the header (drawn on top, so
+                // it wins over the title text) is the toggle target; the body
+                // itself shows a default cursor.
+                (g as SVGElement).style.cursor = 'default';
+                const header = el('rect', {
+                    x: ax, y: ay, width: w, height: REGION_H,
+                    fill: 'transparent', 'pointer-events': 'all',
+                });
+                (header as SVGElement).style.cursor = 'pointer';
+                g.appendChild(header);
                 // Hover: highlight connected edges (closure reads nodeEdgeMap after fill)
                 g.addEventListener('mouseenter', () => {
                     regionRect.setAttribute('stroke-width', '2');

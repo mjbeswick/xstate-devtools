@@ -73,16 +73,23 @@ async function main() {
         // (not the border) of the region whose title matches CLICK_REGION, to
         // prove interior clicks now collapse a region.
         const CLICK = ${JSON.stringify(process.env.CLICK_REGION || '')};
+        // CLICK_TARGET=title (default) clicks the title-bar centre; =body clicks
+        // the region's interior centre. Both go through REAL hit-testing
+        // (elementFromPoint), so this validates pointer-events, not just dispatch.
+        const CLICK_TARGET = ${JSON.stringify(process.env.CLICK_TARGET || 'title')};
         if (CLICK) {
           const tryClick = (tries) => {
             const cy = document.getElementById('cy');
             const regions = [...cy.querySelectorAll('[data-kind="region"]')];
             const g = regions.find(r => r.getAttribute('data-name') === CLICK);
             if (!g) { if (tries > 0) return setTimeout(() => tryClick(tries - 1), 100); else return; }
-            // Click the region's own rect (its interior). Before the fix this
-            // rect had fill:none and ignored interior pointer events.
-            const rect = g.querySelector('rect');
-            rect.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            const box = g.getBoundingClientRect();
+            // Title bar sits at the top of the region; body is its middle.
+            const px = box.left + box.width / 2;
+            const py = CLICK_TARGET === 'body' ? box.top + box.height / 2 : box.top + 10;
+            const hit = document.elementFromPoint(px, py);
+            console.log('hit', CLICK_TARGET, hit && hit.tagName, hit && hit.getAttribute('fill'));
+            if (hit) { hit.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: px, clientY: py })); }
           };
           setTimeout(() => tryClick(20), 300);
         }
