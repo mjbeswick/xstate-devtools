@@ -158,8 +158,6 @@ const ROUTING_OPTS: Record<string, string> = {
     'elk.spacing.edgeEdge': '14',
     'elk.layered.spacing.edgeNodeBetweenLayers': '22',
     'elk.layered.spacing.edgeEdgeBetweenLayers': '12',
-    'elk.edgeLabels.placement': 'CENTER',
-    'elk.spacing.edgeLabel': '6',
     'elk.layered.thoroughness': '12',
     'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
     'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
@@ -184,12 +182,7 @@ function buildElkGraph(): ElkNode {
     const edges: ElkEdge[] = [];
     for (const m of merged.values()) {
         edgeMeta.set(m.id, { srcId: m.s, tgtId: m.t, lines: m.lines });
-        const labels: ElkEdgeLabel[] = m.lines.length ? [{
-            text: m.lines.join('\n'),
-            width: Math.max(...m.lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 12,
-            height: m.lines.length * ACTION_LINE_H + 4,
-        }] : [];
-        edges.push({ id: m.id, sources: [m.s], targets: [m.t], labels });
+        edges.push({ id: m.id, sources: [m.s], targets: [m.t] });
     }
     return {
         id: 'root',
@@ -522,7 +515,25 @@ async function render(): Promise<void> {
     };
     collectEdges(result, 0, 0);
 
-    // ── Draw routed edges + labels ───────────────────────────────────────
+    // Midpoint along a polyline by arc length (better than the middle vertex).
+    const midAlong = (pts: XY[]): XY => {
+        let total = 0;
+        for (let i = 1; i < pts.length; i++) { total += Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y); }
+        let half = total / 2;
+        for (let i = 1; i < pts.length; i++) {
+            const seg = Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
+            if (half <= seg) {
+                const f = seg ? half / seg : 0;
+                return { x: pts[i-1].x + (pts[i].x - pts[i-1].x) * f, y: pts[i-1].y + (pts[i].y - pts[i-1].y) * f };
+            }
+            half -= seg;
+        }
+        return pts[Math.floor(pts.length / 2)];
+    };
+
+    // ── Draw routed edge paths ───────────────────────────────────────────
+    interface Lbl { cx: number; cy: number; w: number; h: number; lines: string[]; srcId: string; tgtId: string; path: SVGElement }
+    const lbls: Lbl[] = [];
     for (const r of routed) {
         if (r.pts.length < 2) { continue; }
         const meta = edgeMeta.get(r.id);
@@ -532,44 +543,66 @@ async function render(): Promise<void> {
             'marker-end': 'url(#arr)',
         });
         gEdges.appendChild(path);
-
-        let labelG: SVGElement | null = null;
         const lines = meta?.lines ?? [];
-        if (lines.length) {
-            // ELK reserved a slot for the label; fall back to the route midpoint.
-            const lw = Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 12;
-            const lh = lines.length * ACTION_LINE_H + 4;
-            const mid = r.pts[Math.floor(r.pts.length / 2)];
-            const bx = r.label ? r.label.x : mid.x - lw / 2;
-            const by = r.label ? r.label.y : mid.y - lh / 2;
-            labelG = el('g', { 'data-src': meta!.srcId });
-            (labelG as SVGElement).style.cursor = 'pointer';
-            labelG.appendChild(el('rect', {
-                x: bx - 2, y: by, width: lw + 4, height: lh + 2,
-                rx: 3, ry: 3, fill: C.bg, 'fill-opacity': 1,
-                stroke: C.fg, 'stroke-width': 0.5, 'stroke-opacity': 0.12,
-            }));
-            const padTop = ((lh + 2) - lines.length * ACTION_LINE_H) / 2;
-            for (let i = 0; i < lines.length; i++) {
-                const lineEl = txt(lines[i], bx + lw / 2, by + padTop + (i + 0.5) * ACTION_LINE_H, {
-                    'text-anchor': 'middle', 'dominant-baseline': 'central',
-                    'font-size': ACTION_PX, fill: C.desc,
-                });
-                lineEl.setAttribute('data-event', lines[i]);
-                labelG.appendChild(lineEl);
-            }
-            labelG.addEventListener('mouseenter', () => {
-                path.setAttribute('stroke-opacity', '0.95');
-                path.setAttribute('stroke-width', '2');
-            });
-            labelG.addEventListener('mouseleave', () => {
-                path.setAttribute('stroke-opacity', '0.7');
-                path.setAttribute('stroke-width', '1.5');
-            });
-            gLabels.appendChild(labelG);
+        if (meta && lines.length) {
+            const w = Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 12;
+            const h = lines.length * ACTION_LINE_H + 4;
+            const mid = midAlong(r.pts);
+            lbls.push({ cx: mid.x, cy: mid.y, w, h, lines, srcId: meta.srcId, tgtId: meta.tgtId, path });
+        } else if (meta) {
+            registerEdge(meta.srcId, meta.tgtId, { path, labelG: null });
         }
+    }
 
-        if (meta) { registerEdge(meta.srcId, meta.tgtId, { path, labelG }); }
+    // ── De-overlap labels (ELK routes the lines; we place the labels) ────
+    for (let iter = 0; iter < 60; iter++) {
+        let moved = false;
+        for (let i = 0; i < lbls.length; i++) {
+            for (let j = i + 1; j < lbls.length; j++) {
+                const a = lbls[i], b = lbls[j];
+                let dx = b.cx - a.cx, dy = b.cy - a.cy;
+                const mx = (a.w + b.w) / 2 + 6, my = (a.h + b.h) / 2 + 4;
+                if (Math.abs(dx) < mx && Math.abs(dy) < my) {
+                    if (dx === 0 && dy === 0) { dx = (i % 2 ? 1 : -1) * 0.5; dy = 0.5; }
+                    const px = (mx - Math.abs(dx)) / 2 + 1, py = (my - Math.abs(dy)) / 2 + 1;
+                    if (py <= px) { a.cy -= py * Math.sign(dy || 1); b.cy += py * Math.sign(dy || 1); }
+                    else { a.cx -= px * Math.sign(dx || 1); b.cx += px * Math.sign(dx || 1); }
+                    moved = true;
+                }
+            }
+        }
+        if (!moved) { break; }
+    }
+
+    // ── Draw labels ──────────────────────────────────────────────────────
+    for (const L of lbls) {
+        const bx = L.cx - L.w / 2, by = L.cy - L.h / 2;
+        const labelG = el('g', { 'data-src': L.srcId });
+        (labelG as SVGElement).style.cursor = 'pointer';
+        labelG.appendChild(el('rect', {
+            x: bx - 2, y: by, width: L.w + 4, height: L.h + 2,
+            rx: 3, ry: 3, fill: C.bg, 'fill-opacity': 1,
+            stroke: C.fg, 'stroke-width': 0.5, 'stroke-opacity': 0.12,
+        }));
+        const padTop = ((L.h + 2) - L.lines.length * ACTION_LINE_H) / 2;
+        for (let i = 0; i < L.lines.length; i++) {
+            const lineEl = txt(L.lines[i], bx + L.w / 2, by + padTop + (i + 0.5) * ACTION_LINE_H, {
+                'text-anchor': 'middle', 'dominant-baseline': 'central',
+                'font-size': ACTION_PX, fill: C.desc,
+            });
+            lineEl.setAttribute('data-event', L.lines[i]);
+            labelG.appendChild(lineEl);
+        }
+        labelG.addEventListener('mouseenter', () => {
+            L.path.setAttribute('stroke-opacity', '0.95');
+            L.path.setAttribute('stroke-width', '2');
+        });
+        labelG.addEventListener('mouseleave', () => {
+            L.path.setAttribute('stroke-opacity', '0.7');
+            L.path.setAttribute('stroke-width', '1.5');
+        });
+        gLabels.appendChild(labelG);
+        registerEdge(L.srcId, L.tgtId, { path: L.path, labelG });
     }
 
     // ── Initial-state arrows ──────────────────────────────────────────────
