@@ -169,17 +169,23 @@ function buildElkGraph(): ElkNode {
     // Merge transitions sharing a visible source→target pair into one routed
     // edge (skip self-loops and initial-marker edges — drawn separately).
     const merged = new Map<string, { id: string; s: string; t: string; lines: string[] }>();
+    const startEdges: ElkEdge[] = [];
     for (const e of payload.edges) {
-        if (e.data.source.startsWith('start_')) { continue; }
         const s = visibleEndpoint(e.data.source), t = visibleEndpoint(e.data.target);
         if (s === t) { continue; }
+        if (e.data.source.startsWith('start_')) {
+            // Let ELK route the initial-state arrows too, so they connect the
+            // dot to the state cleanly instead of at an arbitrary angle.
+            startEdges.push({ id: e.data.id, sources: [s], targets: [t] });
+            continue;
+        }
         const key = `${s} ${t}`;
         const lines = e.data.label ? e.data.label.split('\n').filter(Boolean) : [];
         const ex = merged.get(key);
         if (ex) { for (const l of lines) { if (!ex.lines.includes(l)) { ex.lines.push(l); } } }
         else { merged.set(key, { id: e.data.id, s, t, lines: [...lines] }); }
     }
-    const edges: ElkEdge[] = [];
+    const edges: ElkEdge[] = [...startEdges];
     for (const m of merged.values()) {
         edgeMeta.set(m.id, { srcId: m.s, tgtId: m.t, lines: m.lines });
         edges.push({ id: m.id, sources: [m.s], targets: [m.t] });
@@ -463,13 +469,6 @@ async function render(): Promise<void> {
         selfEdges.set(s, prev ? (lbl ? `${prev}\n${lbl}` : prev) : lbl);
     }
 
-    // Used by the initial-state arrows below.
-    const DOWN = direction === 'DOWN';
-    const lerpBend = (span: number) => {
-        const d = Math.max(0, span);
-        return Math.min(d * 0.5, Math.max(14, d * 0.4));
-    };
-
     // Smooth a routed polyline by rounding each corner with a quadratic curve.
     const roundedPath = (p: XY[], r: number): string => {
         if (p.length < 2) { return ''; }
@@ -490,16 +489,27 @@ async function render(): Promise<void> {
     };
 
     // ── Collect ELK-routed edges (sections live on their container node) ──
-    interface Routed { id: string; pts: XY[]; label?: { x: number; y: number; w: number; h: number } }
+    interface Routed { id: string; pts: XY[] }
     const routed: Routed[] = [];
-    const collectEdges = (n: ElkNode, ox: number, oy: number) => {
-        const ax = ox + (n.x ?? 0), ay = oy + (n.y ?? 0);
+    // elkjs keeps every edge on root.edges, but its section coordinates are
+    // relative to the lowest common ancestor of the two endpoints — so offset
+    // each edge by that ancestor's absolute position (root → no offset).
+    const lcaOffset = (s: string, t: string): XY => {
+        const anc = new Set<string>();
+        for (let c: string | undefined = s; c; c = nodeById.get(c)?.parent) { anc.add(c); }
+        let c: string | undefined = t;
+        while (c && !anc.has(c)) { c = nodeById.get(c)?.parent; }
+        const g = c ? geom.get(c) : undefined;
+        return g ? { x: g.x, y: g.y } : { x: 0, y: 0 };
+    };
+    const collectEdges = (n: ElkNode) => {
         for (const e of n.edges ?? []) {
             const sec = e.sections?.[0];
             let pts: XY[];
             if (sec) {
+                const o = lcaOffset(e.sources[0], e.targets[0]);
                 pts = [sec.startPoint, ...(sec.bendPoints ?? []), sec.endPoint]
-                    .map(pt => ({ x: ax + pt.x, y: ay + pt.y }));
+                    .map(pt => ({ x: o.x + pt.x, y: o.y + pt.y }));
             } else {
                 // ELK gave no route — fall back to a straight centre-to-centre
                 // line (absolute geometry) so the edge is never dropped.
@@ -507,15 +517,11 @@ async function render(): Promise<void> {
                 if (!sg || !tg) { continue; }
                 pts = [{ x: sg.x + sg.w / 2, y: sg.y + sg.h / 2 }, { x: tg.x + tg.w / 2, y: tg.y + tg.h / 2 }];
             }
-            const lb = e.labels?.[0];
-            const label = (lb && lb.x != null && lb.y != null)
-                ? { x: ax + lb.x, y: ay + lb.y, w: lb.width ?? 0, h: lb.height ?? 0 }
-                : undefined;
-            routed.push({ id: e.id, pts, label });
+            routed.push({ id: e.id, pts });
         }
-        for (const c of n.children ?? []) { collectEdges(c, ax, ay); }
+        for (const c of n.children ?? []) { collectEdges(c); }
     };
-    collectEdges(result, 0, 0);
+    collectEdges(result);
 
     // Midpoint along a polyline by arc length (better than the middle vertex).
     const midAlong = (pts: XY[]): XY => {
@@ -540,7 +546,7 @@ async function render(): Promise<void> {
         if (r.pts.length < 2) { continue; }
         const meta = edgeMeta.get(r.id);
         const path = el('path', {
-            d: roundedPath(r.pts, 9),
+            d: roundedPath(r.pts, 18),
             fill: 'none', stroke: C.fg, 'stroke-width': 1.5, 'stroke-opacity': 0.7,
             'marker-end': 'url(#arr)',
         });
@@ -607,27 +613,7 @@ async function render(): Promise<void> {
         registerEdge(L.srcId, L.tgtId, { path: L.path, labelG });
     }
 
-    // ── Initial-state arrows ──────────────────────────────────────────────
-    for (const e of payload.edges) {
-        if (!e.data.source.startsWith('start_')) { continue; }
-        const sg = geom.get(e.data.source), tg = geom.get(e.data.target);
-        if (!sg || !tg) { continue; }
-        // DOWN: dot bottom → state top. RIGHT: dot right → state left.
-        let sx: number, sy: number, ex: number, ey: number, c1x: number, c1y: number, c2x: number, c2y: number;
-        if (DOWN) {
-            sx = sg.x + sg.w/2; sy = sg.y + sg.h; ex = tg.x + tg.w/2; ey = tg.y;
-            const bend = lerpBend(ey - sy);
-            c1x = sx; c1y = sy + bend; c2x = ex; c2y = ey - bend;
-        } else {
-            sx = sg.x + sg.w; sy = sg.y + sg.h/2; ex = tg.x; ey = tg.y + tg.h/2;
-            const bend = lerpBend(ex - sx);
-            c1x = sx + bend; c1y = sy; c2x = ex - bend; c2y = ey;
-        }
-        gEdges.appendChild(el('path', {
-            d: `M ${sx} ${sy} C ${c1x} ${c1y} ${c2x} ${c2y} ${ex} ${ey}`,
-            fill: 'none', stroke: C.fg, 'stroke-width': 1.5, 'marker-end': 'url(#arr)',
-        }));
-    }
+    // (Initial-state arrows are now routed by ELK alongside the other edges.)
 
     // ── Self-transitions ──────────────────────────────────────────────────
     // A transition back to its own state: draw a smooth rounded arch above the
