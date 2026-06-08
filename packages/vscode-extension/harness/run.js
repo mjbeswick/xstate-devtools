@@ -86,6 +86,12 @@ async function main() {
             cy.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey: shift, bubbles: true }));
           }, 400 + i * 180));
         }
+        // HIGHLIGHT=<sanitizedName> posts the host's cursor-sync message.
+        if (${JSON.stringify(process.env.HIGHLIGHT || '')}) {
+          setTimeout(() => window.dispatchEvent(new MessageEvent('message', {
+            data: { command: 'highlight', stateId: ${JSON.stringify(process.env.HIGHLIGHT || '')} },
+          })), 500);
+        }
         // COLLAPSE_ALL=1 clicks the collapse-all toolbar button after render.
         if (${JSON.stringify(process.env.COLLAPSE_ALL || '')}) {
           setTimeout(() => document.getElementById('btn-collapse-all').click(), 300);

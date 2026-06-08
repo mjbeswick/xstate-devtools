@@ -229,7 +229,9 @@ function txt(s: string, x: number, y: number, attrs: Record<string, string | num
 // ── Viewport ──────────────────────────────────────────────────────────────────
 type Rect = { x: number; y: number; w: number; h: number };
 const geom = new Map<string, Rect>();
-const nameToRect = new Map<string, SVGElement>();
+// Sanitized state name → node id, so the host's cursor-sync `highlight` message
+// (keyed by name) can drive the same selection as keyboard nav (keyed by id).
+const idByName = new Map<string, string>();
 const container = document.getElementById('cy')!;
 let viewport: SVGElement;
 let scale = 1, tx = 0, ty = 0;
@@ -264,7 +266,7 @@ async function render(): Promise<void> {
     lastH = result.height ?? 100;
 
     container.replaceChildren();
-    nameToRect.clear();
+    idByName.clear();
     nodeRectById.clear();
     geom.clear();
 
@@ -342,7 +344,7 @@ async function render(): Promise<void> {
                 const histCircle = el('circle', { cx: cxp, cy: cyp, r: w/2 - 1, fill: C.nodeBg, stroke: C.fg, 'stroke-width': 1.5, 'stroke-opacity': 0.8 });
                 g.appendChild(histCircle);
                 g.appendChild(txt(d.history === 'deep' ? 'H*' : 'H', cxp, cyp, { 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 13, 'font-weight': 'bold' }));
-                nameToRect.set(d.name, histCircle);
+                idByName.set(d.name, n.id);
                 nodeRectById.set(n.id, histCircle);
                 gNodes.appendChild(g);
             } else if (isRegion) {
@@ -433,7 +435,7 @@ async function render(): Promise<void> {
                     'stroke-opacity': isParallel ? 0.75 : 0.8,
                     ...(isParallel ? { 'stroke-dasharray': '7 4' } : {}),
                 });
-                nameToRect.set(d.name, rect);
+                idByName.set(d.name, n.id);
                 nodeRectById.set(n.id, rect);
                 g.appendChild(rect);
                 if (d.final) {
@@ -930,17 +932,10 @@ container.addEventListener('pointerleave', () => { dragging = false; });
 window.addEventListener('message', (event: MessageEvent) => {
     const msg = event.data;
     if (msg?.command === 'highlight') {
-        for (const r of nameToRect.values()) {
-            r.setAttribute('fill', C.nodeBg);
-            r.setAttribute('stroke', C.fg);
-            r.setAttribute('stroke-opacity', '0.8');
-        }
-        const hit = nameToRect.get(msg.stateId);
-        if (hit) {
-            hit.setAttribute('fill', C.selBg);
-            hit.setAttribute('stroke', C.focus);
-            hit.setAttribute('stroke-opacity', '1');
-        }
+        // Cursor sync from the editor sets the SAME active node the keyboard
+        // moves, so the two never fight over a node's colours. A name that
+        // isn't currently visible (e.g. inside a collapsed state) clears it.
+        selectNode(idByName.get(msg.stateId) ?? null);
     }
 });
 
