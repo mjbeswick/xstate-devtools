@@ -1,4 +1,4 @@
-import { createMachine, assign } from 'xstate';
+import { createMachine, assign, fromPromise } from 'xstate';
 
 /**
  * Complex state machine with 100+ nested and parallel states,
@@ -736,3 +736,330 @@ export const stateConfig = {
     },
   },
 };
+
+// --- Invoked child machines (XState v5 API) ---
+
+export const authMachine = createMachine({
+  id: 'auth',
+  initial: 'checkingCredentials',
+  context: { attempts: 0, userId: null as string | null },
+  states: {
+    checkingCredentials: {
+      on: {
+        CREDENTIALS_VALID: 'fetchingProfile',
+        CREDENTIALS_INVALID: 'failed',
+      },
+    },
+    fetchingProfile: {
+      on: {
+        PROFILE_LOADED: 'success',
+        PROFILE_ERROR: 'failed',
+      },
+    },
+    success: {
+      type: 'final',
+      output: ({ context }) => ({ userId: context.userId }),
+    },
+    failed: {
+      on: {
+        RETRY: {
+          target: 'checkingCredentials',
+          guard: ({ context }) => context.attempts < 3,
+          actions: assign({ attempts: ({ context }) => context.attempts + 1 }),
+        },
+        GIVE_UP: 'abandoned',
+      },
+    },
+    abandoned: {
+      type: 'final',
+    },
+  },
+});
+
+// Promise actor invoked by dataFetchMachine to load data.
+export const performFetch = fromPromise(async () => {
+  const response = await fetch('/api/data');
+  return response.json();
+});
+
+export const dataFetchMachine = createMachine({
+  id: 'dataFetch',
+  initial: 'idle',
+  context: { data: null as unknown, retries: 0, error: null as string | null },
+  states: {
+    idle: {
+      on: { FETCH: 'loading' },
+    },
+    loading: {
+      invoke: {
+        id: 'fetchRequest',
+        src: performFetch,
+        onDone: {
+          target: 'success',
+          actions: assign({ data: ({ event }: any) => event.output }),
+        },
+        onError: {
+          target: 'retrying',
+          actions: assign({ error: ({ event }: any) => event.error.message }),
+        },
+      },
+    },
+    retrying: {
+      always: [
+        {
+          target: 'loading',
+          guard: ({ context }) => context.retries < 3,
+          actions: assign({ retries: ({ context }) => context.retries + 1 }),
+        },
+        { target: 'failure' },
+      ],
+    },
+    success: {
+      on: { RESET: 'idle' },
+    },
+    failure: {
+      type: 'final',
+    },
+  },
+});
+
+// Child machines invoked by checkoutMachine.
+export const paymentMachine = createMachine({
+  id: 'payment',
+  initial: 'authorizing',
+  states: {
+    authorizing: {
+      on: { APPROVED: 'captured', DECLINED: 'declined' },
+    },
+    captured: { type: 'final' },
+    declined: { type: 'final' },
+  },
+  output: ({ event }: any) => ({ orderId: event.orderId ?? 'order-unknown' }),
+});
+
+export const orderTrackingMachine = createMachine({
+  id: 'orderTracking',
+  initial: 'tracking',
+  states: {
+    tracking: {
+      on: { LOCATION_UPDATE: { actions: assign({}) } },
+    },
+  },
+});
+
+export const deliveryMachine = createMachine({
+  id: 'delivery',
+  initial: 'enRoute',
+  states: {
+    enRoute: {
+      on: { ARRIVED: 'delivered' },
+    },
+    delivered: { type: 'final' },
+  },
+});
+
+export const checkoutMachine = createMachine({
+  id: 'checkout',
+  initial: 'cart',
+  context: { items: [] as string[], paymentMethod: null as string | null, orderId: null as string | null },
+  states: {
+    cart: {
+      on: {
+        ADD_ITEM: { actions: assign({ items: ({ context, event }: any) => [...context.items, event.item] }) },
+        REMOVE_ITEM: { actions: assign({ items: ({ context, event }: any) => context.items.filter((i: string) => i !== event.item) }) },
+        PROCEED_TO_PAYMENT: { target: 'payment', guard: ({ context }) => context.items.length > 0 },
+      },
+    },
+    payment: {
+      invoke: {
+        id: 'paymentProcessor',
+        src: paymentMachine,
+        input: ({ context }) => ({ items: context.items }),
+        onDone: {
+          target: 'confirmation',
+          actions: assign({ orderId: ({ event }: any) => event.output.orderId }),
+        },
+        onError: 'paymentFailed',
+      },
+      on: {
+        BACK_TO_CART: 'cart',
+      },
+    },
+    confirmation: {
+      invoke: {
+        id: 'orderTracker',
+        src: orderTrackingMachine,
+        input: ({ context }) => ({ orderId: context.orderId }),
+      },
+      on: {
+        ORDER_SHIPPED: 'shipped',
+        ORDER_CANCELLED: 'cancelled',
+      },
+    },
+    paymentFailed: {
+      on: {
+        RETRY_PAYMENT: 'payment',
+        BACK_TO_CART: 'cart',
+      },
+    },
+    shipped: {
+      invoke: {
+        id: 'deliveryTracker',
+        src: deliveryMachine,
+        input: ({ context }) => ({ orderId: context.orderId }),
+        onDone: 'delivered',
+      },
+    },
+    delivered: {
+      type: 'final',
+    },
+    cancelled: {
+      type: 'final',
+    },
+  },
+});
+
+/**
+ * Top-level orchestrator that invokes child machines for auth, data loading,
+ * and a multi-step checkout flow.
+ */
+export const orchestratorMachine = createMachine({
+  id: 'orchestrator',
+  initial: 'authenticating',
+  context: {
+    userId: null as string | null,
+    sessionData: null as unknown,
+    orderId: null as string | null,
+    errorMessage: null as string | null,
+  },
+  states: {
+    authenticating: {
+      invoke: {
+        id: 'authService',
+        src: authMachine,
+        onDone: {
+          target: 'loadingData',
+          actions: assign({ userId: ({ event }: any) => event.output.userId }),
+        },
+        onError: {
+          target: 'authFailed',
+          actions: assign({ errorMessage: ({ event }: any) => event.error.message }),
+        },
+      },
+      on: {
+        CANCEL: 'unauthenticated',
+      },
+    },
+    unauthenticated: {
+      on: {
+        LOGIN: 'authenticating',
+      },
+    },
+    authFailed: {
+      on: {
+        RETRY: 'authenticating',
+        CONTINUE_AS_GUEST: 'loadingData',
+      },
+    },
+    loadingData: {
+      type: 'parallel',
+      states: {
+        userProfile: {
+          initial: 'fetching',
+          states: {
+            fetching: {
+              invoke: {
+                id: 'profileFetch',
+                src: dataFetchMachine,
+                onDone: 'profileLoaded',
+                onError: 'profileError',
+              },
+            },
+            profileLoaded: {},
+            profileError: {
+              on: { RETRY_PROFILE: 'fetching' },
+            },
+          },
+        },
+        appConfig: {
+          initial: 'fetching',
+          states: {
+            fetching: {
+              invoke: {
+                id: 'configFetch',
+                src: dataFetchMachine,
+                onDone: 'configLoaded',
+                onError: 'configError',
+              },
+            },
+            configLoaded: {},
+            configError: {
+              on: { RETRY_CONFIG: 'fetching' },
+            },
+          },
+        },
+        featureFlags: {
+          initial: 'fetching',
+          states: {
+            fetching: {
+              invoke: {
+                id: 'featureFlagsFetch',
+                src: dataFetchMachine,
+                onDone: 'flagsLoaded',
+                onError: 'flagsError',
+              },
+            },
+            flagsLoaded: {},
+            flagsError: {
+              on: { USE_DEFAULTS: 'flagsLoaded' },
+            },
+          },
+        },
+      },
+      on: {
+        ALL_DATA_READY: 'ready',
+        DATA_LOAD_FAILED: 'loadingFailed',
+      },
+    },
+    loadingFailed: {
+      on: {
+        RETRY_LOAD: 'loadingData',
+        LOGOUT: 'unauthenticated',
+      },
+    },
+    ready: {
+      initial: 'browsing',
+      states: {
+        browsing: {
+          on: {
+            START_CHECKOUT: 'shopping',
+            LOGOUT: '#orchestrator.unauthenticated',
+          },
+        },
+        shopping: {
+          invoke: {
+            id: 'checkoutFlow',
+            src: checkoutMachine,
+            onDone: {
+              target: 'orderComplete',
+              actions: assign({ orderId: ({ event }: any) => event.output?.orderId ?? null }),
+            },
+            onError: {
+              target: 'browsing',
+              actions: assign({ errorMessage: ({ event }: any) => event.error.message }),
+            },
+          },
+          on: {
+            ABANDON_CHECKOUT: 'browsing',
+          },
+        },
+        orderComplete: {
+          on: {
+            CONTINUE_SHOPPING: 'browsing',
+            LOGOUT: '#orchestrator.unauthenticated',
+          },
+        },
+      },
+    },
+  },
+});

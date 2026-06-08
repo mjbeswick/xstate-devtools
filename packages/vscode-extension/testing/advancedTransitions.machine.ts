@@ -1,4 +1,10 @@
-import { createMachine } from 'xstate';
+import { createMachine, fromPromise } from 'xstate';
+
+// The invoked actor: submits the order. Defined here so the `invoke` resolves.
+export const submitOrder = fromPromise(async () => {
+  const response = await fetch('/api/orders', { method: 'POST' });
+  return response.json();
+});
 
 // Exercises after (delayed), always (transient), state-level onDone,
 // invoke indicator, and description tooltips.
@@ -19,7 +25,7 @@ export const checkoutFlow = createMachine({
     submitting: {
       description: 'Posts the order to the server.',
       invoke: {
-        src: 'submitOrder',
+        src: submitOrder,
         onDone: { target: 'confirming', actions: 'storeReceipt' },
         onError: 'invalid',
       },
