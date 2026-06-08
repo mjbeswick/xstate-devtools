@@ -183,6 +183,19 @@ export class XStateGraphViewProvider {
             const childStates = (n.children ?? []).filter(c => c.type === 'state' && !c.isTypeMarker);
             const entryActions = (n.children ?? []).filter(c => c.type === 'entry').map(c => c.label);
             const exitActions  = (n.children ?? []).filter(c => c.type === 'exit').map(c => c.label);
+            // Internal (action-only) transitions: an event that runs actions
+            // without a target. There's no state change, so it's not an edge —
+            // it belongs inside the state box like entry/exit, shown as
+            // `EVENT [guard] / actions` (Harel internal-transition convention).
+            const internalTransitions = (n.children ?? [])
+                .filter(c => c.type === 'transition'
+                    && !(c.children ?? []).some(cc => cc.type === 'target')
+                    && (c.children ?? []).some(cc => cc.type === 'action'))
+                .map(c => {
+                    const guard = c.children?.find(cc => cc.type === 'guard');
+                    const acts = (c.children ?? []).filter(cc => cc.type === 'action').map(cc => cc.label);
+                    return `${c.label}${guard ? ` [${guard.label}]` : ''} / ${acts.join(', ')}`;
+                });
             nodes.push({
                 data: {
                     id, label: n.label, name,
@@ -194,6 +207,7 @@ export class XStateGraphViewProvider {
                     history: n.historyType,
                     entryActions,
                     exitActions,
+                    internalTransitions,
                 },
             });
 
@@ -380,7 +394,7 @@ interface GraphNode {
         parent?: string; compound?: boolean;
         initial?: boolean; final?: boolean; start?: boolean; parallel?: boolean;
         history?: 'shallow' | 'deep'; ghost?: boolean;
-        entryActions?: string[]; exitActions?: string[];
+        entryActions?: string[]; exitActions?: string[]; internalTransitions?: string[];
     };
 }
 interface GraphEdge {

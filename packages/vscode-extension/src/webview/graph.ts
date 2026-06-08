@@ -8,7 +8,7 @@ interface NodeData {
     id: string; label: string; name: string;
     parent?: string; initial?: boolean; final?: boolean; start?: boolean; parallel?: boolean;
     history?: 'shallow' | 'deep'; ghost?: boolean;
-    entryActions?: string[]; exitActions?: string[];
+    entryActions?: string[]; exitActions?: string[]; internalTransitions?: string[];
 }
 interface GraphPayload {
     nodes: { data: NodeData }[];
@@ -76,16 +76,17 @@ const NODE_V_PAD    = 10;
 const REGION_H      = 28;
 const MIN_W         = 110;
 
-function nw(label: string, entry: string[], exit: string[]): number {
+function nw(label: string, entry: string[], exit: string[], internal: string[] = []): number {
     // Title is rendered at LABEL_PX (13) and centred; actions at ACTION_PX (11)
     // and left-aligned. Measure each row at its real size + generous side pad.
+    // Internal transitions are already-formatted `EVENT [guard] / actions` rows.
     const titleW = Math.ceil(textW(label, LABEL_PX, '500')) + 32;
-    const actionW = [...entry.map(a => `entry / ${a}`), ...exit.map(a => `exit / ${a}`)]
+    const actionW = [...entry.map(a => `entry / ${a}`), ...exit.map(a => `exit / ${a}`), ...internal]
         .map(l => Math.ceil(textW(l, ACTION_PX)) + 24);
     return Math.max(MIN_W, titleW, ...actionW);
 }
-function nh(entry: string[], exit: string[]): number {
-    const n = entry.length + exit.length;
+function nh(entry: string[], exit: string[], internal: string[] = []): number {
+    const n = entry.length + exit.length + internal.length;
     return n === 0
         ? NODE_V_PAD * 2 + LABEL_PX + 4
         : NODE_V_PAD * 2 + LABEL_PX + 4 + 1 + ACTION_TOP + n * ACTION_LINE_H + 4;
@@ -124,8 +125,8 @@ function buildElkNode(id: string): ElkNode {
         const display = d.label + (isCollapsedParent ? ' ⊕' : '');
         return {
             id,
-            width:  nw(display, d.entryActions ?? [], d.exitActions ?? []),
-            height: nh(d.entryActions ?? [], d.exitActions ?? []),
+            width:  nw(display, d.entryActions ?? [], d.exitActions ?? [], d.internalTransitions ?? []),
+            height: nh(d.entryActions ?? [], d.exitActions ?? [], d.internalTransitions ?? []),
             labels: [{ text: d.label }],
         };
     }
@@ -447,8 +448,9 @@ async function render(): Promise<void> {
                 }
                 const entry = d.entryActions ?? [];
                 const exit  = d.exitActions  ?? [];
+                const internal = d.internalTransitions ?? [];
                 const label = d.label + (isCollapsed && hasChildren ? ' ⊕' : '');
-                if (entry.length > 0 || exit.length > 0) {
+                if (entry.length > 0 || exit.length > 0 || internal.length > 0) {
                     const labelY = ay + NODE_V_PAD + LABEL_PX;
                     g.appendChild(txt(label, ax+w/2, labelY, {
                         'text-anchor': 'middle', 'font-size': LABEL_PX, 'font-weight': '500',
@@ -465,6 +467,14 @@ async function render(): Promise<void> {
                     }
                     for (const a of exit) {
                         g.appendChild(txt(`exit / ${a}`, ax+8, lineY, { 'font-size': ACTION_PX, fill: C.desc }));
+                        lineY += ACTION_LINE_H;
+                    }
+                    // Internal transitions: event-triggered actions with no state
+                    // change. Already formatted `EVENT [guard] / actions`; the
+                    // event name reads in the foreground colour to stand apart
+                    // from entry/exit rows.
+                    for (const line of internal) {
+                        g.appendChild(txt(line, ax+8, lineY, { 'font-size': ACTION_PX, fill: C.fg, 'fill-opacity': 0.85 }));
                         lineY += ACTION_LINE_H;
                     }
                 } else {

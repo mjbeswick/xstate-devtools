@@ -42,7 +42,7 @@ interface NodeData {
     id: string; label: string; name: string;
     parent?: string; compound?: boolean; initial?: boolean; final?: boolean;
     parallel?: boolean; history?: 'shallow' | 'deep'; ghost?: boolean; start?: boolean;
-    entryActions?: string[]; exitActions?: string[];
+    entryActions?: string[]; exitActions?: string[]; internalTransitions?: string[];
 }
 const nodes: { data: NodeData }[] = [];
 const edges: { data: { id: string; source: string; target: string; label: string } }[] = [];
@@ -59,11 +59,20 @@ const collect = (n: MachineNode, parentId: string | undefined, isRoot: boolean) 
     const childStates = (n.children ?? []).filter(c => c.type === 'state' && !(c as any).isTypeMarker);
     const entryActions = (n.children ?? []).filter(c => c.type === 'entry').map(c => c.label);
     const exitActions = (n.children ?? []).filter(c => c.type === 'exit').map(c => c.label);
+    const internalTransitions = (n.children ?? [])
+        .filter(c => c.type === 'transition'
+            && !(c.children ?? []).some(cc => cc.type === 'target')
+            && (c.children ?? []).some(cc => cc.type === 'action'))
+        .map(c => {
+            const guard = c.children?.find(cc => cc.type === 'guard');
+            const acts = (c.children ?? []).filter(cc => cc.type === 'action').map(cc => cc.label);
+            return `${c.label}${guard ? ` [${guard.label}]` : ''} / ${acts.join(', ')}`;
+        });
     nodes.push({ data: {
         id, label: n.label, name, parent: parentId,
         compound: childStates.length > 0,
         initial: !!n.isInitial, final: !!n.isFinal, parallel: !!(n as any).isParallel,
-        history: (n as any).historyType, entryActions, exitActions,
+        history: (n as any).historyType, entryActions, exitActions, internalTransitions,
     } });
     for (const c of childStates) { collect(c, id, false); }
 };
