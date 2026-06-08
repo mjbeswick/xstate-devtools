@@ -201,6 +201,8 @@ export class XStateGraphViewProvider {
                     const acts = (c.children ?? []).filter(cc => cc.type === 'action').map(cc => cc.label);
                     return `${c.label}${guard ? ` [${guard.label}]` : ''} / ${acts.join(', ')}`;
                 });
+            // Invoked services on this state (shown as `invoke <src>` rows).
+            const invokes = (n.children ?? []).filter(c => c.type === 'invoke').map(c => c.label);
             nodes.push({
                 data: {
                     id, label: n.label, name,
@@ -213,6 +215,8 @@ export class XStateGraphViewProvider {
                     entryActions,
                     exitActions,
                     internalTransitions,
+                    invokes,
+                    description: n.description,
                 },
             });
 
@@ -271,14 +275,15 @@ export class XStateGraphViewProvider {
                     const invokeT = (n.children ?? [])
                         .filter(c => c.type === 'invoke')
                         .flatMap(inv => (inv.children ?? []).filter(c => c.type === 'transition'));
-                    for (const t of [...directT, ...invokeT]) {
-                        const target = t.children?.find(c => c.type === 'target');
-                        if (!target) { continue; }
-                        const targetName = sanitize(target.label.replace(/^#/, '').split('.').pop() ?? '');
+
+                    // Emit one merged edge for source→target, building the Harel
+                    // label `EVENT [guard] / action1, action2`.
+                    const emitEdge = (targetRaw: string, eventLabel: string, guardLabel?: string, actionLabels: string[] = []) => {
+                        const targetName = sanitize(targetRaw.replace(/^#/, '').split('.').pop() ?? '');
                         let targetId = nameToId.get(targetName);
                         if (!targetId) {
-                            if (!isSubDiagram) { continue; }
-                            const display = target.label.replace(/^#/, '');
+                            if (!isSubDiagram) { return; }
+                            const display = targetRaw.replace(/^#/, '');
                             targetId = ghostByName.get(targetName);
                             if (!targetId) {
                                 targetId = `n${counter++}`;
@@ -288,18 +293,33 @@ export class XStateGraphViewProvider {
                         }
                         const key = `${sourceId} ${targetId}`;
                         let entry = edgeMap.get(key);
-                        if (!entry) {
-                            entry = { source: sourceId, target: targetId, labels: [] };
-                            edgeMap.set(key, entry);
-                        }
-                        // Harel label: EVENT [guard] / action1, action2
-                        const guard   = t.children?.find(c => c.type === 'guard');
-                        const actions = (t.children ?? []).filter(c => c.type === 'action');
-                        let label = t.label ?? '';
-                        if (guard) { label += ` [${guard.label}]`; }
-                        if (actions.length) { label += ` / ${actions.map(a => a.label).join(', ')}`; }
+                        if (!entry) { entry = { source: sourceId, target: targetId, labels: [] }; edgeMap.set(key, entry); }
+                        let label = eventLabel ?? '';
+                        if (guardLabel) { label += ` [${guardLabel}]`; }
+                        if (actionLabels.length) { label += ` / ${actionLabels.join(', ')}`; }
                         label = label.trim();
                         if (label && !entry.labels.includes(label)) { entry.labels.push(label); }
+                    };
+
+                    for (const t of [...directT, ...invokeT]) {
+                        // Conditional transition (array of branches): each branch is
+                        // a `transition` whose label is its own target. Emit an edge
+                        // per branch so guarded multi-target transitions all show.
+                        const branches = (t.children ?? []).filter(c => c.type === 'transition');
+                        if (branches.length > 0) {
+                            for (const b of branches) {
+                                if (!b.label || b.label === '?') { continue; }  // action-only branch, no target
+                                const g = b.children?.find(c => c.type === 'guard');
+                                const acts = (b.children ?? []).filter(c => c.type === 'action').map(a => a.label);
+                                emitEdge(b.label, t.label ?? '', g?.label, acts);
+                            }
+                            continue;
+                        }
+                        const target = t.children?.find(c => c.type === 'target');
+                        if (!target) { continue; }
+                        const guard   = t.children?.find(c => c.type === 'guard');
+                        const actions = (t.children ?? []).filter(c => c.type === 'action').map(a => a.label);
+                        emitEdge(target.label, t.label ?? '', guard?.label, actions);
                     }
                 }
             }
@@ -407,6 +427,7 @@ interface GraphNode {
         initial?: boolean; final?: boolean; start?: boolean; parallel?: boolean;
         history?: 'shallow' | 'deep'; ghost?: boolean;
         entryActions?: string[]; exitActions?: string[]; internalTransitions?: string[];
+        invokes?: string[]; description?: string;
     };
 }
 interface GraphEdge {

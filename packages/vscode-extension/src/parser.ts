@@ -374,6 +374,29 @@ export class XStateMachineParser {
             children.push(...transitions);
         }
 
+        // Parse `after` — delayed transitions, keyed by delay (ms or named delay).
+        const afterProp = this.findProperty(config, 'after');
+        if (afterProp && ts.isObjectLiteralExpression(afterProp)) {
+            for (const t of this.parseTransitions(afterProp, document)) {
+                t.label = /^\d+$/.test(t.label) ? `after ${t.label}ms` : `after ${t.label}`;
+                children.push(t);
+            }
+        }
+
+        // Parse `always` — transient (eventless) transition(s); single, object, or array of branches.
+        const alwaysProp = this.findProperty(config, 'always');
+        if (alwaysProp) {
+            const alwaysNode = this.parseTransitionNode(alwaysProp, 'always', document);
+            if (alwaysNode) { children.push(alwaysNode); }
+        }
+
+        // Parse state-level `onDone` — fires when a compound/parallel state reaches its final state.
+        const onDoneProp = this.findProperty(config, 'onDone');
+        if (onDoneProp) {
+            const onDoneNode = this.parseTransitionNode(onDoneProp, 'onDone', document);
+            if (onDoneNode) { children.push(onDoneNode); }
+        }
+
         // Parse entry actions
         const entryProp = this.findProperty(config, 'entry');
         if (entryProp) {

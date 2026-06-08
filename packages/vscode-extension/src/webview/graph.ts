@@ -9,6 +9,7 @@ interface NodeData {
     parent?: string; initial?: boolean; final?: boolean; start?: boolean; parallel?: boolean;
     history?: 'shallow' | 'deep'; ghost?: boolean;
     entryActions?: string[]; exitActions?: string[]; internalTransitions?: string[];
+    invokes?: string[]; description?: string;
 }
 interface GraphPayload {
     nodes: { data: NodeData }[];
@@ -127,10 +128,12 @@ function buildElkNode(id: string): ElkNode {
         // too so the glyph never overflows the box border.
         const isCollapsedParent = states.length > 0 && collapsed.has(id);
         const display = d.label + (isCollapsedParent ? ' ⊕' : '');
+        // Compartment rows below the title: internal transitions + invoked services.
+        const extraRows = [...(d.internalTransitions ?? []), ...(d.invokes ?? []).map(s => `invoke ${s}`)];
         return {
             id,
-            width:  nw(display, d.entryActions ?? [], d.exitActions ?? [], d.internalTransitions ?? []),
-            height: nh(d.entryActions ?? [], d.exitActions ?? [], d.internalTransitions ?? []),
+            width:  nw(display, d.entryActions ?? [], d.exitActions ?? [], extraRows),
+            height: nh(d.entryActions ?? [], d.exitActions ?? [], extraRows),
             labels: [{ text: d.label }],
         };
     }
@@ -340,6 +343,12 @@ async function render(): Promise<void> {
                 'data-name': d.name,
             });
             (g as SVGElement).style.cursor = 'pointer';
+            // Native tooltip from the state's `description`.
+            if (d.description) {
+                const title = el('title');
+                title.textContent = d.description;
+                g.appendChild(title);
+            }
 
             if (d.start) {
                 g.appendChild(el('circle', { cx: ax + w/2, cy: ay + h/2, r: 6, fill: C.fg }));
@@ -457,8 +466,9 @@ async function render(): Promise<void> {
                 const entry = d.entryActions ?? [];
                 const exit  = d.exitActions  ?? [];
                 const internal = d.internalTransitions ?? [];
+                const invokes = d.invokes ?? [];
                 const label = d.label + (isCollapsed && hasChildren ? ' ⊕' : '');
-                if (entry.length > 0 || exit.length > 0 || internal.length > 0) {
+                if (entry.length > 0 || exit.length > 0 || internal.length > 0 || invokes.length > 0) {
                     const labelY = ay + NODE_V_PAD + LABEL_PX;
                     g.appendChild(txt(label, ax+w/2, labelY, {
                         'text-anchor': 'middle', 'font-size': LABEL_PX, 'font-weight': '500',
@@ -483,6 +493,11 @@ async function render(): Promise<void> {
                     // from entry/exit rows.
                     for (const line of internal) {
                         g.appendChild(txt(line, ax+8, lineY, { 'font-size': ACTION_PX, fill: C.fg, 'fill-opacity': 0.85 }));
+                        lineY += ACTION_LINE_H;
+                    }
+                    // Invoked services: `invoke <src>`, italic to read as an activity.
+                    for (const src of invokes) {
+                        g.appendChild(txt(`invoke ${src}`, ax+8, lineY, { 'font-size': ACTION_PX, fill: C.desc, 'font-style': 'italic' }));
                         lineY += ACTION_LINE_H;
                     }
                 } else {

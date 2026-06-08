@@ -43,6 +43,7 @@ interface NodeData {
     parent?: string; compound?: boolean; initial?: boolean; final?: boolean;
     parallel?: boolean; history?: 'shallow' | 'deep'; ghost?: boolean; start?: boolean;
     entryActions?: string[]; exitActions?: string[]; internalTransitions?: string[];
+    invokes?: string[]; description?: string;
 }
 const nodes: { data: NodeData }[] = [];
 const edges: { data: { id: string; source: string; target: string; label: string } }[] = [];
@@ -68,11 +69,13 @@ const collect = (n: MachineNode, parentId: string | undefined, isRoot: boolean) 
             const acts = (c.children ?? []).filter(cc => cc.type === 'action').map(cc => cc.label);
             return `${c.label}${guard ? ` [${guard.label}]` : ''} / ${acts.join(', ')}`;
         });
+    const invokes = (n.children ?? []).filter(c => c.type === 'invoke').map(c => c.label);
     nodes.push({ data: {
         id, label: n.label, name, parent: parentId,
         compound: childStates.length > 0,
         initial: !!n.isInitial, final: !!n.isFinal, parallel: !!(n as any).isParallel,
         history: (n as any).historyType, entryActions, exitActions, internalTransitions,
+        invokes, description: (n as any).description,
     } });
     for (const c of childStates) { collect(c, id, false); }
 };
@@ -96,14 +99,12 @@ const addEdges = (n: MachineNode) => {
             const invokeT = (n.children ?? [])
                 .filter(c => c.type === 'invoke')
                 .flatMap(inv => (inv.children ?? []).filter(c => c.type === 'transition'));
-            for (const t of [...directT, ...invokeT]) {
-                const target = t.children?.find(c => c.type === 'target');
-                if (!target) { continue; }
-                const targetName = sanitize(target.label.replace(/^#/, '').split('.').pop() ?? '');
+            const emitEdge = (targetRaw: string, eventLabel: string, guardLabel?: string, actionLabels: string[] = []) => {
+                const targetName = sanitize(targetRaw.replace(/^#/, '').split('.').pop() ?? '');
                 let targetId = nameToId.get(targetName);
                 if (!targetId) {
-                    if (!isSubDiagram) { continue; }
-                    const display = target.label.replace(/^#/, '');
+                    if (!isSubDiagram) { return; }
+                    const display = targetRaw.replace(/^#/, '');
                     targetId = ghostByName.get(targetName);
                     if (!targetId) {
                         targetId = `n${counter++}`;
@@ -114,13 +115,28 @@ const addEdges = (n: MachineNode) => {
                 const key = `${sourceId} ${targetId}`;
                 let entry = edgeMap.get(key);
                 if (!entry) { entry = { source: sourceId, target: targetId, labels: [] }; edgeMap.set(key, entry); }
-                const guard = t.children?.find(c => c.type === 'guard');
-                const actions = (t.children ?? []).filter(c => c.type === 'action');
-                let label = t.label ?? '';
-                if (guard) { label += ` [${guard.label}]`; }
-                if (actions.length) { label += ` / ${actions.map(a => a.label).join(', ')}`; }
+                let label = eventLabel ?? '';
+                if (guardLabel) { label += ` [${guardLabel}]`; }
+                if (actionLabels.length) { label += ` / ${actionLabels.join(', ')}`; }
                 label = label.trim();
                 if (label && !entry.labels.includes(label)) { entry.labels.push(label); }
+            };
+            for (const t of [...directT, ...invokeT]) {
+                const branches = (t.children ?? []).filter(c => c.type === 'transition');
+                if (branches.length > 0) {
+                    for (const b of branches) {
+                        if (!b.label || b.label === '?') { continue; }
+                        const g = b.children?.find(c => c.type === 'guard');
+                        const acts = (b.children ?? []).filter(c => c.type === 'action').map(a => a.label);
+                        emitEdge(b.label, t.label ?? '', g?.label, acts);
+                    }
+                    continue;
+                }
+                const target = t.children?.find(c => c.type === 'target');
+                if (!target) { continue; }
+                const guard = t.children?.find(c => c.type === 'guard');
+                const actions = (t.children ?? []).filter(c => c.type === 'action').map(a => a.label);
+                emitEdge(target.label, t.label ?? '', guard?.label, actions);
             }
         }
     }
