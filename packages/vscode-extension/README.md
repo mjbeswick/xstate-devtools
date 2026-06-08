@@ -27,13 +27,14 @@
 - **Invalid property highlighting** — unknown config properties show up in the tree with a red error icon
 
 ### 🗺️ Statechart diagram
-- **Visual statechart** — render any machine (or any compound state) as a Harel-style diagram in its own editor tab via **View State Diagram**
+- **Visual statechart** — render any machine (or any compound state) as a Harel-style diagram in its own editor tab via **View State Diagram** (from the outline _or_ by right-clicking a machine/state in the code)
+- **Every transition kind** — `on` events, `after` (delayed), `always` (transient), invoke `onDone`/`onError`, and state-level `onDone`, with `EVENT [guard] / actions` labels; internal (action-only) transitions and invoked services (`invoke <src>`) show inside the state box
 - **Automatic layout** — clean hierarchical layout with smooth, curved transitions
 - **Top-down ↔ left-right** — a sensible direction is chosen from the machine's shape (left-right for linear machines, top-down for parallel/large ones); flip it anytime and your choice is remembered
 - **Pan, zoom & fit**, plus **expand all / collapse all**
 - **Keyboard navigation** — arrow keys move the selection between states, **Enter** expands/collapses a compound or jumps a state to its source, **Shift+arrows** pan, `]`/`[` (or `+`/`-`) zoom, and `0`/`.` fit
 - **Reflects the outline** — collapsed states render as single blocks; click a collapsed block to expand it, or a region's title bar to collapse it
-- **Two-way sync** — click a state to select it in the tree, click an event to select its transition, and selecting in the tree highlights it in the diagram
+- **Two-way sync** — click a state to select it in the tree, click an event to select its transition, and selecting in the tree (or the editor cursor) highlights it in the diagram; a state's `description` shows as a hover tooltip
 - **Hover to focus** — hovering a state emphasizes its transitions and dims the rest
 - **Export** the diagram as **SVG** or **PNG**
 - **Focus mode** — open the diagram on a compound state to see just that subtree

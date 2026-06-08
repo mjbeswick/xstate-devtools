@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.7.0] - 2026-06-08
+
+### Added
+- **Internal (action-only) transitions** — an event that runs actions without changing state now shows inside the state box as `EVENT [guard] / actions` (Harel internal-transition convention) instead of disappearing
+- **Invoke `onDone` / `onError`** now render as labelled edges from the invoking state
+- **`after` (delayed), `always` (transient), and state-level `onDone`** transitions now appear on the diagram (`after 5000ms`, `always [guard]`, `onDone`)
+- **Invoke indicator** — a state that invokes a service shows an `invoke <src>` row in its box
+- **State descriptions** surface as a native hover tooltip on the diagram
+- **Open the diagram from the editor** — right-click a machine or state in the code (or use the command palette) to open its statechart, with that node selected; opening from the tree now also selects the node
+
+### Fixed
+- Conditional (branch-array) transitions — e.g. guarded `always: [...]` or `EVENT: [{...}, {...}]` — now render one edge per branch instead of vanishing
+- **Go to Implementation / Definition** resolves transition targets, jumping to the target state's definition
+- Hovering a state now fades the **arrowheads** of dimmed edges along with their lines (they previously stayed solid)
+
+### Internal
+- Added a **vitest** parser test suite (fixture snapshots + targeted assertions) — the extension's first automated tests
+
 ## [1.6.0] - 2026-06-08
 
 ### Added
