@@ -23,10 +23,12 @@ export const trafficLightMachine = setup({
   },
 }).createMachine({
   id: 'trafficLight',
+  description: 'Controls a standard traffic light with pedestrian crossing support and a fault mode for power outages.',
   initial: 'green',
   context: { cycles: 0 },
   states: {
     green: {
+      description: 'Traffic flows freely. Pedestrians must wait.',
       entry: 'logChange',
       on: {
         TIMER: 'yellow',
@@ -34,18 +36,29 @@ export const trafficLightMachine = setup({
       },
     },
     yellow: {
+      description: 'Warning phase — traffic should slow and prepare to stop.',
       on: {
         TIMER: 'red',
         POWER_OUTAGE: 'flashing',
       },
     },
     red: {
+      description: 'Traffic is stopped. Pedestrian crossing sequence runs as a nested region.',
       entry: 'countCycle',
       initial: 'walk',
       states: {
-        walk: { on: { TIMER: 'flashWarning' } },
-        flashWarning: { on: { TIMER: 'dontWalk' } },
-        dontWalk: { type: 'final' },
+        walk: {
+          description: 'Pedestrians may cross.',
+          on: { TIMER: 'flashWarning' },
+        },
+        flashWarning: {
+          description: 'Crossing signal flashes — pedestrians should finish crossing.',
+          on: { TIMER: 'dontWalk' },
+        },
+        dontWalk: {
+          description: 'Crossing is closed. Pedestrian sequence complete.',
+          type: 'final',
+        },
       },
       onDone: 'green',
       on: {
@@ -53,6 +66,7 @@ export const trafficLightMachine = setup({
       },
     },
     flashing: {
+      description: 'Fault mode: light flashes amber due to a power outage. Night mode guard determines return target.',
       exit: 'logChange',
       on: {
         POWER_RESTORED: { target: 'red', guard: 'nightMode' },
