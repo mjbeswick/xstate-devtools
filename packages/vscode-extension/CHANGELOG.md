@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.6.0] - 2026-06-08
+
+### Added
+- **Keyboard navigation in the diagram** — arrow keys move the selection between states (auto-panning to keep the selected state in view); **Enter** expands/collapses a compound state or jumps a leaf state to its source; **Shift+arrows** pan; `]`/`[` (or `+`/`-`) zoom; `0` or `.` fits the diagram to the screen
+
+### Changed
+- Diagrams now pick their **initial layout direction from the machine's shape** — left-to-right for small, mostly-linear machines; top-down for parallel, large, or wide ones (still toggleable and persisted per diagram)
+- Compound states collapse/expand from their **title bar** — clicking the body no longer toggles, so it's harder to collapse a region by accident
+- A selected state now uses VS Code's **selection colors** (matching the outline tree), and editor cursor-sync and keyboard navigation share a single active selection
+
+### Fixed
+- **Go to Implementation / Definition** now resolves transition targets — invoking it on a target state name (e.g. `CONFIG_LOADED: 'loadingAssets'`) jumps to that state's definition instead of reporting "No implementation found"
+- Collapsing a compound state no longer floods the diagram with the hidden subtree's internal transition events
+
 ## [1.5.0] - 2026-06-06
 
 ### Added

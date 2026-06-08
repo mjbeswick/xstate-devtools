@@ -29,9 +29,10 @@
 ### 🗺️ Statechart diagram
 - **Visual statechart** — render any machine (or any compound state) as a Harel-style diagram in its own editor tab via **View State Diagram**
 - **Automatic layout** — clean hierarchical layout with smooth, curved transitions
-- **Top-down ↔ left-right** — flip the flow direction to suit each machine; your choice is remembered
+- **Top-down ↔ left-right** — a sensible direction is chosen from the machine's shape (left-right for linear machines, top-down for parallel/large ones); flip it anytime and your choice is remembered
 - **Pan, zoom & fit**, plus **expand all / collapse all**
-- **Reflects the outline** — collapsed states render as single blocks; click a region to expand it
+- **Keyboard navigation** — arrow keys move the selection between states, **Enter** expands/collapses a compound or jumps a state to its source, **Shift+arrows** pan, `]`/`[` (or `+`/`-`) zoom, and `0`/`.` fit
+- **Reflects the outline** — collapsed states render as single blocks; click a collapsed block to expand it, or a region's title bar to collapse it
 - **Two-way sync** — click a state to select it in the tree, click an event to select its transition, and selecting in the tree highlights it in the diagram
 - **Hover to focus** — hovering a state emphasizes its transitions and dims the rest
 - **Export** the diagram as **SVG** or **PNG**
@@ -52,12 +53,14 @@ The example above shows a parallel `checkout` machine: the dashed outer box with
 | Box with a double outline | A final state |
 | **Dashed** box with a `parallel` tag | A parallel (orthogonal) state — its regions run concurrently |
 | Box marked `⊕` | A collapsed compound state (click to expand) |
-| Outline box with a title bar | An expanded region |
+| Outline box with a title bar | An expanded region (click the title bar to collapse) |
 | Outer titled box | The machine itself |
 | Curved arrow with a label | A transition, labelled `EVENT [guard] / actions` |
 | `entry/ …` and `exit/ …` inside a box | The state's entry/exit actions |
 
 **Diagram toolbar:** zoom in `+` / out `−`, fit `⊡`, toggle direction `↧`/`↦`, expand all `⊞`, collapse all `⊟`, and export `SVG` / `PNG`.
+
+**Diagram keyboard shortcuts:** **arrow keys** move the selection between states, **Enter** expands/collapses the selected compound (or jumps a leaf state to its source), **Shift+arrows** pan, `]`/`[` (or `+`/`-`) zoom, and `0` or `.` fits to screen.
 
 ## Icon & color legend
 

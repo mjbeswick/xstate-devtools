@@ -11,6 +11,9 @@ CLAUDE.md
 **/*.map
 **/*.ts
 esbuild.js
+harness/**
+PLAN.md
+docs/**
 node_modules/**
 **/.DS_Store
 .claude/**
