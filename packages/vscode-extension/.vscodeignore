@@ -12,6 +12,8 @@ CLAUDE.md
 **/*.ts
 esbuild.js
 harness/**
+test/**
+vitest.config.ts
 PLAN.md
 docs/**
 node_modules/**

@@ -413,6 +413,8 @@
     ]
   },
   "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
     "vscode:prepublish": "npm run copy-codicons && npm run bundle",
     "copy-codicons": "node -e \"const fs=require('fs'),p=require('path');const dist=p.dirname(require.resolve('@vscode/codicons/package.json'))+'/dist';const out='resources/codicons';fs.mkdirSync(out,{recursive:true});for(const f of ['codicon.css','codicon.ttf'])fs.copyFileSync(p.join(dist,f),p.join(out,f));\"",
     "bundle": "node esbuild.js",

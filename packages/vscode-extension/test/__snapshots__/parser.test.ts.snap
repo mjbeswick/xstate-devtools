@@ -1,0 +1,3533 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`parser snapshots > parses advancedTransitions.machine.ts 1`] = `
+[
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "isValid",
+                    "type": "guard",
+                  },
+                ],
+                "label": "submitting",
+                "type": "transition",
+              },
+              {
+                "label": "invalid",
+                "type": "transition",
+              },
+            ],
+            "label": "always",
+            "type": "transition",
+          },
+        ],
+        "description": "Runs synchronous validation, then auto-advances.",
+        "initial": true,
+        "label": "validating",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "validating",
+                "type": "target",
+              },
+            ],
+            "label": "after 3000ms",
+            "type": "transition",
+          },
+        ],
+        "label": "invalid",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "confirming",
+                    "type": "target",
+                  },
+                  {
+                    "label": "storeReceipt",
+                    "type": "action",
+                  },
+                ],
+                "label": "onDone",
+                "type": "transition",
+              },
+              {
+                "children": [
+                  {
+                    "label": "invalid",
+                    "type": "target",
+                  },
+                ],
+                "label": "onError",
+                "type": "transition",
+              },
+            ],
+            "label": "submitOrder",
+            "type": "invoke",
+          },
+        ],
+        "description": "Posts the order to the server.",
+        "label": "submitting",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "ack",
+                    "type": "target",
+                  },
+                ],
+                "label": "SENT",
+                "type": "transition",
+              },
+            ],
+            "initial": true,
+            "label": "sending",
+            "type": "state",
+          },
+          {
+            "final": true,
+            "label": "ack",
+            "type": "state",
+          },
+          {
+            "children": [
+              {
+                "label": "invalid",
+                "type": "target",
+              },
+              {
+                "label": "timeoutWarn",
+                "type": "action",
+              },
+            ],
+            "label": "after 10000ms",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "done",
+                "type": "target",
+              },
+            ],
+            "label": "onDone",
+            "type": "transition",
+          },
+        ],
+        "label": "confirming",
+        "type": "state",
+      },
+      {
+        "final": true,
+        "label": "done",
+        "type": "state",
+      },
+    ],
+    "label": "checkoutFlow",
+    "type": "machine",
+  },
+]
+`;
+
+exports[`parser snapshots > parses checkout.machine.ts 1`] = `
+[
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "authorizing",
+                    "type": "target",
+                  },
+                ],
+                "label": "SUBMIT_PAYMENT",
+                "type": "transition",
+              },
+            ],
+            "description": "Waiting for the customer to submit payment details.",
+            "initial": true,
+            "label": "idle",
+            "type": "state",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "paid",
+                    "type": "target",
+                  },
+                ],
+                "label": "PAYMENT_APPROVED",
+                "type": "transition",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "label": "canRetry",
+                        "type": "guard",
+                      },
+                    ],
+                    "label": "authorizing",
+                    "type": "transition",
+                  },
+                  {
+                    "label": "declined",
+                    "type": "transition",
+                  },
+                ],
+                "label": "PAYMENT_DECLINED",
+                "type": "transition",
+              },
+              {
+                "label": "chargeCard",
+                "type": "entry",
+              },
+              {
+                "label": "clearPaymentToken",
+                "type": "exit",
+              },
+            ],
+            "description": "Card charge in flight. May retry on decline if the retry guard passes.",
+            "label": "authorizing",
+            "type": "state",
+          },
+          {
+            "description": "Payment successfully captured.",
+            "final": true,
+            "label": "paid",
+            "type": "state",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "idle",
+                    "type": "target",
+                  },
+                ],
+                "label": "CHANGE_CARD",
+                "type": "transition",
+              },
+              {
+                "label": "notifyDecline",
+                "type": "entry",
+              },
+            ],
+            "description": "Card was hard-declined. Customer must provide a new card to continue.",
+            "label": "declined",
+            "type": "state",
+          },
+        ],
+        "description": "Handles card authorisation. Retries are allowed up to a limit; a hard decline blocks until the customer changes card.",
+        "label": "payment",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "inDeliveryZone",
+                    "type": "guard",
+                  },
+                  {
+                    "label": "selectingMethod",
+                    "type": "target",
+                  },
+                ],
+                "label": "ADDRESS_VALID",
+                "type": "transition",
+              },
+            ],
+            "description": "Waiting for a valid address within the delivery zone.",
+            "initial": true,
+            "label": "collectingAddress",
+            "type": "state",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "ready",
+                    "type": "target",
+                  },
+                ],
+                "label": "METHOD_SELECTED",
+                "type": "transition",
+              },
+              {
+                "label": "persistShippingChoice",
+                "type": "exit",
+              },
+            ],
+            "description": "Customer is choosing a shipping method.",
+            "label": "selectingMethod",
+            "type": "state",
+          },
+          {
+            "description": "Delivery details confirmed.",
+            "final": true,
+            "label": "ready",
+            "type": "state",
+          },
+        ],
+        "description": "Collects a delivery address and shipping method before the order can be placed.",
+        "label": "fulfilment",
+        "type": "state",
+      },
+    ],
+    "description": "Parallel checkout flow — payment and fulfilment regions run concurrently; the order completes once both reach their final state.",
+    "label": "checkout",
+    "parallel": true,
+    "type": "machine",
+  },
+]
+`;
+
+exports[`parser snapshots > parses complexMachine.ts 1`] = `
+[
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "loadingConfig",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "CORE_READY",
+                            "type": "transition",
+                          },
+                        ],
+                        "initial": true,
+                        "label": "initializingCore",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "loadingAssets",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "CONFIG_LOADED",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "loadingConfig",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "#applicationOrchestrator.root.applicationLayer.authenticated",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "ASSETS_READY",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "loadingAssets",
+                        "type": "state",
+                      },
+                    ],
+                    "initial": true,
+                    "label": "loadingResources",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "label": "errorRecovery",
+                        "type": "target",
+                      },
+                    ],
+                    "label": "STARTUP_ERROR",
+                    "type": "transition",
+                  },
+                ],
+                "initial": true,
+                "label": "startup",
+                "type": "state",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "sessionActive",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "AUTH_VALID",
+                            "type": "transition",
+                          },
+                          {
+                            "children": [
+                              {
+                                "label": "sessionExpired",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "AUTH_EXPIRED",
+                            "type": "transition",
+                          },
+                        ],
+                        "initial": true,
+                        "label": "checkingAuth",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "sessionEnded",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "LOGOUT",
+                            "type": "transition",
+                          },
+                          {
+                            "children": [
+                              {
+                                "label": "refreshingToken",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "TOKEN_REFRESH",
+                            "type": "transition",
+                          },
+                          {
+                            "children": [
+                              {
+                                "label": "sessionExpired",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "SESSION_TIMEOUT",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "sessionActive",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "sessionActive",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "TOKEN_READY",
+                            "type": "transition",
+                          },
+                          {
+                            "children": [
+                              {
+                                "label": "sessionExpired",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "REFRESH_FAILED",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "refreshingToken",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "checkingAuth",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "REAUTH",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "sessionExpired",
+                        "type": "state",
+                      },
+                      {
+                        "final": true,
+                        "label": "sessionEnded",
+                        "type": "state",
+                      },
+                    ],
+                    "label": "sessionManager",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "rendering",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "PAGE_LOAD",
+                            "type": "transition",
+                          },
+                          {
+                            "children": [
+                              {
+                                "label": "renderingModal",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "MODAL_OPEN",
+                            "type": "transition",
+                          },
+                        ],
+                        "initial": true,
+                        "label": "idle",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "label": "applyStyles",
+                                    "type": "target",
+                                  },
+                                ],
+                                "label": "DOM_PARSED",
+                                "type": "transition",
+                              },
+                            ],
+                            "initial": true,
+                            "label": "parseDOM",
+                            "type": "state",
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "label": "attachEvents",
+                                    "type": "target",
+                                  },
+                                ],
+                                "label": "STYLES_APPLIED",
+                                "type": "transition",
+                              },
+                            ],
+                            "label": "applyStyles",
+                            "type": "state",
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "label": "renderComplete",
+                                    "type": "target",
+                                  },
+                                ],
+                                "label": "EVENTS_ATTACHED",
+                                "type": "transition",
+                              },
+                            ],
+                            "label": "attachEvents",
+                            "type": "state",
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "label": "#applicationOrchestrator.root.applicationLayer.authenticated.uiEngine.idle",
+                                    "type": "target",
+                                  },
+                                ],
+                                "label": "RENDER_DONE",
+                                "type": "transition",
+                              },
+                            ],
+                            "label": "renderComplete",
+                            "type": "state",
+                          },
+                        ],
+                        "label": "rendering",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "label": "injectContent",
+                                    "type": "target",
+                                  },
+                                ],
+                                "label": "TEMPLATE_BUILT",
+                                "type": "transition",
+                              },
+                            ],
+                            "initial": true,
+                            "label": "buildTemplate",
+                            "type": "state",
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "label": "displayModal",
+                                    "type": "target",
+                                  },
+                                ],
+                                "label": "CONTENT_INJECTED",
+                                "type": "transition",
+                              },
+                            ],
+                            "label": "injectContent",
+                            "type": "state",
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "label": "#applicationOrchestrator.root.applicationLayer.authenticated.uiEngine.idle",
+                                    "type": "target",
+                                  },
+                                ],
+                                "label": "MODAL_CLOSED",
+                                "type": "transition",
+                              },
+                            ],
+                            "label": "displayModal",
+                            "type": "state",
+                          },
+                        ],
+                        "label": "renderingModal",
+                        "type": "state",
+                      },
+                    ],
+                    "label": "uiEngine",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "label": "cached",
+                                    "type": "target",
+                                  },
+                                ],
+                                "label": "DATA_FETCHED",
+                                "type": "transition",
+                              },
+                            ],
+                            "initial": true,
+                            "label": "empty",
+                            "type": "state",
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "label": "empty",
+                                    "type": "target",
+                                  },
+                                ],
+                                "label": "CACHE_INVALIDATE",
+                                "type": "transition",
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "label": "updating",
+                                    "type": "target",
+                                  },
+                                ],
+                                "label": "CACHE_UPDATE",
+                                "type": "transition",
+                              },
+                            ],
+                            "label": "cached",
+                            "type": "state",
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "label": "cached",
+                                    "type": "target",
+                                  },
+                                ],
+                                "label": "UPDATE_COMPLETE",
+                                "type": "transition",
+                              },
+                            ],
+                            "label": "updating",
+                            "type": "state",
+                          },
+                        ],
+                        "label": "caching",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "label": "online",
+                                    "type": "target",
+                                  },
+                                ],
+                                "label": "CONNECTION_RESTORED",
+                                "type": "transition",
+                              },
+                            ],
+                            "initial": true,
+                            "label": "offline",
+                            "type": "state",
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "label": "fetching",
+                                        "type": "target",
+                                      },
+                                    ],
+                                    "label": "REQUEST_START",
+                                    "type": "transition",
+                                  },
+                                ],
+                                "initial": true,
+                                "label": "idle",
+                                "type": "state",
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "label": "idle",
+                                        "type": "target",
+                                      },
+                                    ],
+                                    "label": "RESPONSE_SUCCESS",
+                                    "type": "transition",
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "label": "errorHandler",
+                                        "type": "target",
+                                      },
+                                    ],
+                                    "label": "RESPONSE_ERROR",
+                                    "type": "transition",
+                                  },
+                                ],
+                                "label": "fetching",
+                                "type": "state",
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "label": "fetching",
+                                        "type": "target",
+                                      },
+                                    ],
+                                    "label": "RETRY",
+                                    "type": "transition",
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "label": "idle",
+                                        "type": "target",
+                                      },
+                                    ],
+                                    "label": "ABORT",
+                                    "type": "transition",
+                                  },
+                                ],
+                                "label": "errorHandler",
+                                "type": "state",
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "label": "offline",
+                                    "type": "target",
+                                  },
+                                ],
+                                "label": "CONNECTION_LOST",
+                                "type": "transition",
+                              },
+                            ],
+                            "label": "online",
+                            "type": "state",
+                          },
+                        ],
+                        "label": "networking",
+                        "type": "state",
+                      },
+                    ],
+                    "label": "dataLayer",
+                    "parallel": true,
+                    "type": "state",
+                  },
+                ],
+                "label": "authenticated",
+                "parallel": true,
+                "type": "state",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "recovering",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "RECOVERY_POSSIBLE",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "shuttingDown",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "RECOVERY_IMPOSSIBLE",
+                        "type": "transition",
+                      },
+                    ],
+                    "initial": true,
+                    "label": "analyzing",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "startup",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "RECOVERY_SUCCESS",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "shutingDown",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "RECOVERY_FAILED",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "recovering",
+                    "type": "state",
+                  },
+                  {
+                    "final": true,
+                    "label": "shuttingDown",
+                    "type": "state",
+                  },
+                ],
+                "label": "errorRecovery",
+                "type": "state",
+              },
+            ],
+            "label": "applicationLayer",
+            "type": "state",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "recording",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "ANALYTICS_EVENT",
+                        "type": "transition",
+                      },
+                    ],
+                    "initial": true,
+                    "label": "monitoring",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "sending",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "BATCH_READY",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "recording",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "monitoring",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "SEND_SUCCESS",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "queuing",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "SEND_FAILED",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "sending",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "sending",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "RETRY_SEND",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "queuing",
+                    "type": "state",
+                  },
+                ],
+                "label": "analytics",
+                "type": "state",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "buffering",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "LOG_ENTRY",
+                        "type": "transition",
+                      },
+                    ],
+                    "initial": true,
+                    "label": "collecting",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "flushing",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "BUFFER_FULL",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "flushing",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "FLUSH_NOW",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "buffering",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "collecting",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "FLUSH_COMPLETE",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "flushing",
+                    "type": "state",
+                  },
+                ],
+                "label": "logging",
+                "type": "state",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "warning",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "HIGH_CPU",
+                            "type": "transition",
+                          },
+                        ],
+                        "initial": true,
+                        "label": "idle",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "idle",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "CPU_NORMAL",
+                            "type": "transition",
+                          },
+                          {
+                            "children": [
+                              {
+                                "label": "alert",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "CRITICAL_CPU",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "warning",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "throttled",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "THROTTLE_ENABLED",
+                            "type": "transition",
+                          },
+                          {
+                            "children": [
+                              {
+                                "label": "idle",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "CPU_NORMAL",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "alert",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "idle",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "CPU_NORMAL",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "throttled",
+                        "type": "state",
+                      },
+                    ],
+                    "label": "cpuMonitor",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "warning",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "HIGH_MEMORY",
+                            "type": "transition",
+                          },
+                        ],
+                        "initial": true,
+                        "label": "idle",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "idle",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "MEMORY_NORMAL",
+                            "type": "transition",
+                          },
+                          {
+                            "children": [
+                              {
+                                "label": "alert",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "CRITICAL_MEMORY",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "warning",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "cleaning",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "GC_TRIGGERED",
+                            "type": "transition",
+                          },
+                          {
+                            "children": [
+                              {
+                                "label": "idle",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "MEMORY_NORMAL",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "alert",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "idle",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "GC_COMPLETE",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "cleaning",
+                        "type": "state",
+                      },
+                    ],
+                    "label": "memoryMonitor",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "warning",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "STORAGE_LOW",
+                            "type": "transition",
+                          },
+                        ],
+                        "initial": true,
+                        "label": "monitoring",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "monitoring",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "STORAGE_NORMAL",
+                            "type": "transition",
+                          },
+                          {
+                            "children": [
+                              {
+                                "label": "pruning",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "STORAGE_CRITICAL",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "warning",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "monitoring",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "PRUNE_COMPLETE",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "pruning",
+                        "type": "state",
+                      },
+                    ],
+                    "label": "storageMonitor",
+                    "type": "state",
+                  },
+                ],
+                "label": "healthMonitor",
+                "parallel": true,
+                "type": "state",
+              },
+            ],
+            "label": "backgroundServices",
+            "parallel": true,
+            "type": "state",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "dashboard",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_DASHBOARD",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "settings",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_SETTINGS",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "profile",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_PROFILE",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "reports",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_REPORTS",
+                        "type": "transition",
+                      },
+                    ],
+                    "initial": true,
+                    "label": "home",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "home",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_HOME",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "settings",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_SETTINGS",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "profile",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_PROFILE",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "reports",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_REPORTS",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "dashboard",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "home",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_HOME",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "dashboard",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_DASHBOARD",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "profile",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_PROFILE",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "reports",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_REPORTS",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "settings",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "home",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_HOME",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "dashboard",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_DASHBOARD",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "settings",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_SETTINGS",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "reports",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_REPORTS",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "profile",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "home",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_HOME",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "dashboard",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_DASHBOARD",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "settings",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_SETTINGS",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "profile",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "GO_TO_PROFILE",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "reports",
+                    "type": "state",
+                  },
+                ],
+                "initial": true,
+                "label": "navigation",
+                "type": "state",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "displaying",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "SHOW_NOTIFICATION",
+                        "type": "transition",
+                      },
+                    ],
+                    "initial": true,
+                    "label": "idle",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "idle",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "DISMISS",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "idle",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "AUTO_DISMISS",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "queued",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "QUEUE_MORE",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "displaying",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "displaying",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "SHOW_NEXT",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "idle",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "CLEAR_QUEUE",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "queued",
+                    "type": "state",
+                  },
+                ],
+                "label": "notifications",
+                "type": "state",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "dark",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "TOGGLE_DARK",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "auto",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "TOGGLE_AUTO",
+                        "type": "transition",
+                      },
+                    ],
+                    "initial": true,
+                    "label": "light",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "light",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "TOGGLE_LIGHT",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "auto",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "TOGGLE_AUTO",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "dark",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "light",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "TOGGLE_LIGHT",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "dark",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "TOGGLE_DARK",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "auto",
+                    "type": "state",
+                  },
+                ],
+                "label": "themeManager",
+                "type": "state",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "enabled",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "ENABLE_SCREEN_READER",
+                            "type": "transition",
+                          },
+                        ],
+                        "initial": true,
+                        "label": "disabled",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "disabled",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "DISABLE_SCREEN_READER",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "enabled",
+                        "type": "state",
+                      },
+                    ],
+                    "label": "screenReader",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "normal",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "INCREASE_FONT",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "small",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "small",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "DECREASE_FONT",
+                            "type": "transition",
+                          },
+                          {
+                            "children": [
+                              {
+                                "label": "large",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "INCREASE_FONT",
+                            "type": "transition",
+                          },
+                        ],
+                        "initial": true,
+                        "label": "normal",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "normal",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "DECREASE_FONT",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "large",
+                        "type": "state",
+                      },
+                    ],
+                    "label": "fontScaling",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "highContrast",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "ENABLE_HIGH_CONTRAST",
+                            "type": "transition",
+                          },
+                        ],
+                        "initial": true,
+                        "label": "standard",
+                        "type": "state",
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "label": "standard",
+                                "type": "target",
+                              },
+                            ],
+                            "label": "DISABLE_HIGH_CONTRAST",
+                            "type": "transition",
+                          },
+                        ],
+                        "label": "highContrast",
+                        "type": "state",
+                      },
+                    ],
+                    "label": "colorContrast",
+                    "type": "state",
+                  },
+                ],
+                "label": "accessibility",
+                "parallel": true,
+                "type": "state",
+              },
+            ],
+            "label": "userInterface",
+            "type": "state",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "warning",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "FPS_DEGRADED",
+                        "type": "transition",
+                      },
+                    ],
+                    "initial": true,
+                    "label": "optimal",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "critical",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "FPS_CRITICAL",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "optimal",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "FPS_RESTORED",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "warning",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "optimizing",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "ENABLE_PERFORMANCE_MODE",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "optimal",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "FPS_RESTORED",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "critical",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "optimal",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "OPTIMIZATION_COMPLETE",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "optimizing",
+                    "type": "state",
+                  },
+                ],
+                "label": "frameRate",
+                "type": "state",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "medium",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "MEMORY_INCREASING",
+                        "type": "transition",
+                      },
+                    ],
+                    "initial": true,
+                    "label": "low",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "low",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "MEMORY_DECREASING",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "high",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "MEMORY_CRITICAL",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "medium",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "cleaning",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "TRIGGER_CLEANUP",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "medium",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "MEMORY_DECREASING",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "high",
+                    "type": "state",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "low",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "CLEANUP_DONE",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "cleaning",
+                    "type": "state",
+                  },
+                ],
+                "label": "memoryPressure",
+                "type": "state",
+              },
+            ],
+            "label": "performanceMonitoring",
+            "parallel": true,
+            "type": "state",
+          },
+        ],
+        "initial": true,
+        "label": "root",
+        "parallel": true,
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "label": "count: 0",
+            "type": "contextProperty",
+          },
+          {
+            "label": "logs: [0 items]",
+            "type": "contextProperty",
+          },
+          {
+            "label": "activeModules: [0 items]",
+            "type": "contextProperty",
+          },
+          {
+            "label": "systemStatus: "initializing"",
+            "type": "contextProperty",
+          },
+          {
+            "label": "userRole: "guest"",
+            "type": "contextProperty",
+          },
+          {
+            "label": "permissions: [0 items]",
+            "type": "contextProperty",
+          },
+        ],
+        "label": "context",
+        "type": "context",
+      },
+    ],
+    "label": "applicationOrchestrator",
+    "type": "machine",
+  },
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "fetchingProfile",
+                "type": "target",
+              },
+            ],
+            "label": "CREDENTIALS_VALID",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "failed",
+                "type": "target",
+              },
+            ],
+            "label": "CREDENTIALS_INVALID",
+            "type": "transition",
+          },
+        ],
+        "initial": true,
+        "label": "checkingCredentials",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "success",
+                "type": "target",
+              },
+            ],
+            "label": "PROFILE_LOADED",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "failed",
+                "type": "target",
+              },
+            ],
+            "label": "PROFILE_ERROR",
+            "type": "transition",
+          },
+        ],
+        "label": "fetchingProfile",
+        "type": "state",
+      },
+      {
+        "final": true,
+        "label": "success",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "guard",
+                "type": "guard",
+              },
+              {
+                "label": "checkingCredentials",
+                "type": "target",
+              },
+              {
+                "label": "assign",
+                "type": "action",
+              },
+            ],
+            "label": "RETRY",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "abandoned",
+                "type": "target",
+              },
+            ],
+            "label": "GIVE_UP",
+            "type": "transition",
+          },
+        ],
+        "label": "failed",
+        "type": "state",
+      },
+      {
+        "final": true,
+        "label": "abandoned",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "label": "attempts: 0",
+            "type": "contextProperty",
+          },
+          {
+            "label": "userId: ...",
+            "type": "contextProperty",
+          },
+        ],
+        "label": "context",
+        "type": "context",
+      },
+    ],
+    "label": "auth",
+    "type": "machine",
+  },
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "loading",
+                "type": "target",
+              },
+            ],
+            "label": "FETCH",
+            "type": "transition",
+          },
+        ],
+        "initial": true,
+        "label": "idle",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "success",
+                    "type": "target",
+                  },
+                ],
+                "label": "onDone",
+                "type": "transition",
+              },
+              {
+                "children": [
+                  {
+                    "label": "retrying",
+                    "type": "target",
+                  },
+                ],
+                "label": "onError",
+                "type": "transition",
+              },
+            ],
+            "label": "performFetch",
+            "type": "invoke",
+          },
+        ],
+        "label": "loading",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "assign",
+                    "type": "action",
+                  },
+                ],
+                "label": "loading",
+                "type": "transition",
+              },
+              {
+                "label": "failure",
+                "type": "transition",
+              },
+            ],
+            "label": "always",
+            "type": "transition",
+          },
+        ],
+        "label": "retrying",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "idle",
+                "type": "target",
+              },
+            ],
+            "label": "RESET",
+            "type": "transition",
+          },
+        ],
+        "label": "success",
+        "type": "state",
+      },
+      {
+        "final": true,
+        "label": "failure",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "label": "data: ...",
+            "type": "contextProperty",
+          },
+          {
+            "label": "retries: 0",
+            "type": "contextProperty",
+          },
+          {
+            "label": "error: ...",
+            "type": "contextProperty",
+          },
+        ],
+        "label": "context",
+        "type": "context",
+      },
+    ],
+    "label": "dataFetch",
+    "type": "machine",
+  },
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "captured",
+                "type": "target",
+              },
+            ],
+            "label": "APPROVED",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "declined",
+                "type": "target",
+              },
+            ],
+            "label": "DECLINED",
+            "type": "transition",
+          },
+        ],
+        "initial": true,
+        "label": "authorizing",
+        "type": "state",
+      },
+      {
+        "final": true,
+        "label": "captured",
+        "type": "state",
+      },
+      {
+        "final": true,
+        "label": "declined",
+        "type": "state",
+      },
+    ],
+    "label": "payment",
+    "type": "machine",
+  },
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "assign",
+                "type": "action",
+              },
+            ],
+            "label": "LOCATION_UPDATE",
+            "type": "transition",
+          },
+        ],
+        "initial": true,
+        "label": "tracking",
+        "type": "state",
+      },
+    ],
+    "label": "orderTracking",
+    "type": "machine",
+  },
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "delivered",
+                "type": "target",
+              },
+            ],
+            "label": "ARRIVED",
+            "type": "transition",
+          },
+        ],
+        "initial": true,
+        "label": "enRoute",
+        "type": "state",
+      },
+      {
+        "final": true,
+        "label": "delivered",
+        "type": "state",
+      },
+    ],
+    "label": "delivery",
+    "type": "machine",
+  },
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "assign",
+                "type": "action",
+              },
+            ],
+            "label": "ADD_ITEM",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "assign",
+                "type": "action",
+              },
+            ],
+            "label": "REMOVE_ITEM",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "guard",
+                "type": "guard",
+              },
+              {
+                "label": "payment",
+                "type": "target",
+              },
+            ],
+            "label": "PROCEED_TO_PAYMENT",
+            "type": "transition",
+          },
+        ],
+        "initial": true,
+        "label": "cart",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "cart",
+                "type": "target",
+              },
+            ],
+            "label": "BACK_TO_CART",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "confirmation",
+                    "type": "target",
+                  },
+                ],
+                "label": "onDone",
+                "type": "transition",
+              },
+              {
+                "children": [
+                  {
+                    "label": "paymentFailed",
+                    "type": "target",
+                  },
+                ],
+                "label": "onError",
+                "type": "transition",
+              },
+            ],
+            "label": "paymentMachine",
+            "type": "invoke",
+          },
+        ],
+        "label": "payment",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "shipped",
+                "type": "target",
+              },
+            ],
+            "label": "ORDER_SHIPPED",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "cancelled",
+                "type": "target",
+              },
+            ],
+            "label": "ORDER_CANCELLED",
+            "type": "transition",
+          },
+          {
+            "label": "orderTrackingMachine",
+            "type": "invoke",
+          },
+        ],
+        "label": "confirmation",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "payment",
+                "type": "target",
+              },
+            ],
+            "label": "RETRY_PAYMENT",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "cart",
+                "type": "target",
+              },
+            ],
+            "label": "BACK_TO_CART",
+            "type": "transition",
+          },
+        ],
+        "label": "paymentFailed",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "delivered",
+                    "type": "target",
+                  },
+                ],
+                "label": "onDone",
+                "type": "transition",
+              },
+            ],
+            "label": "deliveryMachine",
+            "type": "invoke",
+          },
+        ],
+        "label": "shipped",
+        "type": "state",
+      },
+      {
+        "final": true,
+        "label": "delivered",
+        "type": "state",
+      },
+      {
+        "final": true,
+        "label": "cancelled",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "label": "items: ...",
+            "type": "contextProperty",
+          },
+          {
+            "label": "paymentMethod: ...",
+            "type": "contextProperty",
+          },
+          {
+            "label": "orderId: ...",
+            "type": "contextProperty",
+          },
+        ],
+        "label": "context",
+        "type": "context",
+      },
+    ],
+    "label": "checkout",
+    "type": "machine",
+  },
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "unauthenticated",
+                "type": "target",
+              },
+            ],
+            "label": "CANCEL",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "loadingData",
+                    "type": "target",
+                  },
+                ],
+                "label": "onDone",
+                "type": "transition",
+              },
+              {
+                "children": [
+                  {
+                    "label": "authFailed",
+                    "type": "target",
+                  },
+                ],
+                "label": "onError",
+                "type": "transition",
+              },
+            ],
+            "label": "authMachine",
+            "type": "invoke",
+          },
+        ],
+        "initial": true,
+        "label": "authenticating",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "authenticating",
+                "type": "target",
+              },
+            ],
+            "label": "LOGIN",
+            "type": "transition",
+          },
+        ],
+        "label": "unauthenticated",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "authenticating",
+                "type": "target",
+              },
+            ],
+            "label": "RETRY",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "loadingData",
+                "type": "target",
+              },
+            ],
+            "label": "CONTINUE_AS_GUEST",
+            "type": "transition",
+          },
+        ],
+        "label": "authFailed",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "profileLoaded",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "onDone",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "profileError",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "onError",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "dataFetchMachine",
+                    "type": "invoke",
+                  },
+                ],
+                "initial": true,
+                "label": "fetching",
+                "type": "state",
+              },
+              {
+                "label": "profileLoaded",
+                "type": "state",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "label": "fetching",
+                        "type": "target",
+                      },
+                    ],
+                    "label": "RETRY_PROFILE",
+                    "type": "transition",
+                  },
+                ],
+                "label": "profileError",
+                "type": "state",
+              },
+            ],
+            "label": "userProfile",
+            "type": "state",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "configLoaded",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "onDone",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "configError",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "onError",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "dataFetchMachine",
+                    "type": "invoke",
+                  },
+                ],
+                "initial": true,
+                "label": "fetching",
+                "type": "state",
+              },
+              {
+                "label": "configLoaded",
+                "type": "state",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "label": "fetching",
+                        "type": "target",
+                      },
+                    ],
+                    "label": "RETRY_CONFIG",
+                    "type": "transition",
+                  },
+                ],
+                "label": "configError",
+                "type": "state",
+              },
+            ],
+            "label": "appConfig",
+            "type": "state",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "label": "flagsLoaded",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "onDone",
+                        "type": "transition",
+                      },
+                      {
+                        "children": [
+                          {
+                            "label": "flagsError",
+                            "type": "target",
+                          },
+                        ],
+                        "label": "onError",
+                        "type": "transition",
+                      },
+                    ],
+                    "label": "dataFetchMachine",
+                    "type": "invoke",
+                  },
+                ],
+                "initial": true,
+                "label": "fetching",
+                "type": "state",
+              },
+              {
+                "label": "flagsLoaded",
+                "type": "state",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "label": "flagsLoaded",
+                        "type": "target",
+                      },
+                    ],
+                    "label": "USE_DEFAULTS",
+                    "type": "transition",
+                  },
+                ],
+                "label": "flagsError",
+                "type": "state",
+              },
+            ],
+            "label": "featureFlags",
+            "type": "state",
+          },
+          {
+            "children": [
+              {
+                "label": "ready",
+                "type": "target",
+              },
+            ],
+            "label": "ALL_DATA_READY",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "loadingFailed",
+                "type": "target",
+              },
+            ],
+            "label": "DATA_LOAD_FAILED",
+            "type": "transition",
+          },
+        ],
+        "label": "loadingData",
+        "parallel": true,
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "loadingData",
+                "type": "target",
+              },
+            ],
+            "label": "RETRY_LOAD",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "unauthenticated",
+                "type": "target",
+              },
+            ],
+            "label": "LOGOUT",
+            "type": "transition",
+          },
+        ],
+        "label": "loadingFailed",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "shopping",
+                    "type": "target",
+                  },
+                ],
+                "label": "START_CHECKOUT",
+                "type": "transition",
+              },
+              {
+                "children": [
+                  {
+                    "label": "#orchestrator.unauthenticated",
+                    "type": "target",
+                  },
+                ],
+                "label": "LOGOUT",
+                "type": "transition",
+              },
+            ],
+            "initial": true,
+            "label": "browsing",
+            "type": "state",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "browsing",
+                    "type": "target",
+                  },
+                ],
+                "label": "ABANDON_CHECKOUT",
+                "type": "transition",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "label": "orderComplete",
+                        "type": "target",
+                      },
+                    ],
+                    "label": "onDone",
+                    "type": "transition",
+                  },
+                  {
+                    "children": [
+                      {
+                        "label": "browsing",
+                        "type": "target",
+                      },
+                    ],
+                    "label": "onError",
+                    "type": "transition",
+                  },
+                ],
+                "label": "checkoutMachine",
+                "type": "invoke",
+              },
+            ],
+            "label": "shopping",
+            "type": "state",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "browsing",
+                    "type": "target",
+                  },
+                ],
+                "label": "CONTINUE_SHOPPING",
+                "type": "transition",
+              },
+              {
+                "children": [
+                  {
+                    "label": "#orchestrator.unauthenticated",
+                    "type": "target",
+                  },
+                ],
+                "label": "LOGOUT",
+                "type": "transition",
+              },
+            ],
+            "label": "orderComplete",
+            "type": "state",
+          },
+        ],
+        "label": "ready",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "label": "userId: ...",
+            "type": "contextProperty",
+          },
+          {
+            "label": "sessionData: ...",
+            "type": "contextProperty",
+          },
+          {
+            "label": "orderId: ...",
+            "type": "contextProperty",
+          },
+          {
+            "label": "errorMessage: ...",
+            "type": "contextProperty",
+          },
+        ],
+        "label": "context",
+        "type": "context",
+      },
+    ],
+    "label": "orchestrator",
+    "type": "machine",
+  },
+]
+`;
+
+exports[`parser snapshots > parses internalActions.machine.ts 1`] = `
+[
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "label": "doIncrement",
+            "type": "action",
+          },
+          {
+            "label": "doDecrement",
+            "type": "action",
+          },
+          {
+            "label": "logPing",
+            "type": "action",
+          },
+          {
+            "label": "notify",
+            "type": "action",
+          },
+          {
+            "label": "cleanup",
+            "type": "action",
+          },
+          {
+            "label": "doReset",
+            "type": "action",
+          },
+          {
+            "label": "isPositive",
+            "type": "guard",
+          },
+        ],
+        "label": "setup",
+        "type": "setup",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "doIncrement",
+                "type": "action",
+              },
+            ],
+            "label": "INCREMENT",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "isPositive",
+                "type": "guard",
+              },
+              {
+                "label": "doDecrement",
+                "type": "action",
+              },
+            ],
+            "label": "DECREMENT",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "logPing",
+                "type": "action",
+              },
+              {
+                "label": "notify",
+                "type": "action",
+              },
+            ],
+            "label": "PING",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "doReset",
+                "type": "action",
+              },
+            ],
+            "label": "RESET",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "done",
+                "type": "target",
+              },
+              {
+                "label": "cleanup",
+                "type": "action",
+              },
+            ],
+            "label": "GO",
+            "type": "transition",
+          },
+        ],
+        "initial": true,
+        "label": "active",
+        "type": "state",
+      },
+      {
+        "final": true,
+        "label": "done",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "label": "count: 0",
+            "type": "contextProperty",
+          },
+          {
+            "label": "pingCount: 0",
+            "type": "contextProperty",
+          },
+          {
+            "label": "lastReset: null",
+            "type": "contextProperty",
+          },
+        ],
+        "label": "context",
+        "type": "context",
+      },
+    ],
+    "label": "counter",
+    "type": "machine",
+  },
+]
+`;
+
+exports[`parser snapshots > parses invokeMachine.machine.ts 1`] = `
+[
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "loading",
+                "type": "target",
+              },
+            ],
+            "label": "FETCH",
+            "type": "transition",
+          },
+        ],
+        "initial": true,
+        "label": "idle",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "success",
+                    "type": "target",
+                  },
+                  {
+                    "label": "storeUser",
+                    "type": "action",
+                  },
+                ],
+                "label": "onDone",
+                "type": "transition",
+              },
+              {
+                "children": [
+                  {
+                    "label": "failure",
+                    "type": "target",
+                  },
+                  {
+                    "label": "logError",
+                    "type": "action",
+                  },
+                ],
+                "label": "onError",
+                "type": "transition",
+              },
+            ],
+            "label": "fetchUser",
+            "type": "invoke",
+          },
+        ],
+        "label": "loading",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "loading",
+                "type": "target",
+              },
+            ],
+            "label": "REFRESH",
+            "type": "transition",
+          },
+        ],
+        "label": "success",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "loading",
+                "type": "target",
+              },
+            ],
+            "label": "RETRY",
+            "type": "transition",
+          },
+        ],
+        "label": "failure",
+        "type": "state",
+      },
+    ],
+    "label": "loader",
+    "type": "machine",
+  },
+]
+`;
+
+exports[`parser snapshots > parses trafficLight.machine.ts 1`] = `
+[
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "label": "countCycle",
+            "type": "action",
+          },
+          {
+            "label": "logChange",
+            "type": "action",
+          },
+          {
+            "label": "nightMode",
+            "type": "guard",
+          },
+        ],
+        "label": "setup",
+        "type": "setup",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "yellow",
+                "type": "target",
+              },
+            ],
+            "label": "TIMER",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "flashing",
+                "type": "target",
+              },
+            ],
+            "label": "POWER_OUTAGE",
+            "type": "transition",
+          },
+          {
+            "label": "logChange",
+            "type": "entry",
+          },
+        ],
+        "description": "Traffic flows freely. Pedestrians must wait.",
+        "initial": true,
+        "label": "green",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "red",
+                "type": "target",
+              },
+            ],
+            "label": "TIMER",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "flashing",
+                "type": "target",
+              },
+            ],
+            "label": "POWER_OUTAGE",
+            "type": "transition",
+          },
+        ],
+        "description": "Warning phase — traffic should slow and prepare to stop.",
+        "label": "yellow",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "flashWarning",
+                    "type": "target",
+                  },
+                ],
+                "label": "TIMER",
+                "type": "transition",
+              },
+            ],
+            "description": "Pedestrians may cross.",
+            "initial": true,
+            "label": "walk",
+            "type": "state",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "label": "dontWalk",
+                    "type": "target",
+                  },
+                ],
+                "label": "TIMER",
+                "type": "transition",
+              },
+            ],
+            "description": "Crossing signal flashes — pedestrians should finish crossing.",
+            "label": "flashWarning",
+            "type": "state",
+          },
+          {
+            "description": "Crossing is closed. Pedestrian sequence complete.",
+            "final": true,
+            "label": "dontWalk",
+            "type": "state",
+          },
+          {
+            "children": [
+              {
+                "label": "flashing",
+                "type": "target",
+              },
+            ],
+            "label": "POWER_OUTAGE",
+            "type": "transition",
+          },
+          {
+            "children": [
+              {
+                "label": "green",
+                "type": "target",
+              },
+            ],
+            "label": "onDone",
+            "type": "transition",
+          },
+          {
+            "label": "countCycle",
+            "type": "entry",
+          },
+        ],
+        "description": "Traffic is stopped. Pedestrian crossing sequence runs as a nested region.",
+        "label": "red",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "label": "nightMode",
+                "type": "guard",
+              },
+              {
+                "label": "red",
+                "type": "target",
+              },
+            ],
+            "label": "POWER_RESTORED",
+            "type": "transition",
+          },
+          {
+            "label": "logChange",
+            "type": "exit",
+          },
+        ],
+        "description": "Fault mode: light flashes amber due to a power outage. Night mode guard determines return target.",
+        "label": "flashing",
+        "type": "state",
+      },
+      {
+        "children": [
+          {
+            "label": "cycles: 0",
+            "type": "contextProperty",
+          },
+        ],
+        "label": "context",
+        "type": "context",
+      },
+    ],
+    "description": "Controls a standard traffic light with pedestrian crossing support and a fault mode for power outages.",
+    "label": "trafficLight",
+    "type": "machine",
+  },
+]
+`;
