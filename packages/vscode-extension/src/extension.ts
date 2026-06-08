@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { XStateMachineTreeProvider } from './treeProvider';
-import { MachineNode } from './parser';
+import { MachineNode, XStateMachineParser } from './parser';
+import { findNodeAtPosition } from './utils';
 import { ImplementationFinder } from './implementationFinder';
 import { FilterWebviewViewProvider } from './filterView';
 import { XStateCompletionProvider } from './completionProvider';
@@ -582,10 +583,21 @@ export async function activate(context: vscode.ExtensionContext) {
         new XStateHoverProvider(workspaceScanner)
     );
 
+    // Gate the editor's "View State Diagram" menu on whether the active file
+    // actually contains a machine, so it doesn't clutter every JS/TS file.
+    const updateEditorHasMachine = (editor?: vscode.TextEditor) => {
+        const hasMachine = !!editor
+            && isSupportedXStateDocument(editor.document)
+            && XStateMachineParser.parseMachines(editor.document).length > 0;
+        vscode.commands.executeCommand('setContext', 'xstateOutline.editorHasMachine', hasMachine);
+    };
+    updateEditorHasMachine(vscode.window.activeTextEditor);
+
     const editorChangeListener = vscode.window.onDidChangeActiveTextEditor((editor) => {
-        if (!editor) { return; }
+        if (!editor) { vscode.commands.executeCommand('setContext', 'xstateOutline.editorHasMachine', false); return; }
         treeProvider.refresh();
         scheduleDiagnostics(editor.document, 0);
+        updateEditorHasMachine(editor);
     });
 
     const documentOpenListener = vscode.workspace.onDidOpenTextDocument((document) => {
@@ -668,7 +680,46 @@ export async function activate(context: vscode.ExtensionContext) {
                 }
             }
 
-            graphViewProvider.show(root, root.label);
+            // Select the node that was opened on (the leaf/state itself), even
+            // when the diagram is rooted at the enclosing machine.
+            graphViewProvider.show(root, root.label, node.label);
+        }
+    );
+
+    // Same as openGraphView, but driven from the code editor: resolve the
+    // machine/state under the cursor and open (and select) it in the diagram.
+    const openGraphViewAtCursorCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.openGraphViewAtCursor',
+        () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) { return; }
+            const machines = XStateMachineParser.parseMachines(editor.document);
+            if (machines.length === 0) {
+                vscode.window.showInformationMessage('No XState machine found in this file.');
+                return;
+            }
+            const pos = editor.selection.active;
+            // Walk from the cursor's innermost node outward to the nearest
+            // enclosing state or machine.
+            const hit = findNodeAtPosition(machines, pos);
+            let target: MachineNode | undefined;
+            if (hit) {
+                const chain = [...hit.parents, hit.node]; // outermost → innermost
+                for (let i = chain.length - 1; i >= 0; i--) {
+                    if (chain[i].type === 'state' || chain[i].type === 'machine') { target = chain[i]; break; }
+                }
+            }
+            target = target ?? machines.find(m => m.range.contains(pos)) ?? machines[0];
+
+            // Root: a leaf state opens inside its enclosing machine; a compound
+            // state or a machine roots the diagram at itself.
+            let root = target;
+            const hasChildStates = (target.children ?? []).some(c => c.type === 'state');
+            if (target.type === 'state' && !hasChildStates) {
+                const enclosing = machines.find(m => m.range.contains(target!.range));
+                if (enclosing) { root = enclosing; }
+            }
+            graphViewProvider.show(root, root.label, target.label);
         }
     );
 
@@ -707,6 +758,7 @@ export async function activate(context: vscode.ExtensionContext) {
         addReferenceCommand,
         deleteNodeCommand,
         openGraphViewCommand,
+        openGraphViewAtCursorCommand,
         refreshGraphOnlyCommand,
         navigateToNodeCommand,
         goToImplementationCommand,

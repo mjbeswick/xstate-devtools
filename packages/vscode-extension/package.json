@@ -189,6 +189,12 @@
         "command": "xstateMachineOutline.openGraphView",
         "title": "View State Diagram",
         "icon": "$(git-merge)"
+      },
+      {
+        "command": "xstateMachineOutline.openGraphViewAtCursor",
+        "title": "View State Diagram",
+        "category": "XState",
+        "icon": "$(git-merge)"
       }
     ],
     "configuration": {
@@ -368,6 +374,23 @@
           "command": "xstateMachineOutline.goToImplementation",
           "when": "view == xstateMachineOutline && (viewItem == action || viewItem == guard || viewItem == entry || viewItem == exit || viewItem == invoke)",
           "group": "inline"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "xstateMachineOutline.openGraphViewAtCursor",
+          "when": "xstateOutline.editorHasMachine",
+          "group": "navigation@9"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "xstateMachineOutline.openGraphView",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.openGraphViewAtCursor",
+          "when": "xstateOutline.editorHasMachine"
         }
       ]
     },

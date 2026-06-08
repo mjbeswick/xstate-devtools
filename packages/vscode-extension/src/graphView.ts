@@ -8,6 +8,9 @@ interface PanelEntry {
     nodeById: Map<string, MachineNode>;
     title: string;
     direction: 'DOWN' | 'RIGHT';
+    // State (by label) to select once the diagram first renders — set when the
+    // panel is opened from a specific tree/editor node.
+    selectName?: string;
 }
 
 export class XStateGraphViewProvider {
@@ -37,12 +40,14 @@ export class XStateGraphViewProvider {
         return `${path}::${line}::${machine.label}`;
     }
 
-    public show(machineNode: MachineNode, title: string) {
+    public show(machineNode: MachineNode, title: string, selectName?: string) {
         const key = this.machineKey(machineNode);
         const existing = this.panels.get(key);
         if (existing) {
             existing.panel.reveal();
             this.activeKey = key;
+            // Already rendered — select the requested node via a live message.
+            if (selectName) { this.highlightState(selectName); }
             return;
         }
 
@@ -53,7 +58,7 @@ export class XStateGraphViewProvider {
             { enableScripts: true, localResourceRoots: [this.extensionUri] }
         );
 
-        const entry: PanelEntry = { panel, machine: machineNode, nodeById: new Map(), title, direction: this.autoDirection(machineNode) };
+        const entry: PanelEntry = { panel, machine: machineNode, nodeById: new Map(), title, direction: this.autoDirection(machineNode), selectName };
         this.panels.set(key, entry);
         this.activeKey = key;
 
@@ -155,7 +160,7 @@ export class XStateGraphViewProvider {
         const config = vscode.workspace.getConfiguration('xstateOutline');
         const reflectExpansion = config.get<boolean>('graphReflectsTreeExpansion', true);
         const payload = this.buildElements(entry.machine, reflectExpansion, entry.nodeById);
-        entry.panel.webview.html = this.getHtmlForWebview(entry.panel.webview, payload, entry.direction);
+        entry.panel.webview.html = this.getHtmlForWebview(entry.panel.webview, payload, entry.direction, entry.selectName);
     }
 
     private buildElements(
@@ -313,7 +318,7 @@ export class XStateGraphViewProvider {
         return { nodes, edges, collapsedIds };
     }
 
-    private getHtmlForWebview(webview: vscode.Webview, payload: GraphPayload, direction: 'DOWN' | 'RIGHT'): string {
+    private getHtmlForWebview(webview: vscode.Webview, payload: GraphPayload, direction: 'DOWN' | 'RIGHT', selectName?: string): string {
         const scriptUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this.extensionUri, 'out', 'webview', 'graph.js')
         );
@@ -381,7 +386,7 @@ export class XStateGraphViewProvider {
         <button id="btn-export-svg" title="Export as SVG">SVG</button>
         <button id="btn-export-png" title="Export as PNG">PNG</button>
     </div>
-    <script nonce="${nonce}">window.__GRAPH__ = ${json}; window.__DIRECTION__ = ${JSON.stringify(direction)};</script>
+    <script nonce="${nonce}">window.__GRAPH__ = ${json}; window.__DIRECTION__ = ${JSON.stringify(direction)}; window.__SELECT__ = ${JSON.stringify(selectName ? selectName.replace(/[^a-zA-Z0-9_]/g, '_') : '')};</script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

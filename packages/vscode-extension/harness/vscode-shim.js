@@ -6,11 +6,14 @@ class Position {
 }
 class Range {
     constructor(start, end) { this.start = start; this.end = end; }
-    contains(p) {
-        const afterStart = p.line > this.start.line ||
-            (p.line === this.start.line && p.character >= this.start.character);
-        const beforeEnd = p.line < this.end.line ||
-            (p.line === this.end.line && p.character <= this.end.character);
+    contains(posOrRange) {
+        // Accept a Position or a Range, like vscode.Range.contains.
+        const lo = posOrRange.start ?? posOrRange;
+        const hi = posOrRange.end ?? posOrRange;
+        const afterStart = lo.line > this.start.line ||
+            (lo.line === this.start.line && lo.character >= this.start.character);
+        const beforeEnd = hi.line < this.end.line ||
+            (hi.line === this.end.line && hi.character <= this.end.character);
         return afterStart && beforeEnd;
     }
 }

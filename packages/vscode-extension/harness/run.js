@@ -81,6 +81,7 @@ async function main() {
         window.acquireVsCodeApi = () => ({ postMessage: (m) => console.log('post', JSON.stringify(m)) });
         window.__GRAPH__ = ${payload};
         window.__DIRECTION__ = ${JSON.stringify(direction)};
+        window.__SELECT__ = ${JSON.stringify(process.env.SELECT || '')};
       </script>
       <script>${graphJs}</script>
       <script>

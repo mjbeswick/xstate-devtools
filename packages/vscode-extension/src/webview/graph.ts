@@ -44,6 +44,10 @@ const elk = new ELK();
 let direction: 'DOWN' | 'RIGHT' =
     (window as unknown as { __DIRECTION__?: string }).__DIRECTION__ === 'RIGHT' ? 'RIGHT' : 'DOWN';
 
+// Sanitized state name to auto-select on first render (set when the panel is
+// opened from a specific tree or editor node).
+const initialSelect = (window as unknown as { __SELECT__?: string }).__SELECT__ || '';
+
 // ── Theme ─────────────────────────────────────────────────────────────────────
 const rootStyle = getComputedStyle(document.documentElement);
 const bodyStyle  = getComputedStyle(document.body);
@@ -1033,4 +1037,8 @@ function showError(err: unknown): void {
     container.appendChild(pre);
 }
 
-render().then(() => container.focus()).catch(showError);
+render().then(() => {
+    container.focus();
+    // Select (and pan to) the node the panel was opened on, if any.
+    if (initialSelect) { selectNode(idByName.get(initialSelect) ?? null); }
+}).catch(showError);
