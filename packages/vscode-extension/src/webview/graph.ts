@@ -320,6 +320,7 @@ async function render(): Promise<void> {
         for (const { path, labelG } of allEdges) {
             path.setAttribute('stroke-opacity', '0.7');
             path.setAttribute('stroke-width', '1.5');
+            path.setAttribute('opacity', '1');  // clear any hover dim
             if (labelG) { labelG.setAttribute('opacity', '1'); }
         }
     }
@@ -399,10 +400,13 @@ async function render(): Promise<void> {
                     const mine = new Set(nodeEdgeMap.get(n.id) ?? []);
                     for (const e of allEdges) {
                         if (mine.has(e)) {
+                            e.path.setAttribute('opacity', '1');
                             e.path.setAttribute('stroke-opacity', '0.95');
                             e.path.setAttribute('stroke-width', '2');
                         } else {
-                            e.path.setAttribute('stroke-opacity', '0.1');
+                            // Fade element opacity (not just stroke-opacity) so the
+                            // arrowhead marker dims with the line instead of staying solid.
+                            e.path.setAttribute('opacity', '0.12');
                             if (e.labelG) { e.labelG.setAttribute('opacity', '0.15'); }
                         }
                     }
@@ -493,10 +497,13 @@ async function render(): Promise<void> {
                     const mine = new Set(nodeEdgeMap.get(n.id) ?? []);
                     for (const e of allEdges) {
                         if (mine.has(e)) {
+                            e.path.setAttribute('opacity', '1');
                             e.path.setAttribute('stroke-opacity', '0.95');
                             e.path.setAttribute('stroke-width', '2');
                         } else {
-                            e.path.setAttribute('stroke-opacity', '0.1');
+                            // Fade element opacity (not just stroke-opacity) so the
+                            // arrowhead marker dims with the line instead of staying solid.
+                            e.path.setAttribute('opacity', '0.12');
                             if (e.labelG) { e.labelG.setAttribute('opacity', '0.15'); }
                         }
                     }

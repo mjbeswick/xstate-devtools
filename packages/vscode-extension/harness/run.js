@@ -108,6 +108,13 @@ async function main() {
             data: { command: 'highlight', stateId: ${JSON.stringify(process.env.HIGHLIGHT || '')} },
           })), 500);
         }
+        // HOVER=<name> dispatches mouseenter on the node group with that data-name.
+        if (${JSON.stringify(process.env.HOVER || '')}) {
+          setTimeout(() => {
+            const g = document.querySelector('[data-name="' + ${JSON.stringify(process.env.HOVER || '')} + '"]');
+            if (g) { g.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false })); }
+          }, 450);
+        }
         // COLLAPSE_ALL=1 clicks the collapse-all toolbar button after render.
         if (${JSON.stringify(process.env.COLLAPSE_ALL || '')}) {
           setTimeout(() => document.getElementById('btn-collapse-all').click(), 300);
