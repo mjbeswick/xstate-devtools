@@ -6,6 +6,13 @@ class Position {
 }
 class Range {
     constructor(start, end) { this.start = start; this.end = end; }
+    contains(p) {
+        const afterStart = p.line > this.start.line ||
+            (p.line === this.start.line && p.character >= this.start.character);
+        const beforeEnd = p.line < this.end.line ||
+            (p.line === this.end.line && p.character <= this.end.character);
+        return afterStart && beforeEnd;
+    }
 }
 const Uri = {
     file: (p) => ({ fsPath: p, path: p, scheme: 'file', toString: () => `file://${p}` }),

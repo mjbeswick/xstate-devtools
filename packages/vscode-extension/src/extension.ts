@@ -527,8 +527,10 @@ export async function activate(context: vscode.ExtensionContext) {
                 const name = extractNameAtPosition(document, position);
                 if (!name) { return null; }
                 const result = await ImplementationFinder.findImplementation(name, document);
-                if (!result) { return null; }
-                return new vscode.Location(result.document.uri, result.range);
+                if (result) { return new vscode.Location(result.document.uri, result.range); }
+                // Fall back to a transition target's state definition.
+                const state = treeProvider.resolveStateLocationByName(name, document, position);
+                return state ? new vscode.Location(state.uri, state.range) : null;
             }
         }
     );
@@ -540,8 +542,11 @@ export async function activate(context: vscode.ExtensionContext) {
                 const name = extractNameAtPosition(document, position);
                 if (!name) { return null; }
                 const result = await ImplementationFinder.findImplementation(name, document);
-                if (!result) { return null; }
-                return new vscode.Location(result.document.uri, result.range);
+                if (result) { return new vscode.Location(result.document.uri, result.range); }
+                // Not an action/guard/service — it may be a transition target
+                // (state name). Fall back to the state's own definition.
+                const state = treeProvider.resolveStateLocationByName(name, document, position);
+                return state ? new vscode.Location(state.uri, state.range) : null;
             }
         }
     );

@@ -195,6 +195,38 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
 
 
 
+    /**
+     * Resolve a bare state name (e.g. a transition `target` string under the
+     * editor cursor) to the location of the state that defines it. Searches the
+     * machine in `document` that contains `position` first, then the rest of the
+     * document, then other known files. Returns undefined if no such state
+     * exists. Used as the state-target fallback for Go to Implementation /
+     * Definition, which otherwise only resolve actions/guards/services.
+     */
+    resolveStateLocationByName(
+        name: string,
+        document: vscode.TextDocument,
+        position: vscode.Position
+    ): { uri: vscode.Uri; range: vscode.Range } | undefined {
+        const normalized = normalizeTargetName(name);
+        if (!normalized) { return undefined; }
+        const docMachines = XStateMachineParser.parseMachines(document);
+        const containing = docMachines.find(m => m.range.contains(position));
+        const others = this.workspaceScanner.getCached()
+            .flatMap(fm => fm.machines)
+            .filter(m => m.uri.toString() !== document.uri.toString());
+        const searchOrder = [
+            ...(containing ? [containing] : []),
+            ...docMachines.filter(m => m !== containing),
+            ...others,
+        ];
+        for (const root of searchOrder) {
+            const match = this.findStateByName(root, normalized);
+            if (match) { return { uri: match.uri, range: match.range }; }
+        }
+        return undefined;
+    }
+
     /** Depth-first search for a `state` node with the given name, ignoring non-state branches. */
     private findStateByName(node: MachineNode, name: string): MachineNode | undefined {
         if (node.type === 'state' && node.label === name) { return node; }
