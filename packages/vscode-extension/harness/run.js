@@ -52,16 +52,31 @@ async function main() {
              --vscode-list-activeSelectionBackground:#cce5ff; --vscode-descriptionForeground:#717171;
              --vscode-charts-blue:#3b82f6; --vscode-font-family: system-ui, sans-serif; }
       #cy { position:absolute; inset:0; background:var(--vscode-editor-background); }
+      /* Real toolbar markup mirrored from graphView.getHtmlForWebview, so the
+         harness exercises the actual toolbar wiring (button ids), not stubs. */
+      #toolbar { position:absolute; bottom:12px; right:12px; z-index:10; display:flex;
+        align-items:center; gap:1px; background:var(--vscode-editorWidget-background);
+        border:1px solid rgba(127,127,127,0.3); border-radius:6px; padding:3px;
+        box-shadow:0 2px 8px rgba(0,0,0,0.16); user-select:none; }
+      #toolbar button { background:none; border:none; color:var(--vscode-editor-foreground);
+        cursor:pointer; padding:4px 8px; border-radius:4px; font-size:12px;
+        font-family:var(--vscode-font-family); line-height:1.4; white-space:nowrap; }
+      #toolbar button:hover { background:rgba(127,127,127,0.1); }
+      .tb-sep { width:1px; height:14px; background:rgba(127,127,127,0.3); margin:0 2px; }
     </style></head><body>
       <div id="cy"></div>
-      <button id="btn-direction" style="display:none"></button>
-      <button id="btn-zoom-in" style="display:none"></button>
-      <button id="btn-zoom-out" style="display:none"></button>
-      <button id="btn-fit" style="display:none"></button>
-      <button id="btn-expand-all" style="display:none"></button>
-      <button id="btn-collapse-all" style="display:none"></button>
-      <button id="btn-export-svg" style="display:none"></button>
-      <button id="btn-export-png" style="display:none"></button>
+      <div id="toolbar">
+        <button id="btn-zoom-in"  title="Zoom in">+</button>
+        <button id="btn-zoom-out" title="Zoom out">−</button>
+        <button id="btn-fit"      title="Fit to screen">⊡</button>
+        <button id="btn-direction" title="Toggle layout direction">↧</button>
+        <div class="tb-sep"></div>
+        <button id="btn-expand-all"   title="Expand all states">⊞</button>
+        <button id="btn-collapse-all" title="Collapse all states">⊟</button>
+        <div class="tb-sep"></div>
+        <button id="btn-export-svg" title="Export as SVG">SVG</button>
+        <button id="btn-export-png" title="Export as PNG">PNG</button>
+      </div>
       <script>
         window.acquireVsCodeApi = () => ({ postMessage: (m) => console.log('post', JSON.stringify(m)) });
         window.__GRAPH__ = ${payload};
@@ -95,6 +110,10 @@ async function main() {
         // COLLAPSE_ALL=1 clicks the collapse-all toolbar button after render.
         if (${JSON.stringify(process.env.COLLAPSE_ALL || '')}) {
           setTimeout(() => document.getElementById('btn-collapse-all').click(), 300);
+        }
+        // CLICK_BTN=btn-direction clicks any real toolbar button by id.
+        if (${JSON.stringify(process.env.CLICK_BTN || '')}) {
+          setTimeout(() => document.getElementById(${JSON.stringify(process.env.CLICK_BTN || '')}).click(), 350);
         }
         // CLICK_TARGET=title (default) clicks the title-bar centre; =body clicks
         // the region's interior centre. Both go through REAL hit-testing
