@@ -235,13 +235,13 @@ let viewport: SVGElement;
 let scale = 1, tx = 0, ty = 0;
 let lastW = 100, lastH = 100;
 
-// Keyboard navigation: the currently-selected state and the overlay group its
-// focus ring is drawn into (recreated each render). Container is focusable so
-// it receives keydown.
+// Keyboard navigation: the currently-selected state, and the primary shape for
+// every node id so selection can restyle the node itself (VS Code selection
+// colours) rather than overlay a ring. Container is focusable for keydown.
 container.tabIndex = 0;
 (container as HTMLElement).style.outline = 'none';
 let selectedId: string | null = null;
-let gSel: SVGElement | null = null;
+const nodeRectById = new Map<string, SVGElement>();
 
 function applyTransform() {
     viewport.setAttribute('transform', `translate(${tx} ${ty}) scale(${scale})`);
@@ -265,6 +265,7 @@ async function render(): Promise<void> {
 
     container.replaceChildren();
     nameToRect.clear();
+    nodeRectById.clear();
     geom.clear();
 
     const svg = el('svg', { width: '100%', height: '100%' });
@@ -282,8 +283,7 @@ async function render(): Promise<void> {
     const gEdges  = el('g'); // edge paths
     const gNodes  = el('g'); // leaf state boxes
     const gLabels = el('g'); // edge labels (topmost)
-    gSel = el('g');          // selection focus ring (above everything)
-    viewport.append(gBack, gEdges, gNodes, gLabels, gSel);
+    viewport.append(gBack, gEdges, gNodes, gLabels);
     svg.appendChild(viewport);
     container.appendChild(svg);
 
@@ -339,9 +339,11 @@ async function render(): Promise<void> {
             } else if (d.history) {
                 // History pseudostate: circle with H (shallow) or H* (deep).
                 const cxp = ax + w/2, cyp = ay + h/2;
-                g.appendChild(el('circle', { cx: cxp, cy: cyp, r: w/2 - 1, fill: C.nodeBg, stroke: C.fg, 'stroke-width': 1.5, 'stroke-opacity': 0.8 }));
+                const histCircle = el('circle', { cx: cxp, cy: cyp, r: w/2 - 1, fill: C.nodeBg, stroke: C.fg, 'stroke-width': 1.5, 'stroke-opacity': 0.8 });
+                g.appendChild(histCircle);
                 g.appendChild(txt(d.history === 'deep' ? 'H*' : 'H', cxp, cyp, { 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 13, 'font-weight': 'bold' }));
-                nameToRect.set(d.name, g.firstChild as SVGElement);
+                nameToRect.set(d.name, histCircle);
+                nodeRectById.set(n.id, histCircle);
                 gNodes.appendChild(g);
             } else if (isRegion) {
                 const isParallel = !!d.parallel;
@@ -357,6 +359,7 @@ async function render(): Promise<void> {
                     ...(isParallel ? { 'stroke-dasharray': '7 4' } : {}),
                 });
                 g.appendChild(regionRect);
+                nodeRectById.set(n.id, regionRect);
                 g.appendChild(el('line', {
                     x1: ax+1, y1: ay+REGION_H, x2: ax+w-1, y2: ay+REGION_H,
                     stroke: C.fg, 'stroke-width': 0.75, 'stroke-opacity': 0.35,
@@ -402,16 +405,19 @@ async function render(): Promise<void> {
                 g.addEventListener('mouseleave', () => {
                     regionRect.setAttribute('stroke-width', restW);
                     regionRect.setAttribute('stroke-opacity', restO);
+                    applyNodeStyle(n.id);  // re-assert selection colours if selected
                     resetEdgeStyles();
                 });
                 gBack.appendChild(g);
             } else if (d.ghost) {
                 // Exit stub: a transition target outside the focused subtree.
-                g.appendChild(el('rect', {
+                const ghostRect = el('rect', {
                     x: ax, y: ay, width: w, height: h, rx: 8, ry: 8,
                     fill: 'none', stroke: C.fg, 'stroke-width': 1.2,
                     'stroke-opacity': 0.45, 'stroke-dasharray': '4 4',
-                }));
+                });
+                g.appendChild(ghostRect);
+                nodeRectById.set(n.id, ghostRect);
                 g.appendChild(txt('→ ' + d.label, ax + w/2, ay + h/2, {
                     'text-anchor': 'middle', 'dominant-baseline': 'central',
                     'font-size': 11, 'font-style': 'italic', fill: C.desc,
@@ -428,6 +434,7 @@ async function render(): Promise<void> {
                     ...(isParallel ? { 'stroke-dasharray': '7 4' } : {}),
                 });
                 nameToRect.set(d.name, rect);
+                nodeRectById.set(n.id, rect);
                 g.appendChild(rect);
                 if (d.final) {
                     g.appendChild(el('rect', {
@@ -479,8 +486,7 @@ async function render(): Promise<void> {
                     }
                 });
                 g.addEventListener('mouseleave', () => {
-                    rect.setAttribute('stroke-width', '1.5');
-                    rect.setAttribute('stroke-opacity', '0.8');
+                    applyNodeStyle(n.id);  // restore default or selection colours
                     resetEdgeStyles();
                 });
                 gNodes.appendChild(g);
@@ -735,7 +741,7 @@ async function render(): Promise<void> {
     // A selected node that survived this render keeps its focus ring; one that
     // vanished (e.g. hidden inside a state that was just collapsed) is dropped.
     if (selectedId && !geom.has(selectedId)) { selectedId = null; }
-    drawSelection();
+    applyNodeStyle(selectedId);
 }
 
 // ── Keyboard navigation ─────────────────────────────────────────────────────
@@ -747,22 +753,35 @@ const centerOf = (id: string) => {
     return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
 };
 
-// Draw (or clear) the focus ring around the selected node.
-function drawSelection() {
-    if (!gSel) { return; }
-    gSel.replaceChildren();
-    if (!selectedId) { return; }
-    const r = geom.get(selectedId);
-    if (!r) { return; }
-    gSel.appendChild(el('rect', {
-        x: r.x - 3, y: r.y - 3, width: r.w + 6, height: r.h + 6, rx: 11, ry: 11,
-        fill: 'none', stroke: C.focus, 'stroke-width': 2.5, 'stroke-opacity': 0.95,
-        'pointer-events': 'none',
-    }));
+// Default visual style of a node's primary shape — mirrors how drawNode creates
+// it, so selection styling can be applied and cleanly reverted without a ring.
+function nodeStyle(id: string): { fill: string; stroke: string; sw: number; so: number } {
+    const d = nodeById.get(id);
+    const isParallel = !!d?.parallel;
+    if (d?.ghost)   { return { fill: 'none',    stroke: C.fg, sw: 1.2, so: 0.45 }; }
+    if (d?.history) { return { fill: C.nodeBg,  stroke: C.fg, sw: 1.5, so: 0.8  }; }
+    const isRegion = childStateIds(id).length > 0 && !collapsed.has(id);
+    if (isRegion)   { return { fill: 'none',    stroke: C.fg, sw: isParallel ? 1.6 : 1.5, so: isParallel ? 0.75 : 0.6 }; }
+    return { fill: C.nodeBg, stroke: C.fg, sw: isParallel ? 1.6 : 1.5, so: isParallel ? 0.75 : 0.8 };
+}
+
+// Paint a node in its default style, or — if it is the selected one — in the
+// VS Code selected-tree-row colours (active-selection background + focus
+// border) so selection reads like the tree, not an extra ring.
+function applyNodeStyle(id: string | null) {
+    if (!id) { return; }
+    const rect = nodeRectById.get(id);
+    if (!rect) { return; }
+    const base = nodeStyle(id);
+    const sel = id === selectedId;
+    rect.setAttribute('fill', sel && base.fill !== 'none' ? C.selBg : base.fill);
+    rect.setAttribute('stroke', sel ? C.focus : base.stroke);
+    rect.setAttribute('stroke-width', String(sel ? 2 : base.sw));
+    rect.setAttribute('stroke-opacity', String(sel ? 1 : base.so));
 }
 
 // Pan the minimum amount so the selected node sits inside the viewport (margin
-// of 48px). Keeps the focus ring on screen as selection moves.
+// of 48px). Keeps the selected node on screen as selection moves.
 function ensureSelectedVisible() {
     if (!selectedId) { return; }
     const r = geom.get(selectedId);
@@ -775,8 +794,10 @@ function ensureSelectedVisible() {
 }
 
 function selectNode(id: string | null) {
+    const prev = selectedId;
     selectedId = id;
-    drawSelection();
+    if (prev && prev !== id) { applyNodeStyle(prev); }  // revert old to default
+    if (id) { applyNodeStyle(id); }                     // paint new as selected
     ensureSelectedVisible();
 }
 
@@ -838,7 +859,7 @@ container.addEventListener('keydown', (ev) => {
     const k = ev.key;
     if (k === ']' || k === '+' || k === '=') { zoomAround(1.25); ev.preventDefault(); return; }
     if (k === '[' || k === '-' || k === '_') { zoomAround(1 / 1.25); ev.preventDefault(); return; }
-    if (k === '0') { fitToScreen(); ev.preventDefault(); return; }
+    if (k === '0' || k === '.') { fitToScreen(); ev.preventDefault(); return; }
     const dir = ARROW[k];
     if (dir) {
         ev.preventDefault();
