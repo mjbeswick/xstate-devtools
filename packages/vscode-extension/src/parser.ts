@@ -955,6 +955,12 @@ export class XStateMachineParser {
         if (ts.isStringLiteral(transitionProp)) {
             // Simple string target: onDone: 'nextState'
             target = transitionProp.text;
+            children.push({
+                type: 'target',
+                label: target,
+                range: this.nodeToRange(transitionProp, document),
+                uri: document.uri
+            });
         } else if (ts.isArrayLiteralExpression(transitionProp)) {
             // Array of conditional branches: onDone: [{ guard, target }, ...]
             const branches = transitionProp.elements
@@ -973,6 +979,12 @@ export class XStateMachineParser {
             const targetProp = this.findProperty(transitionProp, 'target');
             if (targetProp && ts.isStringLiteral(targetProp)) {
                 target = targetProp.text;
+                children.push({
+                    type: 'target',
+                    label: target,
+                    range: this.nodeToRange(targetProp, document),
+                    uri: document.uri
+                });
             }
 
             // Parse actions

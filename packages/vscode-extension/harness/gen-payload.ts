@@ -92,7 +92,11 @@ const addEdges = (n: MachineNode) => {
     if (n.type === 'state') {
         const sourceId = idByNode.get(n);
         if (sourceId) {
-            for (const t of (n.children ?? []).filter(c => c.type === 'transition')) {
+            const directT = (n.children ?? []).filter(c => c.type === 'transition');
+            const invokeT = (n.children ?? [])
+                .filter(c => c.type === 'invoke')
+                .flatMap(inv => (inv.children ?? []).filter(c => c.type === 'transition'));
+            for (const t of [...directT, ...invokeT]) {
                 const target = t.children?.find(c => c.type === 'target');
                 if (!target) { continue; }
                 const targetName = sanitize(target.label.replace(/^#/, '').split('.').pop() ?? '');
