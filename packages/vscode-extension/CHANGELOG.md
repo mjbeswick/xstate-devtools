@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.8.0] - 2026-06-09
+
+### Added
+- **Harel-statechart icons in the outline** — state nodes now use custom shape-based icons consistent with the diagram: a hollow circle for a state, a filled dot for the initial state, a bullseye for a final state, a dashed-split box for a parallel state, and a circled **H** for history. Drawn in a neutral grey with light/dark variants
+- **Live diagram updates** — an open statechart now refreshes automatically as you edit the source, **preserving your pan & zoom**; it also keeps your viewport across collapse/expand and direction changes, and reliably auto-centers when first opened
+- **Actual size (100%)** control on the diagram, with a live zoom-percent readout (click it, or press `1`, to reset to 100%)
+- **Distinct transition icons** in the tree — `always` (⚡) and `after` (🕐) transitions are now visually distinguished from ordinary events
+- **Actionable empty states** — the outline now offers buttons (show state configs, search the workspace, open a folder) instead of a plain message
+- Object-form actions (`{ type: 'foo', params: … }`) now render in the outline
+
+### Changed
+- **Diagram readability** — initial/final/parallel states are color-coded (green/red/blue), long labels truncate with a full-text tooltip instead of stretching the layout, and event/guard labels use full-contrast text
+- Collapsed compound states in the diagram now show a **disclosure chevron** (▸/▾) instead of a small ⊕
+- The outline marks initial/final/parallel/history with dimmed text markers and distinct shapes, so the state kind is legible without relying on color
+- Diagrams update **incrementally** (no full reload) and retain their context when hidden, so switching editor tabs no longer rebuilds the layout
+
+### Fixed
+- Single-click no longer briefly navigates before a double-click runs **Go to Implementation** (the editor no longer jumps twice)
+- **Follow cursor** no longer yanks the tree selection while you're interacting with the outline
+- Clearer labels for anonymous actions/guards and guarded transition branches (e.g. `when isReady → active`); de-duplicated tooltips
+
 ## [1.7.0] - 2026-06-08
 
 ### Added

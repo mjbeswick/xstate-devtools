@@ -31,8 +31,9 @@
 - **Every transition kind** — `on` events, `after` (delayed), `always` (transient), invoke `onDone`/`onError`, and state-level `onDone`, with `EVENT [guard] / actions` labels; internal (action-only) transitions and invoked services (`invoke <src>`) show inside the state box
 - **Automatic layout** — clean hierarchical layout with smooth, curved transitions
 - **Top-down ↔ left-right** — a sensible direction is chosen from the machine's shape (left-right for linear machines, top-down for parallel/large ones); flip it anytime and your choice is remembered
-- **Pan, zoom & fit**, plus **expand all / collapse all**
-- **Keyboard navigation** — arrow keys move the selection between states, **Enter** expands/collapses a compound or jumps a state to its source, **Shift+arrows** pan, `]`/`[` (or `+`/`-`) zoom, and `0`/`.` fit
+- **Live updates** — the diagram refreshes as you edit the source, **preserving your pan & zoom**, and auto-centers when first opened
+- **Pan, zoom & fit**, plus **actual size (100%)** and **expand all / collapse all**
+- **Keyboard navigation** — arrow keys move the selection between states, **Enter** expands/collapses a compound or jumps a state to its source, **Shift+arrows** pan, `]`/`[` (or `+`/`-`) zoom, `0`/`.` fit, and `1` actual size
 - **Reflects the outline** — collapsed states render as single blocks; click a collapsed block to expand it, or a region's title bar to collapse it
 - **Two-way sync** — click a state to select it in the tree, click an event to select its transition, and selecting in the tree (or the editor cursor) highlights it in the diagram; a state's `description` shows as a hover tooltip
 - **Hover to focus** — hovering a state emphasizes its transitions and dims the rest
@@ -53,28 +54,29 @@ The example above shows a parallel `checkout` machine: the dashed outer box with
 | Filled dot → state | The initial state of a region |
 | Box with a double outline | A final state |
 | **Dashed** box with a `parallel` tag | A parallel (orthogonal) state — its regions run concurrently |
-| Box marked `⊕` | A collapsed compound state (click to expand) |
-| Outline box with a title bar | An expanded region (click the title bar to collapse) |
+| Box with a `▸` chevron | A collapsed compound state (click to expand) |
+| Outline box with a `▾` title bar | An expanded region (click the title bar to collapse) |
 | Outer titled box | The machine itself |
 | Curved arrow with a label | A transition, labelled `EVENT [guard] / actions` |
 | `entry/ …` and `exit/ …` inside a box | The state's entry/exit actions |
 
-**Diagram toolbar:** zoom in `+` / out `−`, fit `⊡`, toggle direction `↧`/`↦`, expand all `⊞`, collapse all `⊟`, and export `SVG` / `PNG`.
+**Diagram toolbar:** zoom out `−`, the live zoom-percent button (click to reset to **100%**), zoom in `+`, fit `⊡`, toggle direction `↧`/`↦`, expand all `⊞`, collapse all `⊟`, and export `SVG` / `PNG`.
 
-**Diagram keyboard shortcuts:** **arrow keys** move the selection between states, **Enter** expands/collapses the selected compound (or jumps a leaf state to its source), **Shift+arrows** pan, `]`/`[` (or `+`/`-`) zoom, and `0` or `.` fits to screen.
+**Diagram keyboard shortcuts:** **arrow keys** move the selection between states, **Enter** expands/collapses the selected compound (or jumps a leaf state to its source), **Shift+arrows** pan, `]`/`[` (or `+`/`-`) zoom, `0` or `.` fits to screen, and `1` resets to actual size.
 
 ## Icon & color legend
 
-Every icon and color is drawn from your **active VS Code theme**, so the extension looks at home in light, dark, and high-contrast themes alike.
+**State** nodes use custom Harel-statechart shapes — the same notation as the diagram — in a neutral grey with light/dark variants. Every other icon and color is drawn from your **active VS Code theme**, so the extension looks at home in light, dark, and high-contrast themes alike.
 
 | Symbol | Meaning |
 | --- | --- |
 | 📦 Blue box | Machine |
-| 🟢 Green dot | Initial state |
-| 🔴 Red dot | Final state |
-| ⚪ Hollow blue circle | Parallel state |
-| 🔵 Filled dot | State |
-| 🟠 Orange event | Transition (orange inbox = an `on` handler group) |
+| ○ Hollow circle | State |
+| ● Filled dot | Initial state |
+| ◉ Bullseye (double circle) | Final state |
+| ▭ Dashed-split box | Parallel (orthogonal) state |
+| Ⓗ Circled **H** | History state |
+| 🟠 Orange event | Transition (orange inbox = an `on` handler group; ⚡ `always`, 🕐 `after`) |
 | 🎯 Magenta target | Transition target |
 | 🚀 Action · ⤓ entry · ⤒ exit | Actions (entry/exit/transition) |
 | 🛡️ Cyan shield | Guard |
@@ -83,7 +85,7 @@ Every icon and color is drawn from your **active VS Code theme**, so the extensi
 | 🔤 Context · 🔧 context property | Machine context |
 | ❌ Red error | Invalid / unknown property |
 
-In the diagram, state borders, arrows, and labels follow your editor's foreground color; state fills use the editor widget background; a **selected** state is filled with your theme's selection color and outlined with the focus color; and **parallel** states use a dark dashed border.
+In the diagram, state borders, arrows, and labels follow your editor's foreground color; state fills use the editor widget background; a **selected** state is filled with your theme's selection color and outlined with the focus color. State kinds are color-coded: the **initial** dot is green, a **final** state's inner outline is red, and **parallel** states use a blue dashed border.
 
 ## Supported patterns
 
