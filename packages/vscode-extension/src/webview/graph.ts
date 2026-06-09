@@ -309,6 +309,19 @@ function fitToScreen() {
     ty = (ch - lastH * scale) / 2;
     applyTransform();
 }
+// Fit once the container actually has a size. At first paint clientWidth can
+// still be 0 (webview layout not settled), which would mis-centre the initial
+// fit against the 800×600 fallback — so wait for a real size, then fit once.
+function fitWhenReady() {
+    if (container.clientWidth > 0 && container.clientHeight > 0) { fitToScreen(); return; }
+    const ro = new ResizeObserver(() => {
+        if (container.clientWidth > 0 && container.clientHeight > 0) {
+            ro.disconnect();
+            fitToScreen();
+        }
+    });
+    ro.observe(container);
+}
 
 // ── Render ────────────────────────────────────────────────────────────────────
 // `fit: true` re-fits the diagram to the viewport (first open, fit button,
@@ -1128,6 +1141,9 @@ function showError(err: unknown): void {
 }
 
 render({ fit: true }).then(() => {
+    // Re-fit once the container has a real size, so the first render reliably
+    // auto-centres even if layout wasn't settled when the sync fit ran.
+    fitWhenReady();
     container.focus();
     // Select (and pan to) the node the panel was opened on, if any.
     if (initialSelect) { selectNode(idByName.get(initialSelect) ?? null); }
