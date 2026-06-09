@@ -532,7 +532,7 @@ export class XStateMachineParser {
             // guard (XState v5) or cond (XState v4)
             const guardProp = this.findProperty(node, 'guard') ?? this.findProperty(node, 'cond');
             if (guardProp) {
-                const guardLabel = this.extractFunctionName(guardProp) || 'guard';
+                const guardLabel = this.extractFunctionName(guardProp) || '(inline guard)';
                 children.push({
                     type: 'guard',
                     label: guardLabel,
@@ -544,7 +544,7 @@ export class XStateMachineParser {
             // target
             const targetProp = this.findProperty(node, 'target');
             if (targetProp) {
-                const targetLabel = ts.isStringLiteral(targetProp) ? targetProp.text : 'target';
+                const targetLabel = ts.isStringLiteral(targetProp) ? targetProp.text : '(dynamic target)';
                 children.push({
                     type: 'target',
                     label: targetLabel,
@@ -579,19 +579,17 @@ export class XStateMachineParser {
             // Array of actions
             for (const element of node.elements) {
                 const actionName = this.extractFunctionName(element);
-                if (actionName) {
-                    actions.push({
-                        type,
-                        label: actionName,
-                        range: this.nodeToRange(element, document),
-                        uri: document.uri
-                    });
-                }
+                actions.push({
+                    type,
+                    label: actionName || `(inline ${type})`,
+                    range: this.nodeToRange(element, document),
+                    uri: document.uri
+                });
             }
         } else {
             // Single action
             const actionName = this.extractFunctionName(node);
-            const label = actionName || type;
+            const label = actionName || `(inline ${type})`;
             actions.push({
                 type,
                 label,
@@ -940,21 +938,25 @@ export class XStateMachineParser {
 
         const targetProp = this.findProperty(obj, 'target');
         const target = targetProp && ts.isStringLiteral(targetProp) ? targetProp.text : null;
-        const label = target ?? '?';
 
         // Guard
         const guardProp = this.findProperty(obj, 'guard') || this.findProperty(obj, 'cond');
+        const guardName = guardProp ? this.extractFunctionName(guardProp) : null;
         if (guardProp) {
-            const guardName = this.extractFunctionName(guardProp);
-            if (guardName) {
-                children.push({
-                    type: 'guard',
-                    label: guardName,
-                    range: this.nodeToRange(guardProp, document),
-                    uri: document.uri
-                });
-            }
+            children.push({
+                type: 'guard',
+                label: guardName || '(inline guard)',
+                range: this.nodeToRange(guardProp, document),
+                uri: document.uri
+            });
         }
+
+        // Label the branch by its decision: a named guard is what distinguishes
+        // sibling branches, so lead with it (the guard also remains a child for
+        // go-to-implementation). Fall back to the target, then a placeholder.
+        const label = guardName && target ? `when ${guardName} → ${target}`
+            : guardName ? `when ${guardName}`
+            : target ?? '(branch)';
 
         // Actions
         const actionsProp = this.findProperty(obj, 'actions');

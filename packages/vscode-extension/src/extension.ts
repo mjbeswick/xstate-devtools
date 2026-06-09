@@ -55,8 +55,11 @@ export async function activate(context: vscode.ExtensionContext) {
     // Track which items are currently expanded so a click on an already-selected,
     // expanded node can collapse it (see navigateToNode).
     const expandedItems = new WeakSet<object>();
-    const expandListener = treeView.onDidExpandElement(e => expandedItems.add(e.element));
-    const collapseListener = treeView.onDidCollapseElement(e => expandedItems.delete(e.element));
+    // Timestamp of the last user-driven tree interaction. Cursor sync uses this to
+    // avoid yanking the selection while the user is actively working in the tree.
+    let lastTreeInteraction = 0;
+    const expandListener = treeView.onDidExpandElement(e => { expandedItems.add(e.element); lastTreeInteraction = Date.now(); });
+    const collapseListener = treeView.onDidCollapseElement(e => { expandedItems.delete(e.element); lastTreeInteraction = Date.now(); });
 
     // ── Search WebviewView ────────────────────────────────────────────────────
 
@@ -456,6 +459,7 @@ export async function activate(context: vscode.ExtensionContext) {
     // ── Cursor sync ───────────────────────────────────────────────────────────
     let isTreeSelectionChange = false;
 
+    const TREE_INTERACTION_GRACE_MS = 400;
     const cursorChangeListener = vscode.window.onDidChangeTextEditorSelection(async (e) => {
         if (!followCursor || isTreeSelectionChange || treeProvider.getFilterText()) { return; }
 
@@ -465,15 +469,21 @@ export async function activate(context: vscode.ExtensionContext) {
         if (selectionTimeout) { clearTimeout(selectionTimeout); }
 
         selectionTimeout = setTimeout(() => {
+            // Don't fight the user: skip if they just interacted with the tree.
+            if (Date.now() - lastTreeInteraction < TREE_INTERACTION_GRACE_MS) { return; }
+
             const position = editor.selection.active;
             const item = treeProvider.findItemAtPosition(position);
 
-            if (item && treeView.visible) {
+            // Only reveal when it would actually change the selection — re-selecting
+            // the already-selected item is what yanks the tree out from under the user.
+            if (item && treeView.visible && treeView.selection[0] !== item) {
                 isTreeSelectionChange = true;
-                treeView.reveal(item, { select: true, focus: false });
-                setTimeout(() => { isTreeSelectionChange = false; }, 300);
+                // Tie the guard release to the reveal completing, not a fixed timer.
+                void Promise.resolve(treeView.reveal(item, { select: true, focus: false }))
+                    .then(() => { isTreeSelectionChange = false; }, () => { isTreeSelectionChange = false; });
             }
-            
+
             // Sync with graph view
             if (item && item.node && item.node.type === 'state') {
                 graphViewProvider.highlightState(item.node.label);

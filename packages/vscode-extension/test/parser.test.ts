@@ -163,6 +163,50 @@ export const m = createMachine({
     });
 });
 
+describe('fallback labels & branch labeling', () => {
+    const SRC = `
+import { createMachine } from 'xstate';
+export const m = createMachine({
+  id: 'fb',
+  initial: 'idle',
+  states: {
+    idle: {
+      entry: [() => {}],
+      on: {
+        GO: [
+          { guard: 'isReady', target: 'active' },
+          { guard: () => true, target: 'idle' },
+          { target: 'done' },
+        ],
+        PING: { target: 'idle', guard: () => false },
+      },
+    },
+    active: {},
+    done: { type: 'final' },
+  },
+});`;
+    const roots = () => XStateMachineParser.parseMachines(makeDoc(SRC, '/fb.ts'));
+
+    it('anonymous array action gets a placeholder, not the bare type word', () => {
+        const idle = findState(roots(), 'idle');
+        expect(childLabels(idle, 'entry')).toEqual(['(inline entry)']);
+    });
+
+    it('named-guard branches lead with the guard; anonymous guard falls back to target', () => {
+        const idle = findState(roots(), 'idle');
+        const go = idle?.children?.find(c => c.type === 'transition' && c.label === 'GO');
+        const branches = (go?.children ?? []).filter(c => c.type === 'transition').map(c => c.label);
+        expect(branches).toEqual(['when isReady → active', 'idle', 'done']);
+    });
+
+    it('anonymous inline guard renders as a navigable child, not dropped', () => {
+        const idle = findState(roots(), 'idle');
+        const go = idle?.children?.find(c => c.type === 'transition' && c.label === 'GO');
+        const anonBranch = go?.children?.find(c => c.type === 'transition' && c.label === 'idle');
+        expect(childLabels(anonBranch, 'guard')).toEqual(['(inline guard)']);
+    });
+});
+
 describe('structure', () => {
     it('trafficLight: red is a compound state with initial walk', () => {
         const red = findState(parseFixture('trafficLight.machine.ts'), 'red');

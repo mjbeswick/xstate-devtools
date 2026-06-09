@@ -15,7 +15,7 @@ exports[`parser snapshots > parses advancedTransitions.machine.ts 1`] = `
                     "type": "guard",
                   },
                 ],
-                "label": "submitting",
+                "label": "when isValid → submitting",
                 "type": "transition",
               },
               {
@@ -2191,7 +2191,7 @@ exports[`parser snapshots > parses complexMachine.ts 1`] = `
           {
             "children": [
               {
-                "label": "guard",
+                "label": "(inline guard)",
                 "type": "guard",
               },
               {
@@ -2300,6 +2300,10 @@ exports[`parser snapshots > parses complexMachine.ts 1`] = `
             "children": [
               {
                 "children": [
+                  {
+                    "label": "(inline guard)",
+                    "type": "guard",
+                  },
                   {
                     "label": "assign",
                     "type": "action",
@@ -2484,7 +2488,7 @@ exports[`parser snapshots > parses complexMachine.ts 1`] = `
           {
             "children": [
               {
-                "label": "guard",
+                "label": "(inline guard)",
                 "type": "guard",
               },
               {
