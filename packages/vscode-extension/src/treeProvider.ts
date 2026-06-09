@@ -558,6 +558,17 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         return element;
     }
 
+    // Drives the contributed `viewsWelcome` content (buttons) via a context key.
+    // Empty: '' (have items / loading). Otherwise one of the reason strings below.
+    private setEmptyReason(reason: '' | 'noEditor' | 'noMachinesInFile' | 'stateConfigsHidden' | 'noMachinesInWorkspace'): void {
+        if (this.treeView) {
+            // Welcome content carries the explanatory text + buttons for empty
+            // cases; keep `message` only for the live filter indicator.
+            this.treeView.message = reason === '' && this.filterText ? `Filter: "${this.filterText}"` : undefined;
+        }
+        vscode.commands.executeCommand('setContext', 'xstateOutline.emptyReason', reason);
+    }
+
     async getChildren(element?: XStateMachineTreeItem): Promise<XStateMachineTreeItem[]> {
         if (!element) {
             // Root level
@@ -566,6 +577,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
                 if (this.treeView) {
                     this.treeView.message = 'Scanning workspace...';
                 }
+                vscode.commands.executeCommand('setContext', 'xstateOutline.emptyReason', '');
                 return [];
             }
 
@@ -573,18 +585,14 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
                 // File scope - show machines from current file
                 const editor = vscode.window.activeTextEditor;
                 if (!editor) {
-                    if (this.treeView) {
-                        this.treeView.message = 'Open a JS/TS file to see XState machines';
-                    }
+                    this.setEmptyReason('noEditor');
                     return [];
                 }
 
                 // Always re-parse to get latest changes
                 const machines = XStateMachineParser.parseMachines(editor.document);
                 if (machines.length === 0) {
-                    if (this.treeView) {
-                        this.treeView.message = 'No XState machines found in this file';
-                    }
+                    this.setEmptyReason('noMachinesInFile');
                     return [];
                 }
 
@@ -596,34 +604,24 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
                         this.preBuildItemCache(this.displayChildren(m), item);
                         return item;
                     });
-                
+
                 if (items.length === 0 && !this.showStateConfigs) {
-                    if (this.treeView) {
-                        this.treeView.message = 'All machines are state configs (toggle filter to show)';
-                    }
+                    this.setEmptyReason('stateConfigsHidden');
                     return [];
                 }
 
-                if (this.treeView) {
-                    this.treeView.message = this.filterText ? `Filter: "${this.filterText}"` : undefined;
-                }
+                this.setEmptyReason('');
                 return items;
             } else {
                 // Workspace scope
                 const fileMachines = this.workspaceScanner.getCached();
-                
+
                 if (fileMachines.length === 0) {
-                    if (this.treeView) {
-                        this.treeView.message = 'No XState machines found in workspace';
-                    }
+                    this.setEmptyReason('noMachinesInWorkspace');
                     return [];
                 }
 
-                // Clear message when we have items
-                if (this.treeView) {
-                    this.treeView.message = this.filterText ? `Filter: "${this.filterText}"` : undefined;
-                }
-
+                this.setEmptyReason('');
                 return this.formatRootItems(fileMachines);
             }
         } else if (element.type === 'file') {
@@ -643,24 +641,6 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
             }
             return [];
         }
-    }
-
-    private createLoadingItem(): XStateMachineTreeItem {
-        return new XStateMachineTreeItem({
-            type: 'machine',
-            label: 'Scanning workspace...',
-            range: new vscode.Range(0, 0, 0, 0),
-            uri: vscode.Uri.file('')
-        });
-    }
-
-    private createEmptyItem(message: string): XStateMachineTreeItem {
-        return new XStateMachineTreeItem({
-            type: 'machine',
-            label: message,
-            range: new vscode.Range(0, 0, 0, 0),
-            uri: vscode.Uri.file('')
-        });
     }
 
     private formatRootItems(fileMachines: FileMachines[]): XStateMachineTreeItem[] {

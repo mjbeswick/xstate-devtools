@@ -53,6 +53,33 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "xstateMachineOutline",
+        "contents": "All machines in this file are state configs, which are hidden.\n[Show State Configs](command:xstateMachineOutline.setStateConfigsShow)",
+        "when": "xstateOutline.emptyReason == stateConfigsHidden"
+      },
+      {
+        "view": "xstateMachineOutline",
+        "contents": "No XState machines found in this file.\n[Search the Whole Workspace](command:xstateMachineOutline.setScopeWorkspace)",
+        "when": "xstateOutline.emptyReason == noMachinesInFile"
+      },
+      {
+        "view": "xstateMachineOutline",
+        "contents": "Open a JavaScript or TypeScript file to see its XState machines, or search the whole workspace.\n[Search the Whole Workspace](command:xstateMachineOutline.setScopeWorkspace)",
+        "when": "xstateOutline.emptyReason == noEditor"
+      },
+      {
+        "view": "xstateMachineOutline",
+        "contents": "No XState machines found in the workspace.\n[Rescan Workspace](command:xstateMachineOutline.refresh)\n[Search the Current File Only](command:xstateMachineOutline.setScopeFile)",
+        "when": "xstateOutline.emptyReason == noMachinesInWorkspace && workbenchState != empty"
+      },
+      {
+        "view": "xstateMachineOutline",
+        "contents": "Open a folder to scan it for XState machines.\n[Open Folder](command:vscode.openFolder)",
+        "when": "xstateOutline.emptyReason == noMachinesInWorkspace && workbenchState == empty"
+      }
+    ],
     "commands": [
       {
         "command": "xstateMachineOutline.refresh",
@@ -335,7 +362,7 @@
         },
         {
           "command": "xstateMachineOutline.goToImplementation",
-          "when": "view == xstateMachineOutline && viewItem != loading",
+          "when": "view == xstateMachineOutline && (viewItem == action || viewItem == guard || viewItem == entry || viewItem == exit || viewItem == invoke || viewItem == target)",
           "group": "navigation@1"
         },
         {
@@ -372,7 +399,7 @@
         },
         {
           "command": "xstateMachineOutline.goToImplementation",
-          "when": "view == xstateMachineOutline && (viewItem == action || viewItem == guard || viewItem == entry || viewItem == exit || viewItem == invoke)",
+          "when": "view == xstateMachineOutline && (viewItem == action || viewItem == guard || viewItem == entry || viewItem == exit || viewItem == invoke || viewItem == target)",
           "group": "inline"
         }
       ],
