@@ -66,6 +66,11 @@ const C = {
     selBg:  themeVar('--vscode-list-activeSelectionBackground', '#cce5ff'),
     desc:   themeVar('--vscode-descriptionForeground',          '#717171'),
     accent: themeVar('--vscode-charts-blue',                    '#3b82f6'),
+    // State-kind accents, mirroring the tree outline's icon colours so the two
+    // views read consistently: green initial, red final, blue parallel.
+    stInitial:  themeVar('--vscode-charts-green',  '#39a35a'),
+    stFinal:    themeVar('--vscode-charts-red',    '#d24b4b'),
+    stParallel: themeVar('--vscode-charts-blue',   '#3b82f6'),
 };
 const fontFamily = themeVar('--vscode-font-family', 'system-ui, sans-serif');
 
@@ -73,6 +78,17 @@ const measureCtx = document.createElement('canvas').getContext('2d')!;
 function textW(s: string, px: number, weight = 'normal'): number {
     measureCtx.font = `${weight} ${px}px ${fontFamily}`;
     return measureCtx.measureText(s).width;
+}
+// Ellipsize `s` to fit `maxW` px. Returns the (possibly truncated) text and
+// whether it was clipped (so the caller can attach a full-text tooltip).
+function clip(s: string, px: number, maxW: number, weight = 'normal'): { text: string; clipped: boolean } {
+    if (textW(s, px, weight) <= maxW) { return { text: s, clipped: false }; }
+    let lo = 0, hi = s.length;
+    while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (textW(s.slice(0, mid) + '…', px, weight) <= maxW) { lo = mid; } else { hi = mid - 1; }
+    }
+    return { text: s.slice(0, lo) + '…', clipped: true };
 }
 
 // ── Sizing constants ──────────────────────────────────────────────────────────
@@ -83,6 +99,7 @@ const ACTION_TOP    = 7;
 const NODE_V_PAD    = 10;
 const REGION_H      = 28;
 const MIN_W         = 110;
+const MAX_W         = 320; // cap so one long action/event name can't blow up layout
 
 function nw(label: string, entry: string[], exit: string[], internal: string[] = []): number {
     // Title is rendered at LABEL_PX (13) and centred; actions at ACTION_PX (11)
@@ -91,7 +108,8 @@ function nw(label: string, entry: string[], exit: string[], internal: string[] =
     const titleW = Math.ceil(textW(label, LABEL_PX, '500')) + 32;
     const actionW = [...entry.map(a => `entry / ${a}`), ...exit.map(a => `exit / ${a}`), ...internal]
         .map(l => Math.ceil(textW(l, ACTION_PX)) + 24);
-    return Math.max(MIN_W, titleW, ...actionW);
+    // Cap the width; rows wider than the cap are ellipsized at draw time.
+    return Math.min(MAX_W, Math.max(MIN_W, titleW, ...actionW));
 }
 function nh(entry: string[], exit: string[], internal: string[] = []): number {
     const n = entry.length + exit.length + internal.length;
@@ -243,6 +261,14 @@ function txt(s: string, x: number, y: number, attrs: Record<string, string | num
     t.textContent = s;
     return t;
 }
+// Like txt(), but ellipsizes `full` to `maxW` px and attaches a full-text
+// <title> tooltip when truncated. `px`/`weight` must match the rendered font.
+function clipTxt(full: string, x: number, y: number, maxW: number, px: number, attrs: Record<string, string | number> = {}, weight = 'normal'): SVGElement {
+    const c = clip(full, px, maxW, weight);
+    const t = txt(c.text, x, y, attrs);
+    if (c.clipped) { const ti = el('title'); ti.textContent = full; t.appendChild(ti); }
+    return t;
+}
 
 // ── Viewport ──────────────────────────────────────────────────────────────────
 type Rect = { x: number; y: number; w: number; h: number };
@@ -374,7 +400,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
             }
 
             if (d.start) {
-                g.appendChild(el('circle', { cx: ax + w/2, cy: ay + h/2, r: 6, fill: C.fg }));
+                g.appendChild(el('circle', { cx: ax + w/2, cy: ay + h/2, r: 6, fill: C.stInitial }));
                 gNodes.appendChild(g);
             } else if (d.history) {
                 // History pseudostate: circle with H (shallow) or H* (deep).
@@ -393,9 +419,9 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                 const regionRect = el('rect', {
                     x: ax, y: ay, width: w, height: h, rx: 14, ry: 14,
                     fill: 'none',
-                    stroke: C.fg,
+                    stroke: isParallel ? C.stParallel : C.fg,
                     'stroke-width': isParallel ? 1.6 : 1.5,
-                    'stroke-opacity': isParallel ? 0.75 : 0.6,
+                    'stroke-opacity': isParallel ? 0.85 : 0.6,
                     ...(isParallel ? { 'stroke-dasharray': '7 4' } : {}),
                 });
                 g.appendChild(regionRect);
@@ -408,9 +434,9 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                 g.appendChild(txt('▾', ax+12, ay+REGION_H-9, {
                     'text-anchor': 'middle', 'font-size': 10, fill: C.desc,
                 }));
-                g.appendChild(txt(d.label, ax+w/2, ay+REGION_H-9, {
+                g.appendChild(clipTxt(d.label, ax+w/2, ay+REGION_H-9, w-56, 12, {
                     'text-anchor': 'middle', 'font-size': 12, 'font-weight': 'bold',
-                }));
+                }, 'bold'));
                 if (isParallel) {
                     // Plain "parallel" tag, right-aligned in the title bar.
                     g.appendChild(txt('parallel', ax+w-8, ay+REGION_H-9, {
@@ -475,9 +501,9 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                 const rect = el('rect', {
                     x: ax, y: ay, width: w, height: h, rx: 8, ry: 8,
                     fill: C.nodeBg, 'fill-opacity': 1,
-                    stroke: C.fg,
+                    stroke: isParallel ? C.stParallel : C.fg,
                     'stroke-width': isParallel ? 1.6 : 1.5,
-                    'stroke-opacity': isParallel ? 0.75 : 0.8,
+                    'stroke-opacity': isParallel ? 0.85 : 0.8,
                     ...(isParallel ? { 'stroke-dasharray': '7 4' } : {}),
                 });
                 idByName.set(d.name, n.id);
@@ -487,7 +513,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                     g.appendChild(el('rect', {
                         x: ax+4, y: ay+4, width: w-8, height: h-8,
                         rx: 5, ry: 5, fill: 'none',
-                        stroke: C.fg, 'stroke-width': 1, 'stroke-opacity': 0.5,
+                        stroke: C.stFinal, 'stroke-width': 1.25, 'stroke-opacity': 0.85,
                     }));
                 }
                 const entry = d.entryActions ?? [];
@@ -497,9 +523,9 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                 const label = (isCollapsed && hasChildren ? '▸ ' : '') + d.label;
                 if (entry.length > 0 || exit.length > 0 || internal.length > 0 || invokes.length > 0) {
                     const labelY = ay + NODE_V_PAD + LABEL_PX;
-                    g.appendChild(txt(label, ax+w/2, labelY, {
+                    g.appendChild(clipTxt(label, ax+w/2, labelY, w-16, LABEL_PX, {
                         'text-anchor': 'middle', 'font-size': LABEL_PX, 'font-weight': '500',
-                    }));
+                    }, '500'));
                     const divY = labelY + NODE_V_PAD / 2;
                     g.appendChild(el('line', {
                         x1: ax+1, y1: divY, x2: ax+w-1, y2: divY,
@@ -507,11 +533,11 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                     }));
                     let lineY = divY + ACTION_TOP + ACTION_PX;
                     for (const a of entry) {
-                        g.appendChild(txt(`entry / ${a}`, ax+8, lineY, { 'font-size': ACTION_PX, fill: C.desc }));
+                        g.appendChild(clipTxt(`entry / ${a}`, ax+8, lineY, w-16, ACTION_PX, { 'font-size': ACTION_PX, fill: C.desc }));
                         lineY += ACTION_LINE_H;
                     }
                     for (const a of exit) {
-                        g.appendChild(txt(`exit / ${a}`, ax+8, lineY, { 'font-size': ACTION_PX, fill: C.desc }));
+                        g.appendChild(clipTxt(`exit / ${a}`, ax+8, lineY, w-16, ACTION_PX, { 'font-size': ACTION_PX, fill: C.desc }));
                         lineY += ACTION_LINE_H;
                     }
                     // Internal transitions: event-triggered actions with no state
@@ -519,18 +545,18 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                     // event name reads in the foreground colour to stand apart
                     // from entry/exit rows.
                     for (const line of internal) {
-                        g.appendChild(txt(line, ax+8, lineY, { 'font-size': ACTION_PX, fill: C.fg, 'fill-opacity': 0.85 }));
+                        g.appendChild(clipTxt(line, ax+8, lineY, w-16, ACTION_PX, { 'font-size': ACTION_PX, fill: C.fg, 'fill-opacity': 0.85 }));
                         lineY += ACTION_LINE_H;
                     }
                     // Invoked services: `invoke <src>`, italic to read as an activity.
                     for (const src of invokes) {
-                        g.appendChild(txt(`invoke ${src}`, ax+8, lineY, { 'font-size': ACTION_PX, fill: C.desc, 'font-style': 'italic' }));
+                        g.appendChild(clipTxt(`invoke ${src}`, ax+8, lineY, w-16, ACTION_PX, { 'font-size': ACTION_PX, fill: C.desc, 'font-style': 'italic' }));
                         lineY += ACTION_LINE_H;
                     }
                 } else {
-                    g.appendChild(txt(label, ax+w/2, ay + h/2 + LABEL_PX/2 - 1, {
+                    g.appendChild(clipTxt(label, ax+w/2, ay + h/2 + LABEL_PX/2 - 1, w-16, LABEL_PX, {
                         'text-anchor': 'middle', 'font-size': LABEL_PX, 'font-weight': '500',
-                    }));
+                    }, '500'));
                 }
                 // Hover: highlight connected edges + thicken border
                 g.addEventListener('mouseenter', () => {
@@ -748,9 +774,11 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
         }));
         const padTop = ((L.h + 2) - L.lines.length * ACTION_LINE_H) / 2;
         for (let i = 0; i < L.lines.length; i++) {
+            // Event/guard labels are primary semantic content — full foreground
+            // contrast, not the dimmed description colour.
             const lineEl = txt(L.lines[i], bx + L.w / 2, by + padTop + (i + 0.5) * ACTION_LINE_H, {
                 'text-anchor': 'middle', 'dominant-baseline': 'central',
-                'font-size': ACTION_PX, fill: C.desc,
+                'font-size': ACTION_PX, fill: C.fg,
             });
             lineEl.setAttribute('data-event', L.lines[i]);
             labelG.appendChild(lineEl);
@@ -793,7 +821,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
             (g as SVGElement).style.cursor = 'pointer';
             g.appendChild(el('rect', { x: cxp - lw / 2 - 2, y: by, width: lw + 4, height: lines.length * ACTION_LINE_H + 4, rx: 3, ry: 3, fill: C.bg, 'fill-opacity': 1, stroke: C.fg, 'stroke-width': 0.5, 'stroke-opacity': 0.12 }));
             for (let i = 0; i < lines.length; i++) {
-                const t = txt(lines[i], cxp, by + (i + 0.5) * ACTION_LINE_H + ACTION_LINE_H / 2, { 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': ACTION_PX, fill: C.desc });
+                const t = txt(lines[i], cxp, by + (i + 0.5) * ACTION_LINE_H + ACTION_LINE_H / 2, { 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': ACTION_PX, fill: C.fg });
                 t.setAttribute('data-event', lines[i]);
                 g.appendChild(t);
             }
@@ -824,11 +852,12 @@ const centerOf = (id: string) => {
 function nodeStyle(id: string): { fill: string; stroke: string; sw: number; so: number } {
     const d = nodeById.get(id);
     const isParallel = !!d?.parallel;
+    const stroke = isParallel ? C.stParallel : C.fg;
     if (d?.ghost)   { return { fill: 'none',    stroke: C.fg, sw: 1.2, so: 0.45 }; }
     if (d?.history) { return { fill: C.nodeBg,  stroke: C.fg, sw: 1.5, so: 0.8  }; }
     const isRegion = childStateIds(id).length > 0 && !collapsed.has(id);
-    if (isRegion)   { return { fill: 'none',    stroke: C.fg, sw: isParallel ? 1.6 : 1.5, so: isParallel ? 0.75 : 0.6 }; }
-    return { fill: C.nodeBg, stroke: C.fg, sw: isParallel ? 1.6 : 1.5, so: isParallel ? 0.75 : 0.8 };
+    if (isRegion)   { return { fill: 'none',    stroke, sw: isParallel ? 1.6 : 1.5, so: isParallel ? 0.85 : 0.6 }; }
+    return { fill: C.nodeBg, stroke, sw: isParallel ? 1.6 : 1.5, so: isParallel ? 0.85 : 0.8 };
 }
 
 // Paint a node in its default style, or — if it is the selected one — in the
