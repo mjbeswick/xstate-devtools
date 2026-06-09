@@ -359,9 +359,61 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     // ── Navigate to source position (reuses existing tab) ────────────────────
+    // Node types that have a distinct double-click action. Only these defer their
+    // single-click navigation behind a timer (so a second click can "upgrade" to
+    // the double-click action without first jumping to source). Every other type
+    // navigates immediately — no latency for the common case.
+    const DOUBLE_CLICK_TYPES = ['action', 'guard', 'entry', 'exit', 'invoke', 'target'];
     let lastClickedItem: unknown = undefined;
     let lastClickTime = 0;
-    const DOUBLE_CLICK_MS = 500;
+    let pendingClickTimer: NodeJS.Timeout | undefined;
+    const DOUBLE_CLICK_MS = 300;
+
+    // Single-click behavior: collapse an already-selected expanded node, else
+    // reveal the node's own source location.
+    const performSingleClick = async (treeItem: any, wasAlreadySelected: boolean) => {
+        if (wasAlreadySelected
+            && treeItem.collapsibleState !== vscode.TreeItemCollapsibleState.None
+            && expandedItems.has(treeItem)) {
+            treeProvider.collapseItem(treeItem);
+            expandedItems.delete(treeItem);
+            return;
+        }
+        await vscode.window.showTextDocument(treeItem.uri, {
+            selection: treeItem.range,
+            preserveFocus: true,
+            preview: false
+        });
+        treeView.reveal(treeItem, { select: true, focus: false, expand: true });
+    };
+
+    // Double-click behavior. Returns true if it handled the click; false if the
+    // type has no double-click action (caller falls back to single-click).
+    const performDoubleClick = async (treeItem: any): Promise<boolean> => {
+        const implementable = ['action', 'guard', 'entry', 'exit', 'invoke'];
+        if (implementable.includes(treeItem.node?.type)) {
+            await vscode.commands.executeCommand('xstateMachineOutline.goToImplementation', treeItem);
+            return true;
+        }
+        // Double-clicking a transition target jumps to the state it points to.
+        if (treeItem.node?.type === 'target') {
+            const loc = treeProvider.resolveTargetLocation(treeItem.node);
+            if (loc) {
+                await vscode.window.showTextDocument(loc.uri, {
+                    selection: loc.range,
+                    preserveFocus: false,
+                    preview: false
+                });
+                const stateItem = treeProvider.findItemAtPosition(loc.range.start);
+                if (stateItem) {
+                    treeView.reveal(stateItem, { select: true, focus: false, expand: true });
+                }
+                return true;
+            }
+            // Couldn't resolve the target state — fall through to source navigation.
+        }
+        return false;
+    };
 
     const navigateToNodeCommand = vscode.commands.registerCommand(
         'xstateMachineOutline.navigateToNode',
@@ -371,50 +423,33 @@ export async function activate(context: vscode.ExtensionContext) {
             const now = Date.now();
             const isDoubleClick = treeItem === lastClickedItem && (now - lastClickTime) < DOUBLE_CLICK_MS;
             const wasAlreadySelected = treeItem === lastClickedItem;
-            lastClickedItem = treeItem;
             lastClickTime = now;
 
             if (isDoubleClick) {
-                const implementable = ['action', 'guard', 'entry', 'exit', 'invoke'];
-                if (implementable.includes(treeItem.node?.type)) {
-                    await vscode.commands.executeCommand('xstateMachineOutline.goToImplementation', treeItem);
-                    return;
-                }
-                // Double-clicking a transition target jumps to the state it points to
-                if (treeItem.node?.type === 'target') {
-                    const loc = treeProvider.resolveTargetLocation(treeItem.node);
-                    if (loc) {
-                        await vscode.window.showTextDocument(loc.uri, {
-                            selection: loc.range,
-                            preserveFocus: false,
-                            preview: false
-                        });
-                        const stateItem = treeProvider.findItemAtPosition(loc.range.start);
-                        if (stateItem) {
-                            treeView.reveal(stateItem, { select: true, focus: false, expand: true });
-                        }
-                        return;
-                    }
-                    // Couldn't resolve the target state — fall through to source navigation
-                }
-                // For non-implementable types, double-click is the same as single-click
-            }
-
-            // Clicking an already-selected, expanded node collapses it.
-            if (wasAlreadySelected
-                && treeItem.collapsibleState !== vscode.TreeItemCollapsibleState.None
-                && expandedItems.has(treeItem)) {
-                treeProvider.collapseItem(treeItem);
-                expandedItems.delete(treeItem);
+                // Second click in time: cancel the deferred single-click so we
+                // never navigate to source AND to implementation on one gesture.
+                if (pendingClickTimer) { clearTimeout(pendingClickTimer); pendingClickTimer = undefined; }
+                lastClickedItem = undefined; // reset so a third click starts fresh
+                if (await performDoubleClick(treeItem)) { return; }
+                // Type has no double-click action — do a single navigation instead.
+                await performSingleClick(treeItem, wasAlreadySelected);
                 return;
             }
 
-            await vscode.window.showTextDocument(treeItem.uri, {
-                selection: treeItem.range,
-                preserveFocus: true,
-                preview: false
-            });
-            treeView.reveal(treeItem, { select: true, focus: false, expand: true });
+            lastClickedItem = treeItem;
+
+            // Types with no double-click action navigate immediately.
+            if (!DOUBLE_CLICK_TYPES.includes(treeItem.node?.type)) {
+                await performSingleClick(treeItem, wasAlreadySelected);
+                return;
+            }
+
+            // Defer so a follow-up click can upgrade this to a double-click.
+            if (pendingClickTimer) { clearTimeout(pendingClickTimer); }
+            pendingClickTimer = setTimeout(() => {
+                pendingClickTimer = undefined;
+                void performSingleClick(treeItem, wasAlreadySelected);
+            }, DOUBLE_CLICK_MS);
         }
     );
 

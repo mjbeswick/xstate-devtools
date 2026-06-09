@@ -843,8 +843,17 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
     uri?: vscode.Uri;
 
     private getDescription(): string | undefined {
-        // No descriptions needed - indicators are in the label now
-        return undefined;
+        // Dimmed text markers carry state-kind meaning on a non-color channel,
+        // so initial/final/parallel/history stay legible without relying on icon
+        // color (which fails colorblind users and at-a-glance scanning).
+        const node = this.node;
+        if (node.isTypeMarker) { return undefined; }
+        const markers: string[] = [];
+        if (node.historyType) { markers.push(`${node.historyType} history`); }
+        if (node.isParallel) { markers.push('parallel'); }
+        if (node.isInitial) { markers.push('initial'); }
+        if (node.isFinal) { markers.push('final'); }
+        return markers.length > 0 ? markers.join(' · ') : undefined;
     }
 
     private buildTooltip(diagnostics?: vscode.Diagnostic[]): string | vscode.MarkdownString {
@@ -887,7 +896,9 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
                     iconName = 'circle-filled';
                     iconColor = new vscode.ThemeColor('charts.green');
                 } else if (this.node.isFinal) {
-                    iconName = 'circle-filled';
+                    // Shape-distinct from initial (a plain filled circle) so the two
+                    // are tellable apart without relying on green-vs-red color.
+                    iconName = 'pass-filled';
                     iconColor = new vscode.ThemeColor('charts.red');
                 } else {
                     iconName = 'circle-filled';
