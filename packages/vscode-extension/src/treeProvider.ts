@@ -902,6 +902,14 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
                 if (this.node.label === 'onDone' || this.node.label === 'onError') {
                     iconName = 'circle-filled';
                     iconColor = new vscode.ThemeColor('charts.orange');
+                } else if (this.node.label === 'always') {
+                    // Eventless transition — fires automatically, not on an event.
+                    iconName = 'zap';
+                    iconColor = new vscode.ThemeColor('charts.orange');
+                } else if (this.node.label.startsWith('after ')) {
+                    // Delayed (after) transition — fires automatically after a timeout.
+                    iconName = 'clock';
+                    iconColor = new vscode.ThemeColor('charts.orange');
                 } else {
                     iconName = 'symbol-event';
                     iconColor = new vscode.ThemeColor('charts.orange');

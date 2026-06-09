@@ -393,7 +393,14 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
       const li = document.createElement('li');
       li.className = 'result-row';
 
-      const iconEl = codicon(typeInfo.icon);
+      // Eventless/automatic transitions get distinct icons (mirrors the tree).
+      let iconName = typeInfo.icon;
+      if (item.type === 'transition') {
+        if (item.label === 'always') { iconName = 'zap'; }
+        else if (item.label.indexOf('after ') === 0) { iconName = 'clock'; }
+      }
+
+      const iconEl = codicon(iconName);
       iconEl.classList.add('result-icon');
       if (typeInfo.color) { iconEl.style.color = typeInfo.color; }
 
