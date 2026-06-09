@@ -463,6 +463,7 @@ export class XStateGraphViewProvider {
             line-height: 1.4;
             white-space: nowrap;
         }
+        #toolbar button#btn-zoom-reset { min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
         #toolbar button:hover { background: var(--vscode-toolbar-hoverBackground, rgba(127,127,127,0.1)); }
         #toolbar button:active { background: var(--vscode-toolbar-activeBackground, rgba(127,127,127,0.2)); }
         .tb-sep { width: 1px; height: 14px; background: var(--vscode-widget-border, rgba(127,127,127,0.3)); margin: 0 2px; }
@@ -471,8 +472,9 @@ export class XStateGraphViewProvider {
 <body>
     <div id="cy"></div>
     <div id="toolbar">
-        <button id="btn-zoom-in"  title="Zoom in">+</button>
         <button id="btn-zoom-out" title="Zoom out">−</button>
+        <button id="btn-zoom-reset" title="Reset to actual size (100%)">100%</button>
+        <button id="btn-zoom-in"  title="Zoom in">+</button>
         <button id="btn-fit"      title="Fit to screen">⊡</button>
         <button id="btn-direction" title="Toggle layout direction (top-down / left-right)">↧</button>
         <div class="tb-sep"></div>

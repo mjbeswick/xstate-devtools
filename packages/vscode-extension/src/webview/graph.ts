@@ -134,10 +134,10 @@ function buildElkNode(id: string): ElkNode {
     const states = childStateIds(id);
     const isRegion = states.length > 0 && !collapsed.has(id);
     if (!isRegion) {
-        // Render appends a ' ⊕' affordance to collapsed parents — measure it
-        // too so the glyph never overflows the box border.
+        // Render prepends a '▸ ' disclosure chevron to collapsed parents —
+        // measure it too so the glyph never overflows the box border.
         const isCollapsedParent = states.length > 0 && collapsed.has(id);
-        const display = d.label + (isCollapsedParent ? ' ⊕' : '');
+        const display = (isCollapsedParent ? '▸ ' : '') + d.label;
         // Compartment rows below the title: internal transitions + invoked services.
         const extraRows = [...(d.internalTransitions ?? []), ...(d.invokes ?? []).map(s => `invoke ${s}`)];
         return {
@@ -263,8 +263,18 @@ container.tabIndex = 0;
 let selectedId: string | null = null;
 const nodeRectById = new Map<string, SVGElement>();
 
+const zoomReadout = document.getElementById('btn-zoom-reset');
 function applyTransform() {
     viewport.setAttribute('transform', `translate(${tx} ${ty}) scale(${scale})`);
+    if (zoomReadout) { zoomReadout.textContent = `${Math.round(scale * 100)}%`; }
+}
+// Reset to 100% (actual size), keeping the viewport centre fixed.
+function actualSize() {
+    const cx = container.clientWidth / 2, cy = container.clientHeight / 2;
+    tx = cx - ((cx - tx) / scale);
+    ty = cy - ((cy - ty) / scale);
+    scale = 1;
+    applyTransform();
 }
 function fitToScreen() {
     const cw = container.clientWidth || 800, ch = container.clientHeight || 600;
@@ -394,6 +404,10 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                     x1: ax+1, y1: ay+REGION_H, x2: ax+w-1, y2: ay+REGION_H,
                     stroke: C.fg, 'stroke-width': 0.75, 'stroke-opacity': 0.35,
                 }));
+                // Disclosure chevron marks the header as an expand/collapse target.
+                g.appendChild(txt('▾', ax+12, ay+REGION_H-9, {
+                    'text-anchor': 'middle', 'font-size': 10, fill: C.desc,
+                }));
                 g.appendChild(txt(d.label, ax+w/2, ay+REGION_H-9, {
                     'text-anchor': 'middle', 'font-size': 12, 'font-weight': 'bold',
                 }));
@@ -480,7 +494,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                 const exit  = d.exitActions  ?? [];
                 const internal = d.internalTransitions ?? [];
                 const invokes = d.invokes ?? [];
-                const label = d.label + (isCollapsed && hasChildren ? ' ⊕' : '');
+                const label = (isCollapsed && hasChildren ? '▸ ' : '') + d.label;
                 if (entry.length > 0 || exit.length > 0 || internal.length > 0 || invokes.length > 0) {
                     const labelY = ay + NODE_V_PAD + LABEL_PX;
                     g.appendChild(txt(label, ax+w/2, labelY, {
@@ -912,6 +926,7 @@ container.addEventListener('keydown', (ev) => {
     if (k === ']' || k === '+' || k === '=') { zoomAround(1.25); ev.preventDefault(); return; }
     if (k === '[' || k === '-' || k === '_') { zoomAround(1 / 1.25); ev.preventDefault(); return; }
     if (k === '0' || k === '.') { fitToScreen(); ev.preventDefault(); return; }
+    if (k === '1') { actualSize(); ev.preventDefault(); return; }
     const dir = ARROW[k];
     if (dir) {
         ev.preventDefault();
@@ -1066,6 +1081,7 @@ dirBtn?.addEventListener('click', () => {
 
 document.getElementById('btn-zoom-in')?.addEventListener('click',    () => zoomAround(1.25));
 document.getElementById('btn-zoom-out')?.addEventListener('click',   () => zoomAround(1/1.25));
+document.getElementById('btn-zoom-reset')?.addEventListener('click', actualSize);
 document.getElementById('btn-fit')?.addEventListener('click',        fitToScreen);
 document.getElementById('btn-expand-all')?.addEventListener('click', expandAll);
 document.getElementById('btn-collapse-all')?.addEventListener('click', collapseAll);
