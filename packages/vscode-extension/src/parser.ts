@@ -643,6 +643,13 @@ export class XStateMachineParser {
         if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
             return node.expression.text;
         }
+        if (ts.isObjectLiteralExpression(node)) {
+            // Object-form action/guard: { type: 'playSound', params: ... }
+            const typeProp = this.findProperty(node, 'type');
+            if (typeProp && ts.isStringLiteral(typeProp)) {
+                return typeProp.text;
+            }
+        }
         return null;
     }
 

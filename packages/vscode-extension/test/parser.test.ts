@@ -123,6 +123,46 @@ describe('transition coverage', () => {
     });
 });
 
+describe('object-form actions', () => {
+    const SRC = `
+import { createMachine } from 'xstate';
+export const m = createMachine({
+  id: 'obj',
+  initial: 'idle',
+  states: {
+    idle: {
+      on: {
+        'sound.play': {
+          actions: [{ type: 'playSound', params: ({ event }) => event.params }],
+        },
+        'locale.change': {
+          actions: [
+            { type: 'saveSelectedLocale', params: ({ event }) => event.params },
+            { type: 'raiseAnalyticsEvent', params: ({ event }) => event.params },
+            { type: 'bookmark', params: { bookmark: 'CHANGE_LOCALE' } },
+          ],
+        },
+      },
+    },
+  },
+});`;
+    const roots = () => XStateMachineParser.parseMachines(makeDoc(SRC, '/obj.ts'));
+
+    it('renders { type, params } actions from a single-element array', () => {
+        const idle = findState(roots(), 'idle');
+        const t = idle?.children?.find(c => c.type === 'transition' && c.label === 'sound.play');
+        expect(childLabels(t, 'action')).toEqual(['playSound']);
+    });
+
+    it('renders every { type, params } action in a multi-element array', () => {
+        const idle = findState(roots(), 'idle');
+        const t = idle?.children?.find(c => c.type === 'transition' && c.label === 'locale.change');
+        expect(childLabels(t, 'action')).toEqual([
+            'saveSelectedLocale', 'raiseAnalyticsEvent', 'bookmark',
+        ]);
+    });
+});
+
 describe('structure', () => {
     it('trafficLight: red is a compound state with initial walk', () => {
         const red = findState(parseFixture('trafficLight.machine.ts'), 'red');
