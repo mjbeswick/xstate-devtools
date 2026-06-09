@@ -205,7 +205,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
   // ── Type definitions (codicons + theme colors mirror the outline tree) ──
   const TYPES = [
     { id: 'machine',    icon: 'package',          label: 'Machine',    color: 'var(--vscode-charts-blue)' },
-    { id: 'state',      icon: 'circle-filled',    label: 'State',      color: 'var(--vscode-symbolIcon-fieldForeground)' },
+    { id: 'state',      icon: 'circle-outline',   label: 'State',      color: 'var(--vscode-symbolIcon-fieldForeground)' },
     { id: 'transition', icon: 'symbol-event',     label: 'Transition', color: 'var(--vscode-charts-orange)' },
     { id: 'action',     icon: 'rocket',           label: 'Action',     color: 'var(--vscode-symbolIcon-methodForeground)' },
     { id: 'entry',      icon: 'debug-step-into',  label: 'Entry',      color: 'var(--vscode-symbolIcon-methodForeground)' },

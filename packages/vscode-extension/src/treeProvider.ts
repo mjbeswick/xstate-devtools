@@ -47,7 +47,8 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
     ) {
         this.outputChannel = outputChannel;
         this.workspaceScanner = workspaceScanner;
-        
+        XStateMachineTreeItem.iconBase = vscode.Uri.joinPath(context.extensionUri, 'resources', 'icons');
+
         // Load saved preferences from configuration
         const config = vscode.workspace.getConfiguration('xstateOutline');
         this.currentScope = config.get('defaultScope', 'workspace');
@@ -739,10 +740,13 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
 }
 
 export class XStateMachineTreeItem extends vscode.TreeItem {
-    
+
     public readonly type: 'machine' | 'file' | 'loading';
     public readonly machines?: XStateMachineTreeItem[];
-    
+    // Base folder for the bundled custom Harel-shape state icons (resources/icons).
+    // Set once during activation; when present, state nodes use these SVGs.
+    public static iconBase?: vscode.Uri;
+
     constructor(
         public readonly node: MachineNode,
         machines?: XStateMachineTreeItem[],
@@ -800,7 +804,15 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
 
             this.tooltip = this.buildTooltip(nodeDiagnostics);
             this.description = this.getDescription();
-            this.iconPath = this.getIcon(hasError, hasWarning);
+            // State nodes use the bundled custom Harel-shape icons; everything
+            // else (and any node with a diagnostic, so the error/warning tint
+            // still shows) falls back to themed codicons.
+            const stateIcon = XStateMachineTreeItem.iconBase && !hasError && !hasWarning
+                ? this.stateIconFile()
+                : undefined;
+            this.iconPath = stateIcon
+                ? vscode.Uri.joinPath(XStateMachineTreeItem.iconBase!, stateIcon)
+                : this.getIcon(hasError, hasWarning);
             
             // Store range and uri for navigation
             this.range = node.range;
@@ -867,6 +879,19 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
         invoke: 'Invoke', context: 'Context', contextProperty: 'Context property',
         actor: 'Actor', delay: 'Delay', setup: 'Setup', on: 'Events'
     };
+
+    // Custom Harel-shape icon file for a state node, or undefined for non-states
+    // and synthetic `type:` markers (which keep their codicon). Priority mirrors
+    // getIcon: history → parallel → initial → final → plain.
+    private stateIconFile(): string | undefined {
+        const n = this.node;
+        if (n.type !== 'state' || n.isTypeMarker) { return undefined; }
+        if (n.historyType) { return 'state-history.svg'; }
+        if (n.isParallel)  { return 'state-parallel.svg'; }
+        if (n.isInitial)   { return 'state-initial.svg'; }
+        if (n.isFinal)     { return 'state-final.svg'; }
+        return 'state.svg';
+    }
 
     private getIcon(hasError = false, hasWarning = false): vscode.ThemeIcon {
         let iconName = '';
