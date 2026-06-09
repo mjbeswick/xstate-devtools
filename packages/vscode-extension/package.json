@@ -88,51 +88,63 @@
       },
       {
         "command": "xstateMachineOutline.setScopeFile",
-        "title": "Scope: file"
+        "title": "Scope: file",
+        "icon": "$(file)"
       },
       {
         "command": "xstateMachineOutline.setScopeFileActive",
-        "title": "Scope: file"
+        "title": "Scope: file",
+        "icon": "$(file)"
       },
       {
         "command": "xstateMachineOutline.setScopeWorkspace",
-        "title": "Scope: workspace"
+        "title": "Scope: workspace",
+        "icon": "$(folder)"
       },
       {
         "command": "xstateMachineOutline.setScopeWorkspaceActive",
-        "title": "Scope: workspace"
+        "title": "Scope: workspace",
+        "icon": "$(folder)"
       },
       {
         "command": "xstateMachineOutline.setViewGrouped",
-        "title": "View: grouped"
+        "title": "View: grouped",
+        "icon": "$(list-tree)"
       },
       {
         "command": "xstateMachineOutline.setViewGroupedActive",
-        "title": "View: grouped"
+        "title": "View: grouped",
+        "icon": "$(list-tree)"
       },
       {
         "command": "xstateMachineOutline.setViewFlat",
-        "title": "View: flat"
+        "title": "View: flat",
+        "icon": "$(list-flat)"
       },
       {
         "command": "xstateMachineOutline.setViewFlatActive",
-        "title": "View: flat"
+        "title": "View: flat",
+        "icon": "$(list-flat)"
       },
       {
         "command": "xstateMachineOutline.setStateConfigsShow",
-        "title": "State configs: show"
+        "title": "State configs: show",
+        "icon": "$(eye)"
       },
       {
         "command": "xstateMachineOutline.setStateConfigsShowActive",
-        "title": "State configs: show"
+        "title": "State configs: show",
+        "icon": "$(eye)"
       },
       {
         "command": "xstateMachineOutline.setStateConfigsHide",
-        "title": "State configs: hide"
+        "title": "State configs: hide",
+        "icon": "$(eye-closed)"
       },
       {
         "command": "xstateMachineOutline.setStateConfigsHideActive",
-        "title": "State configs: hide"
+        "title": "State configs: hide",
+        "icon": "$(eye-closed)"
       },
       {
         "command": "xstateMachineOutline.toggleFollowCursor",

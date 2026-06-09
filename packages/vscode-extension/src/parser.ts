@@ -505,14 +505,12 @@ export class XStateMachineParser {
                     });
                 }
 
-                // Only include target in the parent label when it won't appear as a child node
-                const target = this.extractTransitionTarget(prop.initializer);
-                const hasTargetChild = children.some(c => c.type === 'target');
-                const label = (target && !hasTargetChild) ? `${eventName} → ${target}` : eventName;
-
+                // Targets always render as a child `target` node — uniform with
+                // onDone/onError/always — so the event label never inlines the
+                // target with an arrow.
                 transitions.push({
                     type: 'transition',
-                    label,
+                    label: eventName,
                     range: this.nodeToRange(prop, document),
                     uri: document.uri,
                     children: children.length > 0 ? children : undefined
@@ -599,25 +597,6 @@ export class XStateMachineParser {
         }
 
         return actions;
-    }
-
-    private static extractTransitionTarget(node: ts.Node): string | null {
-        if (ts.isStringLiteral(node)) {
-            return node.text;
-        }
-        if (ts.isObjectLiteralExpression(node)) {
-            const targetProp = this.findProperty(node, 'target');
-            if (targetProp && ts.isStringLiteral(targetProp)) {
-                return targetProp.text;
-            }
-        }
-        if (ts.isArrayLiteralExpression(node)) {
-            // Handle array of transitions - take first one
-            if (node.elements.length > 0) {
-                return this.extractTransitionTarget(node.elements[0]);
-            }
-        }
-        return null;
     }
 
     /** Read a string-literal `description` property, supporting plain and template (no-substitution) strings. */

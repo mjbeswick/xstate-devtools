@@ -851,8 +851,22 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
             md.appendText(node.description);
             return md;
         }
-        return `${node.type}: ${node.label}`;
+        // Human-readable type name; drop the label when it just repeats the type
+        // (e.g. "context: context", "setup: setup"). Append state-kind markers.
+        const typeName = XStateMachineTreeItem.TYPE_NAMES[node.type] ?? node.type;
+        const markers = this.getDescription();
+        const base = node.label === node.type || node.label === typeName
+            ? typeName
+            : `${typeName}: ${node.label}`;
+        return markers ? `${base} · ${markers}` : base;
     }
+
+    private static readonly TYPE_NAMES: Record<string, string> = {
+        machine: 'Machine', state: 'State', transition: 'Transition', target: 'Target',
+        action: 'Action', guard: 'Guard', entry: 'Entry action', exit: 'Exit action',
+        invoke: 'Invoke', context: 'Context', contextProperty: 'Context property',
+        actor: 'Actor', delay: 'Delay', setup: 'Setup', on: 'Events'
+    };
 
     private getIcon(hasError = false, hasWarning = false): vscode.ThemeIcon {
         let iconName = '';
