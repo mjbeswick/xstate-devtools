@@ -804,14 +804,16 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
 
             this.tooltip = this.buildTooltip(nodeDiagnostics);
             this.description = this.getDescription();
-            // State nodes use the bundled custom Harel-shape icons; everything
-            // else (and any node with a diagnostic, so the error/warning tint
-            // still shows) falls back to themed codicons.
-            const stateIcon = XStateMachineTreeItem.iconBase && !hasError && !hasWarning
-                ? this.stateIconFile()
-                : undefined;
-            this.iconPath = stateIcon
-                ? vscode.Uri.joinPath(XStateMachineTreeItem.iconBase!, stateIcon)
+            // State nodes use the bundled custom Harel-shape icons (per-theme
+            // grey variants); everything else (and any node with a diagnostic,
+            // so the error/warning tint still shows) falls back to themed codicons.
+            const base = XStateMachineTreeItem.iconBase;
+            const stateIcon = base && !hasError && !hasWarning ? this.stateIconFile() : undefined;
+            this.iconPath = stateIcon && base
+                ? {
+                    light: vscode.Uri.joinPath(base, 'light', stateIcon),
+                    dark: vscode.Uri.joinPath(base, 'dark', stateIcon),
+                }
                 : this.getIcon(hasError, hasWarning);
             
             // Store range and uri for navigation
