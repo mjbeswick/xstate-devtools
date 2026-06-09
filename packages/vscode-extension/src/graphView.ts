@@ -11,6 +11,9 @@ interface PanelEntry {
     // State (by label) to select once the diagram first renders — set when the
     // panel is opened from a specific tree/editor node.
     selectName?: string;
+    // Whether the webview HTML has been built yet. Once it has, model updates
+    // are pushed incrementally via `setModel` so the user's pan/zoom survives.
+    rendered?: boolean;
 }
 
 export class XStateGraphViewProvider {
@@ -55,7 +58,13 @@ export class XStateGraphViewProvider {
             XStateGraphViewProvider.viewType,
             `XState Graph: ${title}`,
             { viewColumn: vscode.ViewColumn.Active },
-            { enableScripts: true, localResourceRoots: [this.extensionUri] }
+            {
+                enableScripts: true,
+                localResourceRoots: [this.extensionUri],
+                // Keep the webview alive when hidden so switching editor tabs
+                // doesn't destroy the user's pan/zoom and re-run ELK layout.
+                retainContextWhenHidden: true,
+            }
         );
 
         const entry: PanelEntry = { panel, machine: machineNode, nodeById: new Map(), title, direction: this.autoDirection(machineNode), selectName };
@@ -63,9 +72,14 @@ export class XStateGraphViewProvider {
         this.activeKey = key;
 
         panel.onDidDispose(() => {
-            this.panels.delete(key);
-            if (this.activeKey === key) {
-                this.activeKey = [...this.panels.keys()].at(-1);
+            // Find by panel identity, not the original key — the key can change
+            // when the document is edited and the machine is re-derived.
+            for (const [k, e] of this.panels) {
+                if (e.panel === panel) {
+                    this.panels.delete(k);
+                    if (this.activeKey === k) { this.activeKey = [...this.panels.keys()].at(-1); }
+                    break;
+                }
             }
         });
 
@@ -117,6 +131,55 @@ export class XStateGraphViewProvider {
         for (const key of this.panels.keys()) { this.updatePanel(key); }
     }
 
+    /** True if any open diagram is rooted in the given document. */
+    public hasPanelForDocument(uri: vscode.Uri): boolean {
+        for (const entry of this.panels.values()) {
+            if (entry.machine.uri?.fsPath === uri.fsPath) { return true; }
+        }
+        return false;
+    }
+
+    /**
+     * Re-derive any open diagram rooted in `uri` from a freshly parsed machine
+     * list and push the update (incrementally, preserving the viewport). Called
+     * when the source document changes. Matching is by label, then nearest start
+     * line, since edits shift line numbers out from under the original key.
+     */
+    public updateForDocument(uri: vscode.Uri, machines: MachineNode[]) {
+        for (const [oldKey, entry] of [...this.panels.entries()]) {
+            if (entry.machine.uri?.fsPath !== uri.fsPath) { continue; }
+            const updated = this.matchMachine(entry.machine, machines);
+            if (!updated) { continue; }
+            entry.machine = updated;
+            // The key embeds the line number, which edits shift — re-key so
+            // re-opening the same machine still finds this panel.
+            const newKey = this.machineKey(updated);
+            if (newKey !== oldKey) {
+                this.panels.delete(oldKey);
+                this.panels.set(newKey, entry);
+                if (this.activeKey === oldKey) { this.activeKey = newKey; }
+            }
+            this.updatePanel(newKey);
+        }
+    }
+
+    // Find the parsed node corresponding to a previously-rendered one. Sub-diagrams
+    // are rooted at a nested state, so search the whole tree, not just top level.
+    private matchMachine(prev: MachineNode, machines: MachineNode[]): MachineNode | undefined {
+        const candidates: MachineNode[] = [];
+        const visit = (n: MachineNode) => {
+            if (n.label === prev.label && n.type === prev.type) { candidates.push(n); }
+            for (const c of n.children ?? []) { visit(c); }
+        };
+        for (const m of machines) { visit(m); }
+        if (candidates.length <= 1) { return candidates[0]; }
+        // Disambiguate same-named nodes by proximity to the original line.
+        const prevLine = prev.range?.start.line ?? 0;
+        return candidates.reduce((best, c) =>
+            Math.abs((c.range?.start.line ?? 0) - prevLine) < Math.abs((best.range?.start.line ?? 0) - prevLine) ? c : best
+        );
+    }
+
     // Event label clicked → select the matching transition node in the tree.
     // `eventName` is the rendered Harel label (EVENT [guard] / actions); the
     // transition node's own label is just the event, so match on that prefix.
@@ -160,7 +223,13 @@ export class XStateGraphViewProvider {
         const config = vscode.workspace.getConfiguration('xstateOutline');
         const reflectExpansion = config.get<boolean>('graphReflectsTreeExpansion', true);
         const payload = this.buildElements(entry.machine, reflectExpansion, entry.nodeById);
-        entry.panel.webview.html = this.getHtmlForWebview(entry.panel.webview, payload, entry.direction, entry.selectName);
+        if (entry.rendered) {
+            // Incremental update — preserve the webview's pan/zoom/selection.
+            entry.panel.webview.postMessage({ command: 'setModel', payload, direction: entry.direction });
+        } else {
+            entry.panel.webview.html = this.getHtmlForWebview(entry.panel.webview, payload, entry.direction, entry.selectName);
+            entry.rendered = true;
+        }
     }
 
     private buildElements(

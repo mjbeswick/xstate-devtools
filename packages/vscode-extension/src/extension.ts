@@ -654,11 +654,23 @@ export async function activate(context: vscode.ExtensionContext) {
         diagnosticCollection.delete(document.uri);
     });
 
+    let graphUpdateTimer: NodeJS.Timeout | undefined;
     const documentChangeListener = vscode.workspace.onDidChangeTextDocument((e) => {
         scheduleDiagnostics(e.document);
 
         if (vscode.window.activeTextEditor && e.document === vscode.window.activeTextEditor.document) {
             setImmediate(() => treeProvider.handleDocumentChange(e.document));
+        }
+
+        // Live-update any open diagram rooted in this document. Debounced and
+        // gated on an actually-open panel so we don't re-parse on every keystroke.
+        if (graphViewProvider.hasPanelForDocument(e.document.uri)) {
+            if (graphUpdateTimer) { clearTimeout(graphUpdateTimer); }
+            const doc = e.document;
+            graphUpdateTimer = setTimeout(() => {
+                graphUpdateTimer = undefined;
+                graphViewProvider.updateForDocument(doc.uri, XStateMachineParser.parseMachines(doc));
+            }, 300);
         }
     });
 

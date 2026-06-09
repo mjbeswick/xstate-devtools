@@ -36,7 +36,10 @@ const edgeMeta = new Map<string, { srcId: string; tgtId: string; lines: string[]
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const vscode = acquireVsCodeApi();
-const payload: GraphPayload = (window as unknown as { __GRAPH__: GraphPayload }).__GRAPH__;
+// Mutable so the host can push a fresh model (on source edit / tree expansion)
+// via a `setModel` message without reloading the whole webview — which would
+// destroy the user's pan/zoom.
+let payload: GraphPayload = (window as unknown as { __GRAPH__: GraphPayload }).__GRAPH__;
 const elk = new ELK();
 
 // Layout flow direction, toggled from the toolbar. 'DOWN' = top-to-bottom,
@@ -98,15 +101,22 @@ function nh(entry: string[], exit: string[], internal: string[] = []): number {
 }
 
 // ── Data indexes ──────────────────────────────────────────────────────────────
-const nodeById = new Map<string, NodeData>(payload.nodes.map(n => [n.data.id, n.data]));
+// Rebuilt from `payload` on load and on every `setModel` push.
+const nodeById = new Map<string, NodeData>();
 const childrenOf = new Map<string, string[]>();
-for (const n of payload.nodes) {
-    const k = n.data.parent ?? '__root__';
-    childrenOf.set(k, [...(childrenOf.get(k) ?? []), n.data.id]);
+const collapsed = new Set<string>();
+function loadModel(p: GraphPayload): void {
+    nodeById.clear(); childrenOf.clear(); collapsed.clear();
+    for (const n of p.nodes) { nodeById.set(n.data.id, n.data); }
+    for (const n of p.nodes) {
+        const k = n.data.parent ?? '__root__';
+        childrenOf.set(k, [...(childrenOf.get(k) ?? []), n.data.id]);
+    }
+    for (const id of p.collapsedIds ?? []) { collapsed.add(id); }
 }
+loadModel(payload);
 const childStateIds = (id: string) =>
     (childrenOf.get(id) ?? []).filter(cid => !nodeById.get(cid)?.start);
-const collapsed = new Set<string>(payload.collapsedIds ?? []);
 
 function visibleEndpoint(id: string): string {
     const chain: string[] = [];
@@ -265,7 +275,10 @@ function fitToScreen() {
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
-async function render(): Promise<void> {
+// `fit: true` re-fits the diagram to the viewport (first open, fit button,
+// direction change). Otherwise the user's current pan/zoom is preserved across
+// the rebuild — collapse/expand and live model updates must not yank the view.
+async function render(opts: { fit?: boolean } = {}): Promise<void> {
     // Call as a method so elkjs keeps its `this` binding; cast the argument
     // through unknown since our ElkNode shape differs from elkjs's typings.
     const graph = buildElkGraph() as unknown as Parameters<typeof elk.layout>[0];
@@ -774,8 +787,9 @@ async function render(): Promise<void> {
         }
     }
 
-    // Always re-fit so expanding/collapsing a node reveals the full diagram.
-    fitToScreen();
+    // Fit on demand; otherwise restore the prior pan/zoom onto the freshly
+    // rebuilt viewport group (which would otherwise sit at the identity).
+    if (opts.fit) { fitToScreen(); } else { applyTransform(); }
     // A selected node that survived this render keeps its focus ring; one that
     // vanished (e.g. hidden inside a state that was just collapsed) is dropped.
     if (selectedId && !geom.has(selectedId)) { selectedId = null; }
@@ -972,6 +986,15 @@ window.addEventListener('message', (event: MessageEvent) => {
         // moves, so the two never fight over a node's colours. A name that
         // isn't currently visible (e.g. inside a collapsed state) clears it.
         selectNode(idByName.get(msg.stateId) ?? null);
+    } else if (msg?.command === 'setModel') {
+        // Live model push (source edit, tree expansion). Swap the data and
+        // re-render in place, preserving the user's pan/zoom.
+        payload = msg.payload as GraphPayload;
+        loadModel(payload);
+        if (msg.direction === 'DOWN' || msg.direction === 'RIGHT') { direction = msg.direction; syncDirBtn(); }
+        render({ fit: false })
+            .then(() => { if (msg.select) { selectNode(idByName.get(msg.select) ?? selectedId); } })
+            .catch(showError);
     }
 });
 
@@ -1038,7 +1061,7 @@ dirBtn?.addEventListener('click', () => {
     syncDirBtn();
     // Persist host-side so the choice survives refreshes/re-renders.
     vscode.postMessage({ command: 'setDirection', direction });
-    render().catch(showError);
+    render({ fit: true }).catch(showError);
 });
 
 document.getElementById('btn-zoom-in')?.addEventListener('click',    () => zoomAround(1.25));
@@ -1059,7 +1082,7 @@ function showError(err: unknown): void {
     container.appendChild(pre);
 }
 
-render().then(() => {
+render({ fit: true }).then(() => {
     container.focus();
     // Select (and pan to) the node the panel was opened on, if any.
     if (initialSelect) { selectNode(idByName.get(initialSelect) ?? null); }
