@@ -13,6 +13,7 @@ import { XStateReferenceProvider, XStateRenameProvider } from './providers';
 import { XStateHoverProvider } from './hoverProvider';
 import { XStateGraphViewProvider } from './graphView';
 import { IncomingTreeProvider, IncomingRef } from './incomingView';
+import { TrailService, TrailTreeProvider, TrailEntry } from './trailView';
 
 let selectionTimeout: NodeJS.Timeout | undefined;
 
@@ -409,7 +410,15 @@ export async function activate(context: vscode.ExtensionContext) {
                     preview: false
                 });
                 const stateItem = treeProvider.findItemAtPosition(loc.range.start);
-                if (stateItem) {
+                // Record the forward jump on the trail: from the target's enclosing
+                // state to the destination state, via the transition's event.
+                if (stateItem?.node) {
+                    const fromState = treeProvider.findEnclosingState(treeItem.node);
+                    const via = treeProvider.findEnclosingTransition(treeItem.node)?.label;
+                    trail.recordForward(
+                        fromState ? trailEntryOf(fromState) : undefined,
+                        trailEntryOf(stateItem.node, via),
+                    );
                     treeView.reveal(stateItem, { select: true, focus: false, expand: true });
                 }
                 return true;
@@ -690,6 +699,13 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const graphViewProvider = new XStateGraphViewProvider(context.extensionUri, treeProvider);
 
+    // "Trail" — the path of states walked via target / incoming navigation. The
+    // service is created early so the Incoming command can record backward steps.
+    const trail = new TrailService();
+    const trailEntryOf = (node: MachineNode, via?: string): TrailEntry => ({
+        label: node.label, uri: node.uri, range: node.range, machineKey: treeProvider.machineKeyOf(node), via,
+    });
+
     // "Incoming" view — transitions that lead into the selected state.
     const incomingProvider = new IncomingTreeProvider(node => treeProvider.findMachineContaining(node));
     const incomingView = vscode.window.createTreeView('xstateMachineIncoming', { treeDataProvider: incomingProvider });
@@ -697,8 +713,16 @@ export async function activate(context: vscode.ExtensionContext) {
     const incomingOpenCommand = vscode.commands.registerCommand(
         'xstateMachineIncoming.open',
         async (ref: IncomingRef) => {
-            if (!ref?.uri || !ref?.range) { return; }
-            await vscode.window.showTextDocument(ref.uri, { selection: ref.range, preserveFocus: false, preview: false });
+            if (!ref?.sourceUri) { return; }
+            // Navigate backward to the source state, and prepend it to the trail.
+            const focal = incomingProvider.getFocalNode();
+            if (focal) {
+                trail.recordBackward(
+                    trailEntryOf(focal),
+                    { label: ref.sourceLabel, uri: ref.sourceUri, range: ref.sourceRange, machineKey: treeProvider.machineKeyOf(focal), via: ref.event },
+                );
+            }
+            await vscode.window.showTextDocument(ref.sourceUri, { selection: ref.sourceRange, preserveFocus: false, preview: false });
         }
     );
     const findIncomingCommand = vscode.commands.registerCommand(
@@ -708,6 +732,20 @@ export async function activate(context: vscode.ExtensionContext) {
             await vscode.commands.executeCommand('xstateMachineIncoming.focus');
         }
     );
+
+    // "Trail" view — backed by the TrailService created above.
+    const trailProvider = new TrailTreeProvider(trail);
+    const trailView = vscode.window.createTreeView('xstateMachineTrail', { treeDataProvider: trailProvider });
+
+    const trailOpenCommand = vscode.commands.registerCommand(
+        'xstateMachineTrail.open',
+        async (entry: TrailEntry, index: number) => {
+            if (!entry?.uri) { return; }
+            trail.goTo(index);
+            await vscode.window.showTextDocument(entry.uri, { selection: entry.range, preserveFocus: false, preview: false });
+        }
+    );
+    const trailClearCommand = vscode.commands.registerCommand('xstateMachineTrail.clear', () => trail.clear());
 
     // When the user clicks a node in the diagram, select the matching item in
     // the tree outline (instead of jumping to source). Revealing the item fires
@@ -729,6 +767,9 @@ export async function activate(context: vscode.ExtensionContext) {
         // Update the Incoming view to track the selected state.
         incomingProvider.setFocus(item.node);
         if (item.node.type === 'state') {
+            // Plain selection doesn't mutate the trail, but follows it if the
+            // state is already on it.
+            trail.markCurrentIfPresent(item.node.label, item.node.uri);
             graphViewProvider.highlightState(item.node.label);
         } else if (item.node.type === 'machine') {
             graphViewProvider.show(item.node, item.node.label);
@@ -807,6 +848,9 @@ export async function activate(context: vscode.ExtensionContext) {
         incomingView,
         incomingOpenCommand,
         findIncomingCommand,
+        trailView,
+        trailOpenCommand,
+        trailClearCommand,
         expandListener,
         collapseListener,
         treeSelectionListener,

@@ -54,6 +54,10 @@
         {
           "id": "xstateMachineIncoming",
           "name": "Incoming"
+        },
+        {
+          "id": "xstateMachineTrail",
+          "name": "Trail"
         }
       ]
     },
@@ -62,6 +66,11 @@
         "view": "xstateMachineIncoming",
         "contents": "Select a state in the Outline to see the transitions that lead into it.",
         "when": "!xstateIncoming.hasFocus"
+      },
+      {
+        "view": "xstateMachineTrail",
+        "contents": "Double-click a transition target to start a trail through the machine. Each jump is added; click any step to revisit it.",
+        "when": "!xstateTrail.hasEntries"
       },
       {
         "view": "xstateMachineOutline",
@@ -208,6 +217,15 @@
         "title": "Go to Transition"
       },
       {
+        "command": "xstateMachineTrail.open",
+        "title": "Go to State"
+      },
+      {
+        "command": "xstateMachineTrail.clear",
+        "title": "Clear Trail",
+        "icon": "$(clear-all)"
+      },
+      {
         "command": "xstateMachineOutline.filter",
         "title": "Filter",
         "icon": "$(search)"
@@ -308,6 +326,11 @@
     },
     "menus": {
       "view/title": [
+        {
+          "command": "xstateMachineTrail.clear",
+          "when": "view == xstateMachineTrail && xstateTrail.hasEntries",
+          "group": "navigation"
+        },
         {
           "command": "xstateMachineOutline.refresh",
           "when": "view == xstateMachineOutline",
@@ -456,6 +479,10 @@
         },
         {
           "command": "xstateMachineOutline.findIncoming",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineTrail.open",
           "when": "false"
         },
         {

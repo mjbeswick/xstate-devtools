@@ -4,11 +4,13 @@ import { normalizeTargetName } from './utils';
 
 /** A transition that targets the focal state. */
 export interface IncomingRef {
-    sourceLabel: string;   // the state that owns the transition
-    event: string;         // the transition label (event / always / after Nms / onDone)
-    uri: vscode.Uri;
-    range: vscode.Range;   // the transition's range, to navigate to
-    targetLabel: string;   // the focal state name (for the trail's backward record)
+    sourceLabel: string;       // the state that owns the transition
+    sourceUri: vscode.Uri;     // and where it's defined (the backward-jump destination)
+    sourceRange: vscode.Range;
+    event: string;             // the transition label (event / always / after Nms / onDone)
+    uri: vscode.Uri;           // the transition's own location
+    range: vscode.Range;
+    targetLabel: string;       // the focal state name (for the trail's backward record)
 }
 
 /**
@@ -23,7 +25,10 @@ export function findIncomingTransitions(machineRoot: MachineNode, focalName: str
         if (node.type === 'state' || node.type === 'machine') { s = node; t = null; }
         else if (node.type === 'transition') { t = node; }
         else if (node.type === 'target' && t && s && normalizeTargetName(node.label) === focalName) {
-            out.push({ sourceLabel: s.label, event: t.label, uri: t.uri, range: t.range, targetLabel: focalName });
+            out.push({
+                sourceLabel: s.label, sourceUri: s.uri, sourceRange: s.range,
+                event: t.label, uri: t.uri, range: t.range, targetLabel: focalName,
+            });
         }
         for (const c of node.children ?? []) { visit(c, s, t); }
     };
@@ -38,6 +43,7 @@ export class IncomingTreeProvider implements vscode.TreeDataProvider<IncomingRef
 
     private refs: IncomingRef[] = [];
     private focalLabel = '';
+    private focalNode: MachineNode | undefined;
 
     constructor(private readonly machineOf: (node: MachineNode) => MachineNode | undefined) {}
 
@@ -46,10 +52,12 @@ export class IncomingTreeProvider implements vscode.TreeDataProvider<IncomingRef
         if (!node || node.type !== 'state') {
             this.refs = [];
             this.focalLabel = '';
+            this.focalNode = undefined;
         } else {
             const machine = this.machineOf(node);
             const name = normalizeTargetName(node.label) || node.label;
             this.focalLabel = node.label;
+            this.focalNode = node;
             this.refs = machine ? findIncomingTransitions(machine, name) : [];
         }
         vscode.commands.executeCommand('setContext', 'xstateIncoming.hasFocus', !!this.focalLabel);
@@ -57,6 +65,7 @@ export class IncomingTreeProvider implements vscode.TreeDataProvider<IncomingRef
     }
 
     getFocalLabel(): string { return this.focalLabel; }
+    getFocalNode(): MachineNode | undefined { return this.focalNode; }
 
     getTreeItem(ref: IncomingRef): vscode.TreeItem {
         const item = new vscode.TreeItem(ref.sourceLabel);

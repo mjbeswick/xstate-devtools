@@ -179,6 +179,41 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
             m.uri.toString() === node.uri.toString() && m.range.contains(node.range));
     }
 
+    /** The deepest state/machine whose range contains `node` (its enclosing state). */
+    findEnclosingState(node: MachineNode): MachineNode | undefined {
+        const machine = this.findMachineContaining(node);
+        if (!machine) { return undefined; }
+        let best: MachineNode | undefined;
+        walkNodes(machine, n => {
+            if ((n.type === 'state' || n.type === 'machine') && n !== node
+                && n.uri.toString() === node.uri.toString() && n.range.contains(node.range)
+                && (!best || best.range.contains(n.range))) {
+                best = n;  // prefer the smallest (deepest) containing state
+            }
+        });
+        return best;
+    }
+
+    /** The transition whose range contains `node` (the event it travels on). */
+    findEnclosingTransition(node: MachineNode): MachineNode | undefined {
+        const machine = this.findMachineContaining(node);
+        if (!machine) { return undefined; }
+        let best: MachineNode | undefined;
+        walkNodes(machine, n => {
+            if (n.type === 'transition' && n.uri.toString() === node.uri.toString()
+                && n.range.contains(node.range) && (!best || best.range.contains(n.range))) {
+                best = n;
+            }
+        });
+        return best;
+    }
+
+    /** Stable identity of the machine containing a node (for trail scoping). */
+    machineKeyOf(node: MachineNode): string {
+        const m = this.findMachineContaining(node);
+        return m ? `${m.uri.fsPath}::${m.range.start.line}::${m.label}` : '';
+    }
+
     resolveTargetLocation(targetNode: MachineNode): { uri: vscode.Uri; range: vscode.Range } | undefined {
         const name = normalizeTargetName(targetNode.label);
         if (!name) { return undefined; }
