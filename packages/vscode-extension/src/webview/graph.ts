@@ -287,7 +287,50 @@ let lastW = 100, lastH = 100;
 container.tabIndex = 0;
 (container as HTMLElement).style.outline = 'none';
 let selectedId: string | null = null;
+// Whether the current selection shows the hover-style focus effect (connected
+// edges emphasized, the rest dimmed). Set for explicit in-diagram selection
+// (keyboard/click), but not passive cursor-sync or first-open selection.
+let emphasized = false;
 const nodeRectById = new Map<string, SVGElement>();
+
+// Edge index for the hover/selection focus effect — rebuilt each render(), but
+// declared at module scope so keyboard/click selection (module-level functions)
+// can drive the same emphasis as hover.
+interface EdgeEntry { path: SVGElement; labelG: SVGElement | null }
+let allEdges: EdgeEntry[] = [];
+let nodeEdgeMap = new Map<string, EdgeEntry[]>();
+
+function resetEdgeStyles() {
+    for (const { path, labelG } of allEdges) {
+        path.setAttribute('stroke-opacity', '0.7');
+        path.setAttribute('stroke-width', '1.5');
+        path.setAttribute('opacity', '1');  // clear any dim
+        if (labelG) { labelG.setAttribute('opacity', '1'); }
+    }
+}
+// Emphasize a node's connected edges and dim the rest — the focus effect shared
+// by hover and selection.
+function emphasizeNode(id: string) {
+    const mine = new Set(nodeEdgeMap.get(id) ?? []);
+    for (const e of allEdges) {
+        if (mine.has(e)) {
+            e.path.setAttribute('opacity', '1');
+            e.path.setAttribute('stroke-opacity', '0.95');
+            e.path.setAttribute('stroke-width', '2');
+        } else {
+            // Fade element opacity (not just stroke-opacity) so the arrowhead
+            // marker dims with the line instead of staying solid.
+            e.path.setAttribute('opacity', '0.12');
+            if (e.labelG) { e.labelG.setAttribute('opacity', '0.15'); }
+        }
+    }
+}
+// Reset all edges, then re-assert the selected node's emphasis — so hovering
+// away from a state restores the selection's focus effect instead of clearing it.
+function refreshEdgeEmphasis() {
+    resetEdgeStyles();
+    if (emphasized && selectedId) { emphasizeNode(selectedId); }
+}
 
 const zoomReadout = document.getElementById('btn-zoom-reset');
 function applyTransform() {
@@ -368,25 +411,16 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
     collectGeom(result, 0, 0);
 
     // Per-node edge lists populated during edge drawing — closures in drawNode
-    // read these after edge drawing completes.
-    interface EdgeEntry { path: SVGElement; labelG: SVGElement | null }
-    const allEdges: EdgeEntry[] = [];
-    const nodeEdgeMap = new Map<string, EdgeEntry[]>();
+    // read these after edge drawing completes. Reset the module-level index each
+    // render so selection/hover emphasis operates on the current edges.
+    allEdges = [];
+    nodeEdgeMap = new Map<string, EdgeEntry[]>();
     function registerEdge(srcId: string, tgtId: string, entry: EdgeEntry) {
         allEdges.push(entry);
         for (const id of [srcId, tgtId]) {
             const arr = nodeEdgeMap.get(id) ?? [];
             arr.push(entry);
             nodeEdgeMap.set(id, arr);
-        }
-    }
-
-    function resetEdgeStyles() {
-        for (const { path, labelG } of allEdges) {
-            path.setAttribute('stroke-opacity', '0.7');
-            path.setAttribute('stroke-width', '1.5');
-            path.setAttribute('opacity', '1');  // clear any hover dim
-            if (labelG) { labelG.setAttribute('opacity', '1'); }
         }
     }
 
@@ -472,19 +506,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                 g.addEventListener('mouseenter', () => {
                     regionRect.setAttribute('stroke-width', '2');
                     regionRect.setAttribute('stroke-opacity', '0.9');
-                    const mine = new Set(nodeEdgeMap.get(n.id) ?? []);
-                    for (const e of allEdges) {
-                        if (mine.has(e)) {
-                            e.path.setAttribute('opacity', '1');
-                            e.path.setAttribute('stroke-opacity', '0.95');
-                            e.path.setAttribute('stroke-width', '2');
-                        } else {
-                            // Fade element opacity (not just stroke-opacity) so the
-                            // arrowhead marker dims with the line instead of staying solid.
-                            e.path.setAttribute('opacity', '0.12');
-                            if (e.labelG) { e.labelG.setAttribute('opacity', '0.15'); }
-                        }
-                    }
+                    emphasizeNode(n.id);
                 });
                 const restW = isParallel ? '1.6' : '1.5';
                 const restO = isParallel ? '0.75' : '0.6';
@@ -492,7 +514,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                     regionRect.setAttribute('stroke-width', restW);
                     regionRect.setAttribute('stroke-opacity', restO);
                     applyNodeStyle(n.id);  // re-assert selection colours if selected
-                    resetEdgeStyles();
+                    refreshEdgeEmphasis();  // restore the selected node's emphasis, if any
                 });
                 gBack.appendChild(g);
             } else if (d.ghost) {
@@ -575,23 +597,11 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                 g.addEventListener('mouseenter', () => {
                     rect.setAttribute('stroke-width', '2');
                     rect.setAttribute('stroke-opacity', '1');
-                    const mine = new Set(nodeEdgeMap.get(n.id) ?? []);
-                    for (const e of allEdges) {
-                        if (mine.has(e)) {
-                            e.path.setAttribute('opacity', '1');
-                            e.path.setAttribute('stroke-opacity', '0.95');
-                            e.path.setAttribute('stroke-width', '2');
-                        } else {
-                            // Fade element opacity (not just stroke-opacity) so the
-                            // arrowhead marker dims with the line instead of staying solid.
-                            e.path.setAttribute('opacity', '0.12');
-                            if (e.labelG) { e.labelG.setAttribute('opacity', '0.15'); }
-                        }
-                    }
+                    emphasizeNode(n.id);
                 });
                 g.addEventListener('mouseleave', () => {
                     applyNodeStyle(n.id);  // restore default or selection colours
-                    resetEdgeStyles();
+                    refreshEdgeEmphasis();  // restore the selected node's emphasis, if any
                 });
                 gNodes.appendChild(g);
             }
@@ -849,6 +859,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
     // vanished (e.g. hidden inside a state that was just collapsed) is dropped.
     if (selectedId && !geom.has(selectedId)) { selectedId = null; }
     applyNodeStyle(selectedId);
+    refreshEdgeEmphasis();  // re-assert the selected node's edge emphasis on the rebuilt edges
 }
 
 // ── Keyboard navigation ─────────────────────────────────────────────────────
@@ -901,11 +912,15 @@ function ensureSelectedVisible() {
     applyTransform();
 }
 
-function selectNode(id: string | null) {
+// `emphasize` (default true) gives an explicit selection the hover-style focus
+// effect. Passive selection (cursor sync, first open) passes false — just the ring.
+function selectNode(id: string | null, emphasize = true) {
     const prev = selectedId;
     selectedId = id;
+    emphasized = emphasize && !!id;
     if (prev && prev !== id) { applyNodeStyle(prev); }  // revert old to default
     if (id) { applyNodeStyle(id); }                     // paint new as selected
+    refreshEdgeEmphasis();
     ensureSelectedVisible();
 }
 
@@ -969,6 +984,7 @@ container.addEventListener('keydown', (ev) => {
     if (k === '[' || k === '-' || k === '_') { zoomAround(1 / 1.25); ev.preventDefault(); return; }
     if (k === '0' || k === '.') { fitToScreen(); ev.preventDefault(); return; }
     if (k === '1') { actualSize(); ev.preventDefault(); return; }
+    if (k === 'Escape') { if (selectedId) { selectNode(null); ev.preventDefault(); } return; }
     const dir = ARROW[k];
     if (dir) {
         ev.preventDefault();
@@ -1042,7 +1058,8 @@ window.addEventListener('message', (event: MessageEvent) => {
         // Cursor sync from the editor sets the SAME active node the keyboard
         // moves, so the two never fight over a node's colours. A name that
         // isn't currently visible (e.g. inside a collapsed state) clears it.
-        selectNode(idByName.get(msg.stateId) ?? null);
+        // Passive (no edge emphasis) so editing doesn't flicker the diagram.
+        selectNode(idByName.get(msg.stateId) ?? null, false);
     } else if (msg?.command === 'setModel') {
         // Live model push (source edit, tree expansion). Swap the data and
         // re-render in place, preserving the user's pan/zoom.
@@ -1050,7 +1067,7 @@ window.addEventListener('message', (event: MessageEvent) => {
         loadModel(payload);
         if (msg.direction === 'DOWN' || msg.direction === 'RIGHT') { direction = msg.direction; syncDirBtn(); }
         render({ fit: false })
-            .then(() => { if (msg.select) { selectNode(idByName.get(msg.select) ?? selectedId); } })
+            .then(() => { if (msg.select) { selectNode(idByName.get(msg.select) ?? selectedId, false); } })
             .catch(showError);
     }
 });
@@ -1146,5 +1163,5 @@ render({ fit: true }).then(() => {
     fitWhenReady();
     container.focus();
     // Select (and pan to) the node the panel was opened on, if any.
-    if (initialSelect) { selectNode(idByName.get(initialSelect) ?? null); }
+    if (initialSelect) { selectNode(idByName.get(initialSelect) ?? null, false); }
 }).catch(showError);
