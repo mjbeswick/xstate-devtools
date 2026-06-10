@@ -66,9 +66,9 @@ const C = {
     selBg:  themeVar('--vscode-list-activeSelectionBackground', '#cce5ff'),
     desc:   themeVar('--vscode-descriptionForeground',          '#717171'),
     accent: themeVar('--vscode-charts-blue',                    '#3b82f6'),
-    // State-kind accents, mirroring the tree outline's icon colours so the two
-    // views read consistently: green initial, red final, blue parallel.
-    stInitial:  themeVar('--vscode-charts-green',  '#39a35a'),
+    // State-kind accents, mirroring the tree outline's icon colours: red final,
+    // blue parallel. The initial dot uses the foreground colour (the Harel solid
+    // black dot — black on light themes, adapting to white on dark).
     stFinal:    themeVar('--vscode-charts-red',    '#d24b4b'),
     stParallel: themeVar('--vscode-charts-blue',   '#3b82f6'),
 };
@@ -413,7 +413,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
             }
 
             if (d.start) {
-                g.appendChild(el('circle', { cx: ax + w/2, cy: ay + h/2, r: 6, fill: C.stInitial }));
+                g.appendChild(el('circle', { cx: ax + w/2, cy: ay + h/2, r: 6, fill: C.fg }));
                 gNodes.appendChild(g);
             } else if (d.history) {
                 // History pseudostate: circle with H (shallow) or H* (deep).
