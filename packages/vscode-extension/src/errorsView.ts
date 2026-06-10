@@ -68,8 +68,10 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
     private readonly _onDidChangeTreeData = new vscode.EventEmitter<ErrorNode | void>();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-    /** Latest validated diagnostics in scope, keyed by canonical file path
-     * (fsPath) so a file arriving under two URI representations can't double up. */
+    /** Validated diagnostics for every in-scope file, keyed by canonical file
+     * path (fsPath) so a file arriving under two URI representations can't double
+     * up. Doubles as the validation cache: entries (including clean, empty ones)
+     * are reused across refreshes when the document version is unchanged. */
     private results = new Map<string, FileDiagnostics>();
     private grouping: ErrorsGrouping;
     private filter: ErrorsFilter;
@@ -141,21 +143,25 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
     async refresh(): Promise<void> {
         const next = new Map<string, FileDiagnostics>();
 
+        // Store every validated file — including clean ones (empty diagnostics) —
+        // so the version check in validateUri can skip re-parsing unchanged
+        // documents on the next refresh. Empty entries are ignored at render time.
         if (this.getScope() === 'workspace') {
             for (const fm of this.workspaceScanner.getCached()) {
                 const entry = await this.validateUri(fm.uri, fm.relativePath);
-                if (entry && entry.diagnostics.length > 0) { next.set(fm.uri.fsPath, entry); }
+                if (entry) { next.set(fm.uri.fsPath, entry); }
             }
         } else {
             const editor = vscode.window.activeTextEditor;
             if (editor && isSupportedXStateDocument(editor.document)) {
                 const relativePath = vscode.workspace.asRelativePath(editor.document.uri, false);
-                const diagnostics = dedupeDiagnostics(validateXStateDocument(editor.document));
-                if (diagnostics.length > 0) {
-                    next.set(editor.document.uri.fsPath, {
-                        uri: editor.document.uri, relativePath, version: editor.document.version, diagnostics,
-                    });
-                }
+                const cached = this.results.get(editor.document.uri.fsPath);
+                const diagnostics = cached && cached.version === editor.document.version
+                    ? cached.diagnostics
+                    : dedupeDiagnostics(validateXStateDocument(editor.document));
+                next.set(editor.document.uri.fsPath, {
+                    uri: editor.document.uri, relativePath, version: editor.document.version, diagnostics,
+                });
             }
         }
 
