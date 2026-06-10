@@ -19,13 +19,23 @@
 - **Full machine tree** — nested & parallel states, transitions, targets, entry/exit/transition actions, guards, invokes, actors, delays, context, and XState v5 `setup` implementations
 - **Smart navigation** — click to jump to source; double-click an action or guard to jump to its implementation, or a transition target to jump to the destination state (or press **F12**)
 - **Cursor sync** — the tree highlights the node matching your editor cursor
-- **Transitions panel** — select a state to see every edge touching it, the icon showing direction: **`←`** incoming (a transition that leads in) and **`→`** outgoing (a transition out). Click any row to jump to the other state. Below the arrows, a **Trail** of states (filled/outline circles, current tinted) builds as you navigate — following a transition adds a step; click any step to revisit it without losing the path, or clear it anytime
+- **Transitions panel** — select a state to see every edge touching it, the icon showing direction: **`←`** incoming (a transition that leads in) and **`→`** outgoing (a transition out). Click any row to jump to the other state — it becomes the selected state and the panel updates to show _its_ transitions, so you can walk the machine edge by edge
 - **Search** — a dedicated search box (styled like the Extensions view) with type filtering and keyboard navigation
 
 ### ✏️ Editing & authoring
 - **Context-aware autocomplete** — suggests valid machine, state, transition, invoke, and setup properties, plus valid target / action / guard / actor references
 - **Tree editing** — add, rename, and delete states, transitions, and references straight from the outline
 - **Invalid property highlighting** — unknown config properties show up in the tree with a red error icon
+
+### 🚦 Errors pane
+A dedicated **Errors** view collects every problem the static analyzer finds across your machines — also shown inline as editor squiggles.
+
+- **What it catches** — unreachable / orphaned states, unknown action / guard / actor references (not defined in `setup()`), duplicate explicit `id`s, invalid config properties, the deprecated `cond`, and unused `setup` entries
+- **Real vs. soft** — genuine runtime failures (unknown references, duplicate ids) are **errors**; static heuristics (unreachable state, invalid property) are **warnings**; deprecations and unused-setup entries are informational
+- **Severity filter** — show **all**, **warnings & errors** (the default), or **errors only** to focus on what actually fails at runtime
+- **Grouping** — organize problems **by file**, **by severity**, or as a **flat list**, from the title-bar menu
+- **Navigate & copy** — click a problem to jump to its source; copy a single issue or a whole group (right-click or **Ctrl/Cmd+C**)
+- **At a glance** — a badge shows the total count, and the pane follows the outline's file/workspace scope
 
 ### 🗺️ Statechart diagram
 - **Visual statechart** — render any machine (or any compound state) as a Harel-style diagram in its own editor tab via **View State Diagram** (from the outline _or_ by right-clicking a machine/state in the code)
@@ -134,6 +144,8 @@ const machine = setup({
 | `xstateOutline.graphReflectsTreeExpansion` | `true` | Make the diagram render only the states expanded in the outline |
 | `xstateOutline.groupEventHandlers` | `false` | Group a state's event-handler transitions under an `on` node |
 | `xstateOutline.sortChildren` | `original` | Order child nodes by source order (`original`) or alphabetically (`sorted`) |
+| `xstateOutline.errorsGrouping` | `file` | How the Errors pane groups problems: `file`, `severity`, or `flat` |
+| `xstateOutline.errorsFilter` | `warning` | Minimum severity shown in the Errors pane: `all`, `warning` (warnings & errors), or `error` |
 
 ## Requirements
 
