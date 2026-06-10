@@ -54,8 +54,8 @@ The example above shows a parallel `checkout` machine: the dashed outer box with
 | Filled dot → state | The initial state of a region |
 | Box with a double outline | A final state |
 | **Dashed** box with a `parallel` tag | A parallel (orthogonal) state — its regions run concurrently |
-| Box with a `▸` chevron | A collapsed compound state (click to expand) |
-| Outline box with a `▾` title bar | An expanded region (click the title bar to collapse) |
+| Box with a `⊞` (plus) square | A collapsed compound state (click to expand) |
+| Region with a `⊟` (minus) title bar | An expanded region (click the title bar to collapse) |
 | Outer titled box | The machine itself |
 | Curved arrow with a label | A transition, labelled `EVENT [guard] / actions` |
 | `entry/ …` and `exit/ …` inside a box | The state's entry/exit actions |

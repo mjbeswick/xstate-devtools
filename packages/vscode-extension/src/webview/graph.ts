@@ -152,10 +152,9 @@ function buildElkNode(id: string): ElkNode {
     const states = childStateIds(id);
     const isRegion = states.length > 0 && !collapsed.has(id);
     if (!isRegion) {
-        // Render prepends a '▸ ' disclosure chevron to collapsed parents —
-        // measure it too so the glyph never overflows the box border.
-        const isCollapsedParent = states.length > 0 && collapsed.has(id);
-        const display = (isCollapsedParent ? '▸ ' : '') + d.label;
+        // Collapsed parents get a left-anchored '+' toggle square, drawn at render
+        // time; the title's clip width is narrowed there to leave room for it.
+        const display = d.label;
         // Compartment rows below the title: internal transitions + invoked services.
         const extraRows = [...(d.internalTransitions ?? []), ...(d.invokes ?? []).map(s => `invoke ${s}`)];
         return {
@@ -268,6 +267,23 @@ function clipTxt(full: string, x: number, y: number, maxW: number, px: number, a
     const t = txt(c.text, x, y, attrs);
     if (c.clipped) { const ti = el('title'); ti.textContent = full; t.appendChild(ti); }
     return t;
+}
+// A small rounded-square +/− toggle, mirroring the toolbar's expand/collapse
+// icons. Drawn (not a glyph) so the +/− sits inset from the border with padding.
+// `kind`: 'plus' = collapsed (click to expand), 'minus' = expanded (click to
+// collapse). Centred on (cx, cy).
+function toggleSquare(cx: number, cy: number, kind: 'plus' | 'minus'): SVGElement {
+    const S = 11, r = S / 2, pad = 3, a = r - pad;
+    const g = el('g');
+    g.appendChild(el('rect', {
+        x: cx - r, y: cy - r, width: S, height: S, rx: 2.5, ry: 2.5,
+        fill: 'none', stroke: C.desc, 'stroke-width': 1.1,
+    }));
+    g.appendChild(el('line', { x1: cx - a, y1: cy, x2: cx + a, y2: cy, stroke: C.desc, 'stroke-width': 1.1 }));
+    if (kind === 'plus') {
+        g.appendChild(el('line', { x1: cx, y1: cy - a, x2: cx, y2: cy + a, stroke: C.desc, 'stroke-width': 1.1 }));
+    }
+    return g;
 }
 
 // ── Viewport ──────────────────────────────────────────────────────────────────
@@ -477,10 +493,8 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                     x1: ax+1, y1: ay+REGION_H, x2: ax+w-1, y2: ay+REGION_H,
                     stroke: C.fg, 'stroke-width': 0.75, 'stroke-opacity': 0.35,
                 }));
-                // Disclosure chevron marks the header as an expand/collapse target.
-                g.appendChild(txt('▾', ax+12, ay+REGION_H-9, {
-                    'text-anchor': 'middle', 'font-size': 10, fill: C.desc,
-                }));
+                // Left-anchored minus square marks the header as collapsible.
+                g.appendChild(toggleSquare(ax+13, ay+REGION_H/2, 'minus'));
                 g.appendChild(clipTxt(d.label, ax+w/2, ay+REGION_H-9, w-56, 12, {
                     'text-anchor': 'middle', 'font-size': 12, 'font-weight': 'bold',
                 }, 'bold'));
@@ -555,12 +569,15 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                 const exit  = d.exitActions  ?? [];
                 const internal = d.internalTransitions ?? [];
                 const invokes = d.invokes ?? [];
-                const label = (isCollapsed && hasChildren ? '▸ ' : '') + d.label;
+                const collapsedToggle = isCollapsed && hasChildren;
+                const label = d.label;
+                const titleW = collapsedToggle ? w - 40 : w - 16;  // leave room for the left '+' toggle
                 if (entry.length > 0 || exit.length > 0 || internal.length > 0 || invokes.length > 0) {
                     const labelY = ay + NODE_V_PAD + LABEL_PX;
-                    g.appendChild(clipTxt(label, ax+w/2, labelY, w-16, LABEL_PX, {
+                    g.appendChild(clipTxt(label, ax+w/2, labelY, titleW, LABEL_PX, {
                         'text-anchor': 'middle', 'font-size': LABEL_PX, 'font-weight': '500',
                     }, '500'));
+                    if (collapsedToggle) { g.appendChild(toggleSquare(ax+13, labelY - LABEL_PX/2 + 1, 'plus')); }
                     const divY = labelY + NODE_V_PAD / 2;
                     g.appendChild(el('line', {
                         x1: ax+1, y1: divY, x2: ax+w-1, y2: divY,
@@ -589,9 +606,10 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                         lineY += ACTION_LINE_H;
                     }
                 } else {
-                    g.appendChild(clipTxt(label, ax+w/2, ay + h/2 + LABEL_PX/2 - 1, w-16, LABEL_PX, {
+                    g.appendChild(clipTxt(label, ax+w/2, ay + h/2 + LABEL_PX/2 - 1, titleW, LABEL_PX, {
                         'text-anchor': 'middle', 'font-size': LABEL_PX, 'font-weight': '500',
                     }, '500'));
+                    if (collapsedToggle) { g.appendChild(toggleSquare(ax+13, ay + h/2, 'plus')); }
                 }
                 // Hover: highlight connected edges + thicken border
                 g.addEventListener('mouseenter', () => {
