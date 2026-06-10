@@ -54,19 +54,18 @@ function findOutgoing(focal: MachineNode, resolve: ResolveTarget, machineKey: st
     return out;
 }
 
-type Group = { kind: 'group'; id: 'transitions' | 'trail' };
 type TxRow = { kind: 'tx'; ref: TransitionRef };
 type TrailRow = { kind: 'trail'; entry: TrailEntry };
 type Hint = { kind: 'hint'; text: string };
-type NavNode = Group | TxRow | TrailRow | Hint;
+type NavNode = TxRow | TrailRow | Hint;
 
 const arrowIn = 'arrow-small-left';
 const arrowOut = 'arrow-small-right';
 
 /**
- * Combined "Transitions" pane. Two groups, one arrow language (← in/back,
- * → out/forward): the **Transitions** of the selected state, and the **Trail**
- * of states walked while navigating.
+ * Combined "Transitions" pane — a single flat list, no group headers. The icon
+ * carries the meaning: ← incoming / → outgoing transitions of the selected
+ * state, then the navigation Trail as filled/outline circles (current tinted).
  */
 export class NavigatorTreeProvider implements vscode.TreeDataProvider<NavNode> {
     private readonly _onDidChangeTreeData = new vscode.EventEmitter<NavNode | void>();
@@ -104,32 +103,18 @@ export class NavigatorTreeProvider implements vscode.TreeDataProvider<NavNode> {
     }
 
     getChildren(el?: NavNode): NavNode[] {
-        if (!el) {
-            return [{ kind: 'group', id: 'transitions' }, { kind: 'group', id: 'trail' }];
+        if (el) { return []; }  // flat list
+        const rows: NavNode[] = [
+            ...this.transitions.map(ref => ({ kind: 'tx', ref }) as TxRow),
+            ...this.trail.getEntries().map(entry => ({ kind: 'trail', entry }) as TrailRow),
+        ];
+        if (rows.length === 0) {
+            rows.push({ kind: 'hint', text: this.focalNode ? 'No transitions' : 'Select a state to see its transitions' });
         }
-        if (el.kind === 'group' && el.id === 'transitions') {
-            if (!this.focalNode) { return [{ kind: 'hint', text: 'Select a state to see its transitions' }]; }
-            if (this.transitions.length === 0) { return [{ kind: 'hint', text: 'No transitions' }]; }
-            return this.transitions.map(ref => ({ kind: 'tx', ref }) as TxRow);
-        }
-        if (el.kind === 'group' && el.id === 'trail') {
-            const entries = this.trail.getEntries();
-            if (entries.length === 0) { return [{ kind: 'hint', text: 'Navigate a transition to start a trail' }]; }
-            return entries.map(entry => ({ kind: 'trail', entry }) as TrailRow);
-        }
-        return [];
+        return rows;
     }
 
     getTreeItem(node: NavNode): vscode.TreeItem {
-        if (node.kind === 'group') {
-            const item = new vscode.TreeItem(
-                node.id === 'transitions' ? 'Transitions' : 'Trail',
-                vscode.TreeItemCollapsibleState.Expanded,
-            );
-            item.contextValue = `group-${node.id}`;
-            if (node.id === 'transitions' && this.focalNode) { item.description = this.focalNode.label; }
-            return item;
-        }
         if (node.kind === 'hint') {
             const item = new vscode.TreeItem(node.text);
             item.description = '';
@@ -146,16 +131,16 @@ export class NavigatorTreeProvider implements vscode.TreeDataProvider<NavNode> {
             item.command = { command: 'xstateNavigator.openTransition', title: 'Go to state', arguments: [r] };
             return item;
         }
-        // trail row
+        // trail row — circles (not arrows) so trail steps read distinctly from
+        // the ←/→ transition rows; the current step is filled and tinted.
         const entries = this.trail.getEntries();
         const index = entries.indexOf(node.entry);
         const isCurrent = index === this.trail.getCurrent();
         const e = node.entry;
-        const arrow = e.direction === 'backward' ? arrowIn : e.direction === 'forward' ? arrowOut : 'circle-small-filled';
         const item = new vscode.TreeItem(e.label);
         item.iconPath = isCurrent
-            ? new vscode.ThemeIcon(arrow, new vscode.ThemeColor('charts.blue'))
-            : new vscode.ThemeIcon(arrow);
+            ? new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('charts.blue'))
+            : new vscode.ThemeIcon('circle-outline');
         item.description = isCurrent ? [e.via, 'current'].filter(Boolean).join(' · ') : e.via;
         item.tooltip = `${e.label}${e.via ? ` (via ${e.via})` : ''}${isCurrent ? ' — current' : ''}`;
         item.command = { command: 'xstateMachineTrail.open', title: 'Go to state', arguments: [e, index] };
