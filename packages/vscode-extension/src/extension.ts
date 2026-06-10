@@ -712,7 +712,7 @@ export async function activate(context: vscode.ExtensionContext) {
         workspaceScanner,
         initialErrorsGrouping,
     );
-    const errorsView = vscode.window.createTreeView('xstateMachineErrors', { treeDataProvider: errorsProvider });
+    const errorsView = vscode.window.createTreeView('xstateMachineErrors', { treeDataProvider: errorsProvider, showCollapseAll: true });
 
     let errorsRefreshTimer: NodeJS.Timeout | undefined;
     const refreshErrors = (delay = 300) => {
