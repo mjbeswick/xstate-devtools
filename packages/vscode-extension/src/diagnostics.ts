@@ -241,7 +241,7 @@ function validateActionProperty(node: ts.Expression | undefined, context: Valida
 
         context.diagnostics.push(createDiagnostic(
             nodeRange(context.document, candidate.node),
-            `Unknown action reference '${candidate.name}' in setup().`,
+            `Action '${candidate.name}' is not defined in setup({ actions }). Add it there, or pass the action inline.`,
             XSTATE_DIAGNOSTIC_CODES.unknownAction,
             vscode.DiagnosticSeverity.Error
         ));
@@ -266,7 +266,7 @@ function validateGuardProperty(node: ts.Expression | undefined, context: Validat
 
     context.diagnostics.push(createDiagnostic(
         nodeRange(context.document, candidate.node),
-        `Unknown guard reference '${candidate.name}' in setup().`,
+        `Guard '${candidate.name}' is not defined in setup({ guards }). Add it there, or pass the guard inline.`,
         XSTATE_DIAGNOSTIC_CODES.unknownGuard,
         vscode.DiagnosticSeverity.Error
     ));
@@ -290,7 +290,7 @@ function validateActorProperty(node: ts.Expression | undefined, context: Validat
 
     context.diagnostics.push(createDiagnostic(
         nodeRange(context.document, candidate.node),
-        `Unknown actor reference '${candidate.name}' in setup().`,
+        `Actor '${candidate.name}' is not defined in setup({ actors }). Add it there, or pass the actor inline.`,
         XSTATE_DIAGNOSTIC_CODES.unknownActor,
         vscode.DiagnosticSeverity.Error
     ));
@@ -613,11 +613,23 @@ function validateInvalidProperties(
 
         const diagnostic = createDiagnostic(
             propertyNameRange(context.document, property.name),
-            `Invalid ${objectContext} property '${propertyName}'.`,
+            invalidPropertyMessage(objectContext, propertyName),
             XSTATE_DIAGNOSTIC_CODES.invalidProperty
         );
         context.diagnostics.push(diagnostic);
     }
+}
+
+/** Message for an invalid property — tailored for common, easily-fixed mistakes. */
+function invalidPropertyMessage(objectContext: XStateObjectContext, propertyName: string): string {
+    if ((objectContext === 'state' || objectContext === 'machine') && propertyName === 'actions') {
+        return `'actions' is not valid on a ${objectContext} and will not run. Use 'entry' or 'exit' to run actions on the ${objectContext}, or move them into a transition.`;
+    }
+    if (propertyName === 'onEntry' || propertyName === 'onExit') {
+        const replacement = propertyName === 'onEntry' ? 'entry' : 'exit';
+        return `'${propertyName}' is a v4 property; use '${replacement}' in XState v5.`;
+    }
+    return `Invalid ${objectContext} property '${propertyName}'.`;
 }
 
 function collectSetupReferences(setupConfig: ts.ObjectLiteralExpression, document: vscode.TextDocument): SetupReferences {
@@ -664,7 +676,7 @@ function collectSetupSectionKeys(setupConfig: ts.ObjectLiteralExpression, sectio
 function collectActionReferences(node: ts.Expression): ReferenceCandidate[] {
     if (ts.isArrayLiteralExpression(node)) {
         return node.elements.flatMap((element) => {
-            if (ts.isStringLiteralLike(element) || ts.isIdentifier(element)) {
+            if (ts.isStringLiteralLike(element)) {
                 return [{ name: element.text, node: element }];
             }
 
@@ -694,8 +706,11 @@ function collectActionObjectReference(node: ts.ObjectLiteralExpression): Referen
     return candidate ? [candidate] : [];
 }
 
+// Only *string* references name a setup() entry (`guard: 'foo'`). A bare identifier
+// (`guard: foo`) is an inline implementation that needs no setup registration — the
+// TypeScript server already validates that the identifier resolves.
 function collectSimpleReference(node: ts.Node): ReferenceCandidate | undefined {
-    if (ts.isStringLiteralLike(node) || ts.isIdentifier(node)) {
+    if (ts.isStringLiteralLike(node)) {
         return { name: node.text, node };
     }
 

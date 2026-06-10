@@ -117,6 +117,28 @@ describe('unreachable-state reachability walk', () => {
         expect(byCode(XSTATE_DIAGNOSTIC_CODES.unreachableState)?.severity).toBe(vscode.DiagnosticSeverity.Warning);
     });
 
+    it('does not flag inline action/guard implementations passed by identifier', () => {
+        // `guard: isReady` / `entry: logIt` reference local functions directly — inline
+        // implementations, not setup() names — so they must not be reported as unknown.
+        const src = `
+            import { setup } from 'xstate';
+            const isReady = () => true;
+            const logIt = () => {};
+            export const m = setup({ actions: {}, guards: {} }).createMachine({
+                initial: 'idle',
+                states: {
+                    idle: {
+                        entry: logIt,
+                        on: { GO: { target: 'idle', guard: isReady, actions: [logIt] } },
+                    },
+                },
+            });
+        `;
+        const codes = validateXStateDocument(makeDoc(src)).map(d => d.code);
+        expect(codes).not.toContain(XSTATE_DIAGNOSTIC_CODES.unknownGuard);
+        expect(codes).not.toContain(XSTATE_DIAGNOSTIC_CODES.unknownAction);
+    });
+
     it('recognizes setup actions defined with method-shorthand or shorthand syntax', () => {
         // logError uses method shorthand; ping uses shorthand property — both are
         // valid XState v5 setup forms and must not be reported as unknown.
