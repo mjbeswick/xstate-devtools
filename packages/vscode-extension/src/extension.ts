@@ -668,6 +668,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
         if (vscode.window.activeTextEditor && e.document === vscode.window.activeTextEditor.document) {
             setImmediate(() => treeProvider.handleDocumentChange(e.document));
+            // In file scope the scanner isn't updated on edits, so drive the Errors
+            // pane directly. In workspace scope the scanner's change event handles it.
+            if (treeProvider.getScope() === 'file' && isSupportedXStateDocument(e.document)) {
+                markErrorsDirty(e.document.uri);
+            }
         }
 
         // Live-update any open diagram rooted in this document. Debounced and
@@ -717,19 +722,49 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     const errorsView = vscode.window.createTreeView('xstateMachineErrors', { treeDataProvider: errorsProvider, showCollapseAll: true });
 
-    let errorsRefreshTimer: NodeJS.Timeout | undefined;
-    const refreshErrors = (delay = 300) => {
-        if (errorsRefreshTimer) { clearTimeout(errorsRefreshTimer); }
-        errorsRefreshTimer = setTimeout(() => {
-            errorsRefreshTimer = undefined;
-            void errorsProvider.refresh().then(() => {
-                errorsView.badge = errorsProvider.totalCount() > 0
-                    ? { value: errorsProvider.totalCount(), tooltip: 'XState problems' }
-                    : undefined;
-            });
-        }, delay);
+    // Keep the badge in sync with whatever the provider currently shows.
+    const updateErrorsBadge = () => {
+        const count = errorsProvider.totalCount();
+        errorsView.badge = count > 0 ? { value: count, tooltip: 'XState problems' } : undefined;
     };
-    refreshErrors(0);
+    const errorsBadgeListener = errorsProvider.onDidChangeTreeData(() => updateErrorsBadge());
+
+    // Incremental refresh: coalesce per-file changes and bulk rebuilds over a short
+    // debounce. Bulk (scope change / scan complete) re-validates everything; per-file
+    // changes (a single edited/created/deleted machine file) re-validate just that file.
+    const errorsDirty = new Set<string>();
+    let errorsBulkPending = true;
+    let errorsTimer: NodeJS.Timeout | undefined;
+    const flushErrors = async () => {
+        errorsTimer = undefined;
+        if (errorsBulkPending) {
+            errorsBulkPending = false;
+            errorsDirty.clear();
+            await errorsProvider.refresh();
+        } else {
+            const uris = [...errorsDirty];
+            errorsDirty.clear();
+            for (const u of uris) { await errorsProvider.updateUri(vscode.Uri.parse(u)); }
+        }
+    };
+    const scheduleErrors = (delay = 300) => {
+        if (errorsTimer) { clearTimeout(errorsTimer); }
+        errorsTimer = setTimeout(() => void flushErrors(), delay);
+    };
+    const markErrorsBulk = () => { errorsBulkPending = true; scheduleErrors(); };
+    const markErrorsDirty = (uri: vscode.Uri) => { errorsDirty.add(uri.toString()); scheduleErrors(); };
+
+    // Workspace-scope staleness flows through the scanner (it re-parses on edits,
+    // file-watcher events, and scans). File scope is driven by editor/document
+    // events below instead.
+    const errorsScanListener = workspaceScanner.onDidChange(change => {
+        if (treeProvider.getScope() !== 'workspace') { return; }
+        if (!change) { markErrorsBulk(); }
+        else if (change.kind === 'remove') { errorsProvider.removeUri(change.uri); }
+        else { markErrorsDirty(change.uri); }
+    });
+
+    scheduleErrors(0);
 
     const openErrorCommand = vscode.commands.registerCommand(
         'xstateErrors.open',
@@ -768,10 +803,7 @@ export async function activate(context: vscode.ExtensionContext) {
         const cfg = vscode.workspace.getConfiguration('xstateOutline');
         cfg.update('errorsFilter', filter, vscode.ConfigurationTarget.Global);
         vscode.commands.executeCommand('setContext', 'xstateErrors.filter', filter);
-        errorsProvider.setFilter(filter);
-        errorsView.badge = errorsProvider.totalCount() > 0
-            ? { value: errorsProvider.totalCount(), tooltip: 'XState problems' }
-            : undefined;
+        errorsProvider.setFilter(filter); // fires onDidChangeTreeData → badge updates
     };
     const setErrorsFilterAllCommand = vscode.commands.registerCommand(
         'xstateMachineOutline.setErrorsFilterAll', () => setErrorsFilter('all'));
@@ -780,12 +812,13 @@ export async function activate(context: vscode.ExtensionContext) {
     const setErrorsFilterErrorsCommand = vscode.commands.registerCommand(
         'xstateMachineOutline.setErrorsFilterErrors', () => setErrorsFilter('error'));
 
-    // The Errors pane recomputes whenever the outline fully refreshes — this single
-    // hook covers active-editor changes, document edits, scope toggles, workspace-scan
-    // completion, and file-watcher create/delete events. Partial reveals (fire(item),
-    // e.g. cursor sync) pass an element and are ignored.
-    const errorsRefreshListener = treeProvider.onDidChangeTreeData(e => {
-        if (!e) { refreshErrors(); }
+    // File scope is driven by the active editor: switching files rebuilds (it
+    // validates only the active doc); scope toggles rebuild for the new scope.
+    const errorsEditorListener = vscode.window.onDidChangeActiveTextEditor(() => {
+        if (treeProvider.getScope() === 'file') { markErrorsBulk(); }
+    });
+    const errorsConfigListener = vscode.workspace.onDidChangeConfiguration(e => {
+        if (e.affectsConfiguration('xstateOutline.defaultScope')) { markErrorsBulk(); }
     });
 
     // Click a transition row: navigate to the other state and select it in the
@@ -914,7 +947,10 @@ export async function activate(context: vscode.ExtensionContext) {
         setErrorsFilterAllCommand,
         setErrorsFilterWarningsCommand,
         setErrorsFilterErrorsCommand,
-        errorsRefreshListener,
+        errorsBadgeListener,
+        errorsScanListener,
+        errorsEditorListener,
+        errorsConfigListener,
         openTransitionCommand,
         showTransitionsCommand,
         expandListener,

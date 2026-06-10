@@ -169,6 +169,19 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
         this._onDidChangeTreeData.fire();
     }
 
+    /** Re-validate a single file in place (incremental update) and refresh the tree. */
+    async updateUri(uri: vscode.Uri): Promise<void> {
+        const entry = await this.validateUri(uri, vscode.workspace.asRelativePath(uri, false));
+        if (entry) { this.results.set(uri.fsPath, entry); }
+        else { this.results.delete(uri.fsPath); }
+        this._onDidChangeTreeData.fire();
+    }
+
+    /** Drop a single file from the cache (e.g. deleted) and refresh the tree. */
+    removeUri(uri: vscode.Uri): void {
+        if (this.results.delete(uri.fsPath)) { this._onDidChangeTreeData.fire(); }
+    }
+
     /** Validate a single uri, reusing the cached result when the version is unchanged. */
     private async validateUri(uri: vscode.Uri, relativePath: string): Promise<FileDiagnostics | undefined> {
         try {

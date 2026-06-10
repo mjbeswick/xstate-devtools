@@ -7,10 +7,21 @@ export interface FileMachines {
     machines: MachineNode[];
 }
 
+/** A single-file cache mutation; `undefined` from the event means a bulk change. */
+export interface WorkspaceChange {
+    uri: vscode.Uri;
+    kind: 'update' | 'remove';
+}
+
 export class WorkspaceScanner {
     private cache: Map<string, FileMachines> = new Map();
     private scanning: boolean = false;
     private fileWatcher?: vscode.FileSystemWatcher;
+
+    /** Fires on cache mutations: a per-file change, or `undefined` for bulk
+     *  changes (full scan completed / cleared). Lets consumers update incrementally. */
+    private readonly _onDidChange = new vscode.EventEmitter<WorkspaceChange | undefined>();
+    readonly onDidChange = this._onDidChange.event;
 
     constructor(private outputChannel?: vscode.OutputChannel) {}
 
@@ -71,6 +82,7 @@ export class WorkspaceScanner {
             this.scanning = false;
         }
 
+        this._onDidChange.fire(undefined);
         return Array.from(this.cache.values());
     }
 
@@ -97,7 +109,9 @@ export class WorkspaceScanner {
             this.updateDocument(document);
         } catch (error) {
             // If file can't be parsed, remove from cache
-            this.cache.delete(uri.toString());
+            if (this.cache.delete(uri.toString())) {
+                this._onDidChange.fire({ uri, kind: 'remove' });
+            }
         }
     }
 
@@ -120,9 +134,10 @@ export class WorkspaceScanner {
                 relativePath,
                 machines
             });
-        } else {
+            this._onDidChange.fire({ uri, kind: 'update' });
+        } else if (this.cache.delete(uri.toString())) {
             // No machines found, remove from cache
-            this.cache.delete(uri.toString());
+            this._onDidChange.fire({ uri, kind: 'remove' });
         }
     }
 
@@ -130,7 +145,9 @@ export class WorkspaceScanner {
      * Remove a file from the cache
      */
     removeFile(uri: vscode.Uri): void {
-        this.cache.delete(uri.toString());
+        if (this.cache.delete(uri.toString())) {
+            this._onDidChange.fire({ uri, kind: 'remove' });
+        }
     }
 
     /**
@@ -173,6 +190,7 @@ export class WorkspaceScanner {
      */
     clear(): void {
         this.cache.clear();
+        this._onDidChange.fire(undefined);
     }
 
     /**
@@ -194,6 +212,7 @@ export class WorkspaceScanner {
 
     dispose(): void {
         this.stopWatching();
-        this.clear();
+        this.cache.clear();
+        this._onDidChange.dispose();
     }
 }
