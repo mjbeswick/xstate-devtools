@@ -156,12 +156,58 @@ exports[`parser snapshots > parses checkout.machine.ts 1`] = `
       {
         "children": [
           {
+            "label": "chargeCard",
+            "type": "action",
+          },
+          {
+            "label": "clearPaymentToken",
+            "type": "action",
+          },
+          {
+            "label": "incrementRetry",
+            "type": "action",
+          },
+          {
+            "label": "notifyDecline",
+            "type": "action",
+          },
+          {
+            "label": "persistShippingChoice",
+            "type": "action",
+          },
+          {
+            "label": "saveAddress",
+            "type": "action",
+          },
+          {
+            "label": "completeOrder",
+            "type": "action",
+          },
+          {
+            "label": "canRetry",
+            "type": "guard",
+          },
+          {
+            "label": "inDeliveryZone",
+            "type": "guard",
+          },
+        ],
+        "label": "setup",
+        "type": "setup",
+      },
+      {
+        "children": [
+          {
             "children": [
               {
                 "children": [
                   {
                     "label": "authorizing",
                     "type": "target",
+                  },
+                  {
+                    "label": "chargeCard",
+                    "type": "action",
                   },
                 ],
                 "label": "SUBMIT_PAYMENT",
@@ -181,6 +227,10 @@ exports[`parser snapshots > parses checkout.machine.ts 1`] = `
                     "label": "paid",
                     "type": "target",
                   },
+                  {
+                    "label": "assign",
+                    "type": "action",
+                  },
                 ],
                 "label": "PAYMENT_APPROVED",
                 "type": "transition",
@@ -193,8 +243,12 @@ exports[`parser snapshots > parses checkout.machine.ts 1`] = `
                         "label": "canRetry",
                         "type": "guard",
                       },
+                      {
+                        "label": "incrementRetry",
+                        "type": "action",
+                      },
                     ],
-                    "label": "authorizing",
+                    "label": "when canRetry → authorizing",
                     "type": "transition",
                   },
                   {
@@ -204,10 +258,6 @@ exports[`parser snapshots > parses checkout.machine.ts 1`] = `
                 ],
                 "label": "PAYMENT_DECLINED",
                 "type": "transition",
-              },
-              {
-                "label": "chargeCard",
-                "type": "entry",
               },
               {
                 "label": "clearPaymentToken",
@@ -231,6 +281,10 @@ exports[`parser snapshots > parses checkout.machine.ts 1`] = `
                   {
                     "label": "idle",
                     "type": "target",
+                  },
+                  {
+                    "label": "assign",
+                    "type": "action",
                   },
                 ],
                 "label": "CHANGE_CARD",
@@ -263,6 +317,10 @@ exports[`parser snapshots > parses checkout.machine.ts 1`] = `
                   {
                     "label": "selectingMethod",
                     "type": "target",
+                  },
+                  {
+                    "label": "saveAddress",
+                    "type": "action",
                   },
                 ],
                 "label": "ADDRESS_VALID",
@@ -305,6 +363,32 @@ exports[`parser snapshots > parses checkout.machine.ts 1`] = `
         "description": "Collects a delivery address and shipping method before the order can be placed.",
         "label": "fulfilment",
         "type": "state",
+      },
+      {
+        "children": [
+          {
+            "label": "retryCount: 0",
+            "type": "contextProperty",
+          },
+          {
+            "label": "cardToken: null",
+            "type": "contextProperty",
+          },
+          {
+            "label": "address: null",
+            "type": "contextProperty",
+          },
+          {
+            "label": "shippingMethod: null",
+            "type": "contextProperty",
+          },
+          {
+            "label": "orderRef: null",
+            "type": "contextProperty",
+          },
+        ],
+        "label": "context",
+        "type": "context",
       },
     ],
     "description": "Parallel checkout flow — payment and fulfilment regions run concurrently; the order completes once both reach their final state.",
