@@ -6,9 +6,23 @@ export type ErrorsGrouping = 'file' | 'severity' | 'flat';
 
 /** One file's validated diagnostics, cached by document version. */
 interface FileDiagnostics {
+    uri: vscode.Uri;
     relativePath: string;
     version: number;
     diagnostics: vscode.Diagnostic[];
+}
+
+/** Drop diagnostics that are identical in position, code, and message. */
+function dedupeDiagnostics(diagnostics: vscode.Diagnostic[]): vscode.Diagnostic[] {
+    const seen = new Set<string>();
+    const out: vscode.Diagnostic[] = [];
+    for (const d of diagnostics) {
+        const key = `${d.code}|${d.range.start.line}:${d.range.start.character}|${d.message}`;
+        if (seen.has(key)) { continue; }
+        seen.add(key);
+        out.push(d);
+    }
+    return out;
 }
 
 type FileGroupRow = { kind: 'file'; uri: vscode.Uri; relativePath: string; count: number };
@@ -51,7 +65,8 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
     private readonly _onDidChangeTreeData = new vscode.EventEmitter<ErrorNode | void>();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-    /** Latest validated diagnostics in scope, keyed by uri string. */
+    /** Latest validated diagnostics in scope, keyed by canonical file path
+     * (fsPath) so a file arriving under two URI representations can't double up. */
     private results = new Map<string, FileDiagnostics>();
     private grouping: ErrorsGrouping;
 
@@ -82,14 +97,13 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
             return formatIssue(node.relativePath, node.diagnostic);
         }
         if (node.kind === 'file') {
-            const fd = this.results.get(node.uri.toString());
+            const fd = this.results.get(node.uri.fsPath);
             if (!fd) { return ''; }
             return [node.relativePath, ...fd.diagnostics.map(d => '  ' + formatIssue(node.relativePath, d))].join('\n');
         }
         if (node.kind === 'severity') {
             const lines: string[] = [];
-            for (const [uriStr, fd] of this.results) {
-                void uriStr;
+            for (const fd of this.results.values()) {
                 for (const d of fd.diagnostics) {
                     if (d.severity === node.severity) { lines.push('  ' + formatIssue(fd.relativePath, d)); }
                 }
@@ -106,16 +120,16 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
         if (this.getScope() === 'workspace') {
             for (const fm of this.workspaceScanner.getCached()) {
                 const entry = await this.validateUri(fm.uri, fm.relativePath);
-                if (entry && entry.diagnostics.length > 0) { next.set(fm.uri.toString(), entry); }
+                if (entry && entry.diagnostics.length > 0) { next.set(fm.uri.fsPath, entry); }
             }
         } else {
             const editor = vscode.window.activeTextEditor;
             if (editor && isSupportedXStateDocument(editor.document)) {
                 const relativePath = vscode.workspace.asRelativePath(editor.document.uri, false);
-                const diagnostics = validateXStateDocument(editor.document);
+                const diagnostics = dedupeDiagnostics(validateXStateDocument(editor.document));
                 if (diagnostics.length > 0) {
-                    next.set(editor.document.uri.toString(), {
-                        relativePath, version: editor.document.version, diagnostics,
+                    next.set(editor.document.uri.fsPath, {
+                        uri: editor.document.uri, relativePath, version: editor.document.version, diagnostics,
                     });
                 }
             }
@@ -130,9 +144,9 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
         try {
             const document = await vscode.workspace.openTextDocument(uri);
             if (!isSupportedXStateDocument(document)) { return undefined; }
-            const cached = this.results.get(uri.toString());
+            const cached = this.results.get(uri.fsPath);
             if (cached && cached.version === document.version) { return cached; }
-            return { relativePath, version: document.version, diagnostics: validateXStateDocument(document) };
+            return { uri, relativePath, version: document.version, diagnostics: dedupeDiagnostics(validateXStateDocument(document)) };
         } catch {
             return undefined;
         }
@@ -141,16 +155,15 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
     getChildren(el?: ErrorNode): ErrorNode[] {
         if (!el) { return this.rootChildren(); }
         if (el.kind === 'file') {
-            const fd = this.results.get(el.uri.toString());
+            const fd = this.results.get(el.uri.fsPath);
             if (!fd) { return []; }
             return fd.diagnostics.map(d => this.issueRow(el.uri, el.relativePath, d));
         }
         if (el.kind === 'severity') {
             const rows: IssueRow[] = [];
-            for (const [uriStr, fd] of this.results) {
-                const uri = vscode.Uri.parse(uriStr);
+            for (const fd of this.results.values()) {
                 for (const d of fd.diagnostics) {
-                    if (d.severity === el.severity) { rows.push(this.issueRow(uri, fd.relativePath, d)); }
+                    if (d.severity === el.severity) { rows.push(this.issueRow(fd.uri, fd.relativePath, d)); }
                 }
             }
             return rows;
@@ -165,8 +178,8 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
 
         if (this.grouping === 'file') {
             const rows: FileGroupRow[] = [];
-            for (const [uriStr, fd] of this.results) {
-                rows.push({ kind: 'file', uri: vscode.Uri.parse(uriStr), relativePath: fd.relativePath, count: fd.diagnostics.length });
+            for (const fd of this.results.values()) {
+                rows.push({ kind: 'file', uri: fd.uri, relativePath: fd.relativePath, count: fd.diagnostics.length });
             }
             return rows.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
         }
@@ -183,9 +196,8 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
 
         // flat
         const rows: IssueRow[] = [];
-        for (const [uriStr, fd] of this.results) {
-            const uri = vscode.Uri.parse(uriStr);
-            for (const d of fd.diagnostics) { rows.push(this.issueRow(uri, fd.relativePath, d)); }
+        for (const fd of this.results.values()) {
+            for (const d of fd.diagnostics) { rows.push(this.issueRow(fd.uri, fd.relativePath, d)); }
         }
         return rows;
     }
@@ -226,7 +238,9 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
         item.contextValue = 'errorIssue';
         item.iconPath = new vscode.ThemeIcon(meta.icon, meta.color);
         const line = node.diagnostic.range.start.line + 1;
-        item.description = this.grouping === 'flat' ? `${node.relativePath}:${line}` : `${line}`;
+        // Under a file group the parent already names the file; otherwise show it
+        // so issues from different files are never visually identical.
+        item.description = this.grouping === 'file' ? `${line}` : `${node.relativePath}:${line}`;
         item.tooltip = `${node.diagnostic.message}\n${node.relativePath}:${line}`;
         item.command = {
             command: 'xstateErrors.open',
