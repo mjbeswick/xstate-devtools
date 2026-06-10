@@ -12,7 +12,6 @@ import { WorkspaceScanner } from './workspaceScanner';
 import { XStateReferenceProvider, XStateRenameProvider } from './providers';
 import { XStateHoverProvider } from './hoverProvider';
 import { XStateGraphViewProvider } from './graphView';
-import { TrailService, TrailEntry } from './trailView';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
 import { ErrorsTreeProvider, ErrorsGrouping } from './errorsView';
 
@@ -412,16 +411,10 @@ export async function activate(context: vscode.ExtensionContext) {
                     preserveFocus: false,
                     preview: false
                 });
+                // Select the destination state in the outline. Revealing it fires
+                // the tree selection listener, which repoints the Transitions pane.
                 const stateItem = treeProvider.findItemAtPosition(loc.range.start);
-                // Record the forward jump on the trail: from the target's enclosing
-                // state to the destination state, via the transition's event.
                 if (stateItem?.node) {
-                    const fromState = treeProvider.findEnclosingState(treeItem.node);
-                    const via = treeProvider.findEnclosingTransition(treeItem.node)?.label;
-                    trail.recordForward(
-                        fromState ? trailEntryOf(fromState) : undefined,
-                        trailEntryOf(stateItem.node, via, 'forward'),
-                    );
                     treeView.reveal(stateItem, { select: true, focus: false, expand: true });
                 }
                 return true;
@@ -703,19 +696,11 @@ export async function activate(context: vscode.ExtensionContext) {
     const graphViewProvider = new XStateGraphViewProvider(context.extensionUri, treeProvider);
 
     // "Transitions" view — the selected state's incoming (←) / outgoing (→)
-    // transitions, plus the Trail of states walked while navigating.
-    const trail = new TrailService();
-    const trailEntryOf = (node: MachineNode, via?: string, direction?: 'forward' | 'backward'): TrailEntry => ({
-        label: node.label, uri: node.uri, range: node.range, machineKey: treeProvider.machineKeyOf(node), via, direction,
-    });
-    trail.onDidChange(() =>
-        vscode.commands.executeCommand('setContext', 'xstateTrail.hasEntries', trail.getEntries().length > 0));
-
+    // transitions.
     const navigatorProvider = new NavigatorTreeProvider(
         node => treeProvider.findMachineContaining(node),
         target => treeProvider.resolveTargetLocation(target),
         node => treeProvider.machineKeyOf(node),
-        trail,
     );
     const navigatorView = vscode.window.createTreeView('xstateMachineNavigator', { treeDataProvider: navigatorProvider });
 
@@ -772,24 +757,18 @@ export async function activate(context: vscode.ExtensionContext) {
         if (!e) { refreshErrors(); }
     });
 
-    // Click a transition row: navigate to the other state and record the hop on
-    // the trail — outgoing (→) appends, incoming (←) prepends.
+    // Click a transition row: navigate to the other state and select it in the
+    // outline. Revealing the item fires the tree selection listener, which
+    // repoints the Transitions pane at the newly selected state.
     const openTransitionCommand = vscode.commands.registerCommand(
         'xstateNavigator.openTransition',
         async (ref: TransitionRef) => {
             if (!ref?.otherUri) { return; }
-            const focal = navigatorProvider.getFocalNode();
-            if (focal) {
-                const focalEntry = trailEntryOf(focal);
-                const to: TrailEntry = {
-                    label: ref.otherLabel, uri: ref.otherUri, range: ref.otherRange,
-                    machineKey: ref.machineKey, via: ref.event,
-                    direction: ref.direction === 'out' ? 'forward' : 'backward',
-                };
-                if (ref.direction === 'out') { trail.recordForward(focalEntry, to); }
-                else { trail.recordBackward(focalEntry, to); }
-            }
             await vscode.window.showTextDocument(ref.otherUri, { selection: ref.otherRange, preserveFocus: false, preview: false });
+            const item = treeProvider.findItemAtPosition(ref.otherRange.start);
+            if (item && treeView.visible) {
+                treeView.reveal(item, { select: true, focus: false, expand: true });
+            }
         }
     );
     const showTransitionsCommand = vscode.commands.registerCommand(
@@ -799,16 +778,6 @@ export async function activate(context: vscode.ExtensionContext) {
             await vscode.commands.executeCommand('xstateMachineNavigator.focus');
         }
     );
-    const trailOpenCommand = vscode.commands.registerCommand(
-        'xstateMachineTrail.open',
-        async (entry: TrailEntry, index: number) => {
-            if (!entry?.uri) { return; }
-            trail.goTo(index);
-            await vscode.window.showTextDocument(entry.uri, { selection: entry.range, preserveFocus: false, preview: false });
-        }
-    );
-    const trailClearCommand = vscode.commands.registerCommand('xstateMachineTrail.clear', () => trail.clear());
-
     // When the user clicks a node in the diagram, select the matching item in
     // the tree outline (instead of jumping to source). Revealing the item fires
     // onDidChangeSelection below, which in turn highlights it in the diagram.
@@ -829,9 +798,6 @@ export async function activate(context: vscode.ExtensionContext) {
         // Update the Transitions view to track the selected state.
         navigatorProvider.setFocus(item.node);
         if (item.node.type === 'state') {
-            // Plain selection doesn't mutate the trail, but follows it if the
-            // state is already on it.
-            trail.markCurrentIfPresent(item.node.label, item.node.uri);
             graphViewProvider.highlightState(item.node.label);
         } else if (item.node.type === 'machine') {
             graphViewProvider.show(item.node, item.node.label);
@@ -916,8 +882,6 @@ export async function activate(context: vscode.ExtensionContext) {
         errorsRefreshListener,
         openTransitionCommand,
         showTransitionsCommand,
-        trailOpenCommand,
-        trailClearCommand,
         expandListener,
         collapseListener,
         treeSelectionListener,

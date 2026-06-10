@@ -208,7 +208,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         return best;
     }
 
-    /** Stable identity of the machine containing a node (for trail scoping). */
+    /** Stable identity of the machine containing a node (scopes transition refs). */
     machineKeyOf(node: MachineNode): string {
         const m = this.findMachineContaining(node);
         return m ? `${m.uri.fsPath}::${m.range.start.line}::${m.label}` : '';

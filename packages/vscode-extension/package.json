@@ -226,15 +226,6 @@
         "title": "Go to State"
       },
       {
-        "command": "xstateMachineTrail.open",
-        "title": "Go to State"
-      },
-      {
-        "command": "xstateMachineTrail.clear",
-        "title": "Clear Trail",
-        "icon": "$(clear-all)"
-      },
-      {
         "command": "xstateMachineOutline.filter",
         "title": "Filter",
         "icon": "$(search)"
@@ -345,11 +336,6 @@
     },
     "menus": {
       "view/title": [
-        {
-          "command": "xstateMachineTrail.clear",
-          "when": "view == xstateMachineNavigator && xstateTrail.hasEntries",
-          "group": "navigation"
-        },
         {
           "command": "xstateMachineOutline.refresh",
           "when": "view == xstateMachineOutline",
@@ -513,10 +499,6 @@
         },
         {
           "command": "xstateNavigator.openTransition",
-          "when": "false"
-        },
-        {
-          "command": "xstateMachineTrail.open",
           "when": "false"
         },
         {
