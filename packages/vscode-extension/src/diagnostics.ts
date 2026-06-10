@@ -575,7 +575,15 @@ function collectSetupSectionKeys(setupConfig: ts.ObjectLiteralExpression, sectio
     }
 
     for (const property of section.initializer.properties) {
-        if (!ts.isPropertyAssignment(property)) {
+        // Accept every way a setup entry can be written:
+        //   foo: () => {}            PropertyAssignment
+        //   foo() {}                 MethodDeclaration (shorthand)
+        //   foo                      ShorthandPropertyAssignment ({ foo })
+        if (
+            !ts.isPropertyAssignment(property) &&
+            !ts.isMethodDeclaration(property) &&
+            !ts.isShorthandPropertyAssignment(property)
+        ) {
             continue;
         }
 

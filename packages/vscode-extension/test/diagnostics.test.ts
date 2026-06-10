@@ -117,6 +117,28 @@ describe('unreachable-state reachability walk', () => {
         expect(byCode(XSTATE_DIAGNOSTIC_CODES.unreachableState)?.severity).toBe(vscode.DiagnosticSeverity.Warning);
     });
 
+    it('recognizes setup actions defined with method-shorthand or shorthand syntax', () => {
+        // logError uses method shorthand; ping uses shorthand property — both are
+        // valid XState v5 setup forms and must not be reported as unknown.
+        const src = `
+            import { setup } from 'xstate';
+            const ping = () => {};
+            export const m = setup({
+                actions: {
+                    logError({ context }, params) { context.log(params); },
+                    ping,
+                },
+            }).createMachine({
+                initial: 'idle',
+                states: {
+                    idle: { entry: ['logError', 'ping'] },
+                },
+            });
+        `;
+        const codes = validateXStateDocument(makeDoc(src)).map(d => d.code);
+        expect(codes).not.toContain(XSTATE_DIAGNOSTIC_CODES.unknownAction);
+    });
+
     it('resolves targets by explicit id', () => {
         const src = `
             createMachine({
