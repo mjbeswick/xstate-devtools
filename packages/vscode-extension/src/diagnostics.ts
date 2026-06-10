@@ -438,7 +438,34 @@ function buildStateInfo(
  * caught. Targets resolve by bare name (last path segment) or explicit `id`, matching
  * the resolution used elsewhere in the extension.
  */
+/**
+ * True if the machine composes its states or transitions via object spreads
+ * (`states: { ...shared }`, `on: { ...handlers }`). Such configs are only partly
+ * visible to static analysis, so reachability can't be computed soundly — bail
+ * rather than emit false "unreachable" warnings.
+ */
+function hasStructuralSpread(config: ts.ObjectLiteralExpression): boolean {
+    let found = false;
+    const visit = (obj: ts.ObjectLiteralExpression, spreadMatters: boolean): void => {
+        for (const property of obj.properties) {
+            if (found) { return; }
+            if (ts.isSpreadAssignment(property)) {
+                if (spreadMatters) { found = true; }
+                continue;
+            }
+            if (ts.isPropertyAssignment(property) && ts.isObjectLiteralExpression(property.initializer)) {
+                const name = getPropertyName(property.name);
+                visit(property.initializer, name === 'states' || name === 'on' || name === 'after');
+            }
+        }
+    };
+    visit(config, false);
+    return found;
+}
+
 function checkUnreachableStates(machineConfig: ts.ObjectLiteralExpression, context: ValidationContext): void {
+    if (hasStructuralSpread(machineConfig)) { return; }
+
     const dummyRange = new vscode.Range(0, 0, 0, 0);
     const root = buildStateInfo('(machine)', dummyRange, machineConfig, context.document, undefined);
 
@@ -448,32 +475,48 @@ function checkUnreachableStates(machineConfig: ts.ObjectLiteralExpression, conte
     })(root);
     if (all.length === 0) { return; }
 
-    const byName = new Map<string, StateInfo>();
+    // Index states by explicit id (absolute `#id` targets). State *names* are NOT
+    // globally unique — the same name (idle, load, retry, …) recurs in every region —
+    // so targets must be resolved by scope, not by a flat name lookup.
     const byId = new Map<string, StateInfo>();
+    if (root.id) { byId.set(root.id, root); }
     for (const state of all) {
-        byName.set(state.name, state);
         if (state.id) { byId.set(state.id, state); }
     }
 
-    const resolve = (raw: string): StateInfo | undefined => {
-        const segments = raw.replace(/^#/, '').split('.').filter(Boolean);
-        if (segments.length === 0) { return undefined; }
-        return byName.get(segments[segments.length - 1]) ?? byId.get(segments[0]);
+    // Walk `segs` down from a scope node's descendants.
+    const descend = (scope: StateInfo | undefined, segs: string[]): StateInfo | undefined => {
+        let node = scope;
+        for (const seg of segs) {
+            if (!node) { return undefined; }
+            node = node.children.find(c => c.name === seg);
+        }
+        return node;
+    };
+
+    // Resolve a transition target the way XState does, relative to its source state:
+    //   '#id' / '#id.a.b'  → absolute, by explicit id then descend
+    //   '.child'           → relative to the source's own descendants
+    //   'sibling' / 'a.b'  → relative to the source's parent (siblings); the machine
+    //                        root resolves against its own children (top-level states)
+    const resolveTarget = (source: StateInfo, raw: string): StateInfo | undefined => {
+        if (!raw) { return undefined; }
+        if (raw.startsWith('#')) {
+            const segs = raw.slice(1).split('.').filter(Boolean);
+            return segs.length ? descend(byId.get(segs[0]), segs.slice(1)) : undefined;
+        }
+        if (raw.startsWith('.')) {
+            return descend(source, raw.slice(1).split('.').filter(Boolean));
+        }
+        const segs = raw.split('.').filter(Boolean);
+        return segs.length ? descend(source.parent ?? source, segs) : undefined;
     };
 
     const reachable = new Set<StateInfo>();
-    const activate = (state: StateInfo): void => {
-        if (reachable.has(state)) { return; }
-        // Mark this state and its ancestors active (you cannot be in a child
-        // without its parents) — but not the parents' other children.
-        let cursor: StateInfo | undefined = state;
-        while (cursor && cursor !== root && !reachable.has(cursor)) {
-            reachable.add(cursor);
-            cursor = cursor.parent;
-        }
-        enterInitialConfig(state);
-    };
+    const entered = new Set<StateInfo>(); // states whose initial configuration we've entered
     const enterInitialConfig = (state: StateInfo): void => {
+        if (entered.has(state)) { return; }
+        entered.add(state);
         if (state.children.length === 0) { return; }
         if (state.isParallel) {
             for (const child of state.children) { activate(child); }
@@ -483,16 +526,35 @@ function checkUnreachableStates(machineConfig: ts.ObjectLiteralExpression, conte
             || state.children[0];
         if (initial) { activate(initial); }
     };
+    const activate = (state: StateInfo): void => {
+        // Mark this state and its ancestors active (you cannot be in a child without
+        // its parents) — but don't enter the ancestors' initial config; we arrived via
+        // a specific path, not their default entry.
+        let cursor: StateInfo | undefined = state;
+        while (cursor && cursor !== root && !reachable.has(cursor)) {
+            reachable.add(cursor);
+            cursor = cursor.parent;
+        }
+        reachable.add(state);
+        // Entering a state enters its initial configuration. This runs even if the
+        // state was already reachable as an ancestor of a deeper target — a later
+        // direct/plain target genuinely enters its initial child.
+        enterInitialConfig(state);
+    };
 
-    // Seed with the machine's own initial configuration, then follow transitions.
+    // The machine root is always active, so its own `on` handlers are always live —
+    // include it as a transition source (it is never itself flagged: `all` excludes it).
+    reachable.add(root);
     enterInitialConfig(root);
-    let changed = true;
-    while (changed) {
-        changed = false;
+
+    // Follow transitions to a fixpoint. activate() is idempotent (guarded by the
+    // reachable/entered sets), so re-run rounds until nothing new is added.
+    for (let size = -1; size !== reachable.size + entered.size; ) {
+        size = reachable.size + entered.size;
         for (const state of [...reachable]) {
             for (const target of state.targets) {
-                const dest = resolve(target);
-                if (dest && !reachable.has(dest)) { activate(dest); changed = true; }
+                const dest = resolveTarget(state, target);
+                if (dest) { activate(dest); }
             }
         }
     }

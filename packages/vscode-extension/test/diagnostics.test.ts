@@ -139,6 +139,69 @@ describe('unreachable-state reachability walk', () => {
         expect(codes).not.toContain(XSTATE_DIAGNOSTIC_CODES.unknownAction);
     });
 
+    it('does not flag same-named states in different regions (scoped resolution)', () => {
+        // 'idle' recurs in two regions; each is reached by a sibling target within
+        // its own region. Bare-name resolution would mark one of them unreachable.
+        const src = `
+            createMachine({
+                type: 'parallel',
+                states: {
+                    a: {
+                        initial: 'idle',
+                        states: { idle: { on: { GO: 'busy' } }, busy: {} },
+                    },
+                    b: {
+                        initial: 'idle',
+                        states: { idle: { on: { GO: 'busy' } }, busy: {} },
+                    },
+                },
+            });
+        `;
+        expect(unreachable(src)).toEqual([]);
+    });
+
+    it('follows machine-root on handlers with dot-relative targets', () => {
+        const src = `
+            createMachine({
+                initial: 'idle',
+                states: { idle: {}, error: {} },
+                on: { FAIL: { target: '.error' } },
+            });
+        `;
+        expect(unreachable(src)).toEqual([]);
+    });
+
+    it('enters a compound initial even when first reached by a deep target', () => {
+        // 'wrap' is reached first by the deep target 'wrap.done', then plainly via
+        // 'GO'. Its initial child 'inner' must still count as reachable.
+        const src = `
+            createMachine({
+                initial: 'start',
+                states: {
+                    start: { on: { JUMP: 'wrap.done', GO: 'wrap' } },
+                    wrap: {
+                        initial: 'inner',
+                        states: { inner: {}, done: {} },
+                    },
+                },
+            });
+        `;
+        expect(unreachable(src)).toEqual([]);
+    });
+
+    it('skips reachability analysis for spread-composed states', () => {
+        // The states are partly external (...shared), so reachability is unknowable —
+        // the checker must not guess and emit false positives.
+        const src = `
+            const shared = {};
+            createMachine({
+                initial: 'idle',
+                states: { ...shared, idle: {}, lonely: {} },
+            });
+        `;
+        expect(unreachable(src)).toEqual([]);
+    });
+
     it('resolves targets by explicit id', () => {
         const src = `
             createMachine({
