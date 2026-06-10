@@ -50,10 +50,19 @@
         {
           "id": "xstateMachineOutline",
           "name": "Outline"
+        },
+        {
+          "id": "xstateMachineIncoming",
+          "name": "Incoming"
         }
       ]
     },
     "viewsWelcome": [
+      {
+        "view": "xstateMachineIncoming",
+        "contents": "Select a state in the Outline to see the transitions that lead into it.",
+        "when": "!xstateIncoming.hasFocus"
+      },
       {
         "view": "xstateMachineOutline",
         "contents": "All machines in this file are state configs, which are hidden.\n[Show State Configs](command:xstateMachineOutline.setStateConfigsShow)",
@@ -188,6 +197,15 @@
         "command": "xstateMachineOutline.goToImplementation",
         "title": "Go to Implementation",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "xstateMachineOutline.findIncoming",
+        "title": "Find Incoming Transitions",
+        "icon": "$(arrow-small-right)"
+      },
+      {
+        "command": "xstateMachineIncoming.open",
+        "title": "Go to Transition"
       },
       {
         "command": "xstateMachineOutline.filter",
@@ -378,6 +396,11 @@
           "group": "navigation@1"
         },
         {
+          "command": "xstateMachineOutline.findIncoming",
+          "when": "view == xstateMachineOutline && viewItem == state",
+          "group": "navigation@2"
+        },
+        {
           "command": "xstateMachineOutline.editNode",
           "when": "view == xstateMachineOutline && (viewItem == state || viewItem == transition || viewItem == target || viewItem == action || viewItem == guard || viewItem == invoke || viewItem == contextProperty || viewItem == actor || viewItem == delay || viewItem == invalid)",
           "group": "edit@1"
@@ -425,6 +448,14 @@
       "commandPalette": [
         {
           "command": "xstateMachineOutline.openGraphView",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineIncoming.open",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.findIncoming",
           "when": "false"
         },
         {

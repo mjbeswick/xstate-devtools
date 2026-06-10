@@ -12,6 +12,7 @@ import { WorkspaceScanner } from './workspaceScanner';
 import { XStateReferenceProvider, XStateRenameProvider } from './providers';
 import { XStateHoverProvider } from './hoverProvider';
 import { XStateGraphViewProvider } from './graphView';
+import { IncomingTreeProvider, IncomingRef } from './incomingView';
 
 let selectionTimeout: NodeJS.Timeout | undefined;
 
@@ -689,6 +690,25 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const graphViewProvider = new XStateGraphViewProvider(context.extensionUri, treeProvider);
 
+    // "Incoming" view — transitions that lead into the selected state.
+    const incomingProvider = new IncomingTreeProvider(node => treeProvider.findMachineContaining(node));
+    const incomingView = vscode.window.createTreeView('xstateMachineIncoming', { treeDataProvider: incomingProvider });
+
+    const incomingOpenCommand = vscode.commands.registerCommand(
+        'xstateMachineIncoming.open',
+        async (ref: IncomingRef) => {
+            if (!ref?.uri || !ref?.range) { return; }
+            await vscode.window.showTextDocument(ref.uri, { selection: ref.range, preserveFocus: false, preview: false });
+        }
+    );
+    const findIncomingCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.findIncoming',
+        async (treeItem) => {
+            if (treeItem?.node) { incomingProvider.setFocus(treeItem.node); }
+            await vscode.commands.executeCommand('xstateMachineIncoming.focus');
+        }
+    );
+
     // When the user clicks a node in the diagram, select the matching item in
     // the tree outline (instead of jumping to source). Revealing the item fires
     // onDidChangeSelection below, which in turn highlights it in the diagram.
@@ -706,6 +726,8 @@ export async function activate(context: vscode.ExtensionContext) {
         if (isTreeSelectionChange) { return; } // ignore programmatic reveals driven by cursor sync
         const item = e.selection[0];
         if (!item?.node) { return; }
+        // Update the Incoming view to track the selected state.
+        incomingProvider.setFocus(item.node);
         if (item.node.type === 'state') {
             graphViewProvider.highlightState(item.node.label);
         } else if (item.node.type === 'machine') {
@@ -782,6 +804,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         treeView,
+        incomingView,
+        incomingOpenCommand,
+        findIncomingCommand,
         expandListener,
         collapseListener,
         treeSelectionListener,

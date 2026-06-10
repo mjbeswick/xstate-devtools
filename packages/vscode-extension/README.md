@@ -19,6 +19,7 @@
 - **Full machine tree** — nested & parallel states, transitions, targets, entry/exit/transition actions, guards, invokes, actors, delays, context, and XState v5 `setup` implementations
 - **Smart navigation** — click to jump to source; double-click an action or guard to jump to its implementation, or a transition target to jump to the destination state (or press **F12**)
 - **Cursor sync** — the tree highlights the node matching your editor cursor
+- **Incoming transitions** — select a state to see, in the **Incoming** panel, every transition that leads into it (`SOURCE_STATE — via EVENT`), each click-navigable to its source; also on a state's right-click menu as **Find Incoming Transitions**
 - **Search** — a dedicated search box (styled like the Extensions view) with type filtering and keyboard navigation
 
 ### ✏️ Editing & authoring

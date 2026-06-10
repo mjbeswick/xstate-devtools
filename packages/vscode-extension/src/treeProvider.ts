@@ -173,6 +173,12 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
      * Resolve a transition `target` node to the location of the state it points to.
      * Returns the defining state's uri/range, or undefined if it can't be resolved.
      */
+    /** The machine root whose source range contains the given node, if any. */
+    findMachineContaining(node: MachineNode): MachineNode | undefined {
+        return this.getAllMachineNodes().find(m =>
+            m.uri.toString() === node.uri.toString() && m.range.contains(node.range));
+    }
+
     resolveTargetLocation(targetNode: MachineNode): { uri: vscode.Uri; range: vscode.Range } | undefined {
         const name = normalizeTargetName(targetNode.label);
         if (!name) { return undefined; }
