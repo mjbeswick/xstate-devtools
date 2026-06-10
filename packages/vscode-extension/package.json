@@ -52,26 +52,12 @@
           "name": "Outline"
         },
         {
-          "id": "xstateMachineIncoming",
-          "name": "Incoming"
-        },
-        {
-          "id": "xstateMachineTrail",
-          "name": "Trail"
+          "id": "xstateMachineNavigator",
+          "name": "Transitions"
         }
       ]
     },
     "viewsWelcome": [
-      {
-        "view": "xstateMachineIncoming",
-        "contents": "Select a state in the Outline to see the transitions that lead into it.",
-        "when": "!xstateIncoming.hasFocus"
-      },
-      {
-        "view": "xstateMachineTrail",
-        "contents": "Double-click a transition target to start a trail through the machine. Each jump is added; click any step to revisit it.",
-        "when": "!xstateTrail.hasEntries"
-      },
       {
         "view": "xstateMachineOutline",
         "contents": "All machines in this file are state configs, which are hidden.\n[Show State Configs](command:xstateMachineOutline.setStateConfigsShow)",
@@ -208,13 +194,13 @@
         "icon": "$(go-to-file)"
       },
       {
-        "command": "xstateMachineOutline.findIncoming",
-        "title": "Find Incoming Transitions",
-        "icon": "$(arrow-small-right)"
+        "command": "xstateMachineOutline.showTransitions",
+        "title": "Show Transitions",
+        "icon": "$(arrow-both)"
       },
       {
-        "command": "xstateMachineIncoming.open",
-        "title": "Go to Transition"
+        "command": "xstateNavigator.openTransition",
+        "title": "Go to State"
       },
       {
         "command": "xstateMachineTrail.open",
@@ -328,7 +314,7 @@
       "view/title": [
         {
           "command": "xstateMachineTrail.clear",
-          "when": "view == xstateMachineTrail && xstateTrail.hasEntries",
+          "when": "view == xstateMachineNavigator && xstateTrail.hasEntries",
           "group": "navigation"
         },
         {
@@ -419,7 +405,7 @@
           "group": "navigation@1"
         },
         {
-          "command": "xstateMachineOutline.findIncoming",
+          "command": "xstateMachineOutline.showTransitions",
           "when": "view == xstateMachineOutline && viewItem == state",
           "group": "navigation@2"
         },
@@ -474,11 +460,11 @@
           "when": "false"
         },
         {
-          "command": "xstateMachineIncoming.open",
+          "command": "xstateMachineOutline.showTransitions",
           "when": "false"
         },
         {
-          "command": "xstateMachineOutline.findIncoming",
+          "command": "xstateNavigator.openTransition",
           "when": "false"
         },
         {

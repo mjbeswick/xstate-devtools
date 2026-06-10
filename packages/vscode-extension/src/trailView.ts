@@ -6,7 +6,8 @@ export interface TrailEntry {
     uri: vscode.Uri;
     range: vscode.Range;
     machineKey: string;
-    via?: string;   // the transition event used to arrive here (undefined for a seed origin)
+    via?: string;       // the transition event used to arrive here (undefined for a seed origin)
+    direction?: 'forward' | 'backward';   // → followed a target, ← followed an incoming source
 }
 
 const CAP = 50;
@@ -89,37 +90,5 @@ export class TrailService {
     }
     private trimHead(): void {
         while (this.entries.length > CAP) { this.entries.pop(); }
-    }
-}
-
-export class TrailTreeProvider implements vscode.TreeDataProvider<TrailEntry> {
-    private readonly _onDidChangeTreeData = new vscode.EventEmitter<void>();
-    readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
-
-    constructor(private readonly trail: TrailService) {
-        trail.onDidChange(() => {
-            vscode.commands.executeCommand('setContext', 'xstateTrail.hasEntries', trail.getEntries().length > 0);
-            this._onDidChangeTreeData.fire();
-        });
-    }
-
-    getTreeItem(entry: TrailEntry): vscode.TreeItem {
-        const entries = this.trail.getEntries();
-        const index = entries.indexOf(entry);
-        const isCurrent = index === this.trail.getCurrent();
-        const item = new vscode.TreeItem(entry.label);
-        item.description = isCurrent ? (entry.via ? `via ${entry.via} · current` : 'current') : (entry.via ? `via ${entry.via}` : undefined);
-        item.iconPath = new vscode.ThemeIcon(isCurrent ? 'circle-filled' : 'circle-outline');
-        item.tooltip = `${entry.label}${entry.via ? ` (via ${entry.via})` : ''}`;
-        item.command = {
-            command: 'xstateMachineTrail.open',
-            title: 'Go to state',
-            arguments: [entry, index],
-        };
-        return item;
-    }
-
-    getChildren(): TrailEntry[] {
-        return this.trail.getEntries();
     }
 }

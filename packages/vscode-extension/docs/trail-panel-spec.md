@@ -1,7 +1,11 @@
 # Trail Panel — Spec
 
-> Status: **implemented** (`src/trailView.ts`, wired in `extension.ts`; Incoming
-> in `src/incomingView.ts`). Grounded in the current code:
+> Status: **implemented**, then combined with Incoming into a single
+> **Transitions** pane (`src/navigatorView.ts`, with `TrailService` in
+> `src/trailView.ts`, wired in `extension.ts`). The pane has two groups —
+> **Transitions** (the selected state's ← incoming / → outgoing edges) and
+> **Trail** (the navigation breadcrumb) — sharing one arrow convention
+> (→ forward/outgoing, ← back/incoming). Grounded in the current code:
 > forward target jump at `extension.ts:403` (`navigateToNode` double-click-target
 > branch), `treeProvider.resolveTargetLocation` (`treeProvider.ts:176`), and the
 > graph's `stateClicked` / `revealInTree` path (`graphView.ts`).
