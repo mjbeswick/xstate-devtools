@@ -54,6 +54,10 @@
         {
           "id": "xstateMachineNavigator",
           "name": "Transitions"
+        },
+        {
+          "id": "xstateMachineErrors",
+          "name": "Errors"
         }
       ]
     },
@@ -185,6 +189,25 @@
         "title": "Sort children: source order"
       },
       {
+        "command": "xstateMachineOutline.setErrorsGroupingFile",
+        "title": "Group: by file",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "xstateMachineOutline.setErrorsGroupingSeverity",
+        "title": "Group: by severity",
+        "icon": "$(warning)"
+      },
+      {
+        "command": "xstateMachineOutline.setErrorsGroupingFlat",
+        "title": "Group: flat",
+        "icon": "$(list-flat)"
+      },
+      {
+        "command": "xstateErrors.open",
+        "title": "Go to Problem"
+      },
+      {
         "command": "xstateMachineOutline.navigateToNode",
         "title": "Go to Source"
       },
@@ -307,6 +330,16 @@
           ],
           "default": "original",
           "description": "Order of child nodes in the outline: source order (original) or alphabetical (sorted)"
+        },
+        "xstateOutline.errorsGrouping": {
+          "type": "string",
+          "enum": [
+            "file",
+            "severity",
+            "flat"
+          ],
+          "default": "file",
+          "description": "How the Errors pane groups problems: by file, by severity, or a flat list"
         }
       }
     },
@@ -391,6 +424,21 @@
           "command": "xstateMachineOutline.setSortChildrenOriginal",
           "when": "view == xstateMachineOutline && xstateOutline.sortChildrenIsSorted",
           "group": "5_sort@2"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsGroupingFile",
+          "when": "view == xstateMachineErrors && xstateErrors.grouping != file",
+          "group": "1_grouping@1"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsGroupingSeverity",
+          "when": "view == xstateMachineErrors && xstateErrors.grouping != severity",
+          "group": "1_grouping@2"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsGroupingFlat",
+          "when": "view == xstateMachineErrors && xstateErrors.grouping != flat",
+          "group": "1_grouping@3"
         }
       ],
       "view/item/context": [
@@ -469,6 +517,22 @@
         },
         {
           "command": "xstateMachineTrail.open",
+          "when": "false"
+        },
+        {
+          "command": "xstateErrors.open",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsGroupingFile",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsGroupingSeverity",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsGroupingFlat",
           "when": "false"
         },
         {

@@ -14,6 +14,7 @@ import { XStateHoverProvider } from './hoverProvider';
 import { XStateGraphViewProvider } from './graphView';
 import { TrailService, TrailEntry } from './trailView';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
+import { ErrorsTreeProvider, ErrorsGrouping } from './errorsView';
 
 let selectionTimeout: NodeJS.Timeout | undefined;
 
@@ -28,6 +29,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const initialShowStateConfigs = config.get<boolean>('showStateConfigs', false);
     const initialGroupEventHandlers = config.get<boolean>('groupEventHandlers', false);
     const initialSortChildren = config.get<string>('sortChildren', 'original');
+    const initialErrorsGrouping = config.get<ErrorsGrouping>('errorsGrouping', 'file');
     let followCursor = config.get<boolean>('followCursor', true);
 
     let graphReflectsTreeExpansion = config.get<boolean>('graphReflectsTreeExpansion', true);
@@ -39,6 +41,7 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('setContext', 'xstateOutline.showStateConfigs', initialShowStateConfigs),
         vscode.commands.executeCommand('setContext', 'xstateOutline.groupEventHandlers', initialGroupEventHandlers),
         vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenIsSorted', initialSortChildren === 'sorted'),
+        vscode.commands.executeCommand('setContext', 'xstateErrors.grouping', initialErrorsGrouping),
         vscode.commands.executeCommand('setContext', 'xstateOutline.followCursor', followCursor),
         vscode.commands.executeCommand('setContext', 'xstateOutline.graphReflectsTreeExpansion', graphReflectsTreeExpansion),
     ]);
@@ -716,6 +719,59 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     const navigatorView = vscode.window.createTreeView('xstateMachineNavigator', { treeDataProvider: navigatorProvider });
 
+    // ── Errors pane ──────────────────────────────────────────────────────────
+    // Aggregates every XState diagnostic (orphaned states, unknown refs, …) into a
+    // navigable tree. Scope follows the outline's file/workspace toggle.
+    const errorsProvider = new ErrorsTreeProvider(
+        () => treeProvider.getScope(),
+        workspaceScanner,
+        initialErrorsGrouping,
+    );
+    const errorsView = vscode.window.createTreeView('xstateMachineErrors', { treeDataProvider: errorsProvider });
+
+    let errorsRefreshTimer: NodeJS.Timeout | undefined;
+    const refreshErrors = (delay = 300) => {
+        if (errorsRefreshTimer) { clearTimeout(errorsRefreshTimer); }
+        errorsRefreshTimer = setTimeout(() => {
+            errorsRefreshTimer = undefined;
+            void errorsProvider.refresh().then(() => {
+                errorsView.badge = errorsProvider.totalCount() > 0
+                    ? { value: errorsProvider.totalCount(), tooltip: 'XState problems' }
+                    : undefined;
+            });
+        }, delay);
+    };
+    refreshErrors(0);
+
+    const openErrorCommand = vscode.commands.registerCommand(
+        'xstateErrors.open',
+        async (uri: vscode.Uri, range: vscode.Range) => {
+            if (!uri || !range) { return; }
+            await vscode.window.showTextDocument(uri, { selection: range, preserveFocus: false, preview: false });
+        }
+    );
+
+    const setErrorsGrouping = (grouping: ErrorsGrouping) => {
+        const cfg = vscode.workspace.getConfiguration('xstateOutline');
+        cfg.update('errorsGrouping', grouping, vscode.ConfigurationTarget.Global);
+        vscode.commands.executeCommand('setContext', 'xstateErrors.grouping', grouping);
+        errorsProvider.setGrouping(grouping);
+    };
+    const setErrorsGroupingFileCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.setErrorsGroupingFile', () => setErrorsGrouping('file'));
+    const setErrorsGroupingSeverityCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.setErrorsGroupingSeverity', () => setErrorsGrouping('severity'));
+    const setErrorsGroupingFlatCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.setErrorsGroupingFlat', () => setErrorsGrouping('flat'));
+
+    // The Errors pane recomputes whenever the outline fully refreshes — this single
+    // hook covers active-editor changes, document edits, scope toggles, workspace-scan
+    // completion, and file-watcher create/delete events. Partial reveals (fire(item),
+    // e.g. cursor sync) pass an element and are ignored.
+    const errorsRefreshListener = treeProvider.onDidChangeTreeData(e => {
+        if (!e) { refreshErrors(); }
+    });
+
     // Click a transition row: navigate to the other state and record the hop on
     // the trail — outgoing (→) appends, incoming (←) prepends.
     const openTransitionCommand = vscode.commands.registerCommand(
@@ -852,6 +908,12 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         treeView,
         navigatorView,
+        errorsView,
+        openErrorCommand,
+        setErrorsGroupingFileCommand,
+        setErrorsGroupingSeverityCommand,
+        setErrorsGroupingFlatCommand,
+        errorsRefreshListener,
         openTransitionCommand,
         showTransitionsCommand,
         trailOpenCommand,
