@@ -25,19 +25,11 @@ interface SetupReferences {
     actors: Map<string, { used: boolean, range: vscode.Range }>;
 }
 
-interface StateReference {
-    range: vscode.Range;
-    targeted: boolean;
-    isInitial: boolean;
-}
-
 interface ValidationContext {
     document: vscode.TextDocument;
     diagnostics: vscode.Diagnostic[];
     explicitIds: Map<string, vscode.Range>;
     setupReferences?: SetupReferences;
-    stateReferences: Map<string, StateReference>;
-    targetReferences: string[];
 }
 
 interface ReferenceCandidate {
@@ -80,8 +72,6 @@ export function validateXStateDocument(document: vscode.TextDocument): vscode.Di
                         diagnostics,
                         explicitIds: new Map<string, vscode.Range>(),
                         setupReferences: setupConfig ? collectSetupReferences(setupConfig, document) : undefined,
-                        stateReferences: new Map<string, StateReference>(),
-                        targetReferences: []
                     };
 
                     if (setupConfig) {
@@ -89,14 +79,12 @@ export function validateXStateDocument(document: vscode.TextDocument): vscode.Di
                     }
                     validateMachineConfig(configArg, context);
                     checkUnusedSetup(context);
-                    checkUnreachableStates(context);
+                    checkUnreachableStates(configArg, context);
                 } else {
                     validateStateConfig(configArg, {
                         document,
                         diagnostics,
                         explicitIds: new Map<string, vscode.Range>(),
-                        stateReferences: new Map<string, StateReference>(),
-                        targetReferences: []
                     });
                 }
             }
@@ -120,14 +108,8 @@ function validateMachineConfig(config: ts.ObjectLiteralExpression, context: Vali
     validateInvokeProperty(findPropertyAssignment(config, 'invoke')?.initializer, context);
 
     const statesProperty = findPropertyAssignment(config, 'states');
-    const initialProperty = findPropertyAssignment(config, 'initial');
-    let initialName: string | undefined;
-    if (initialProperty && ts.isStringLiteralLike(initialProperty.initializer)) {
-        initialName = initialProperty.initializer.text;
-    }
-
     if (statesProperty && ts.isObjectLiteralExpression(statesProperty.initializer)) {
-        validateStatesObject(statesProperty.initializer, context, initialName);
+        validateStatesObject(statesProperty.initializer, context);
     }
 }
 
@@ -144,14 +126,8 @@ function validateStateConfig(config: ts.ObjectLiteralExpression, context: Valida
     validateInvokeProperty(findPropertyAssignment(config, 'invoke')?.initializer, context);
 
     const statesProperty = findPropertyAssignment(config, 'states');
-    const initialProperty = findPropertyAssignment(config, 'initial');
-    let initialName: string | undefined;
-    if (initialProperty && ts.isStringLiteralLike(initialProperty.initializer)) {
-        initialName = initialProperty.initializer.text;
-    }
-
     if (statesProperty && ts.isObjectLiteralExpression(statesProperty.initializer)) {
-        validateStatesObject(statesProperty.initializer, context, initialName);
+        validateStatesObject(statesProperty.initializer, context);
     }
 }
 
@@ -159,23 +135,11 @@ function validateSetupConfig(config: ts.ObjectLiteralExpression, context: Valida
     validateInvalidProperties(config, 'setup', context);
 }
 
-function validateStatesObject(statesObject: ts.ObjectLiteralExpression, context: ValidationContext, parentInitialState?: string): void {
+function validateStatesObject(statesObject: ts.ObjectLiteralExpression, context: ValidationContext): void {
     for (const property of statesObject.properties) {
         if (!ts.isPropertyAssignment(property) || !ts.isObjectLiteralExpression(property.initializer)) {
             continue;
         }
-
-        const name = getPropertyName(property.name);
-        if (!name) {
-            continue;
-        }
-
-        context.stateReferences.set(name, {
-            range: propertyNameRange(context.document, property.name),
-            targeted: false,
-            isInitial: name === parentInitialState
-        });
-
         validateStateConfig(property.initializer, context);
     }
 }
@@ -200,7 +164,6 @@ function validateTransitionValue(node: ts.Expression | undefined, context: Valid
     }
 
     if (ts.isStringLiteralLike(node)) {
-        context.targetReferences.push(node.text);
         return;
     }
 
@@ -231,19 +194,6 @@ function validateTransitionObject(node: ts.ObjectLiteralExpression, context: Val
         );
         diagnostic.severity = vscode.DiagnosticSeverity.Warning;
         context.diagnostics.push(diagnostic);
-    }
-
-    const targetProperty = findPropertyAssignment(node, 'target');
-    if (targetProperty) {
-        if (ts.isStringLiteralLike(targetProperty.initializer)) {
-            context.targetReferences.push(targetProperty.initializer.text);
-        } else if (ts.isArrayLiteralExpression(targetProperty.initializer)) {
-            for (const elem of targetProperty.initializer.elements) {
-                if (ts.isStringLiteralLike(elem)) {
-                    context.targetReferences.push(elem.text);
-                }
-            }
-        }
     }
 
     validateGuardProperty(findPropertyAssignment(node, 'guard')?.initializer ?? findPropertyAssignment(node, 'cond')?.initializer, context);
@@ -365,26 +315,193 @@ function checkUnusedSetup(context: ValidationContext): void {
     check(context.setupReferences.actors, 'Actor', XSTATE_DIAGNOSTIC_CODES.unusedActor);
 }
 
-function checkUnreachableStates(context: ValidationContext): void {
-    // Normalize target references to compare against state keys
-    const targeted = new Set<string>();
-    for (const ref of context.targetReferences) {
-        const segments = ref.replace(/^#/, '').split('.').filter(Boolean);
-        if (segments.length > 0) {
-            targeted.add(segments[segments.length - 1]);
+/** A node in the machine's state hierarchy, used for reachability analysis. */
+interface StateInfo {
+    name: string;
+    range: vscode.Range;
+    parent?: StateInfo;
+    children: StateInfo[];
+    initialChild?: string;
+    isParallel: boolean;
+    targets: string[];   // raw target strings of this state's own transitions
+    id?: string;         // explicit `id`
+}
+
+function getStringProperty(config: ts.ObjectLiteralExpression, name: string): string | undefined {
+    const prop = findPropertyAssignment(config, name);
+    return prop && ts.isStringLiteralLike(prop.initializer) ? prop.initializer.text : undefined;
+}
+
+/** Collect every target string reachable from one transition value (string / object / array). */
+function collectTransitionTargets(node: ts.Expression | undefined, out: string[]): void {
+    if (!node) { return; }
+    if (ts.isStringLiteralLike(node)) { out.push(node.text); return; }
+    if (ts.isObjectLiteralExpression(node)) {
+        const target = findPropertyAssignment(node, 'target');
+        if (target && ts.isStringLiteralLike(target.initializer)) {
+            out.push(target.initializer.text);
+        } else if (target && ts.isArrayLiteralExpression(target.initializer)) {
+            for (const elem of target.initializer.elements) {
+                if (ts.isStringLiteralLike(elem)) { out.push(elem.text); }
+            }
+        }
+        return;
+    }
+    if (ts.isArrayLiteralExpression(node)) {
+        for (const elem of node.elements) { collectTransitionTargets(elem, out); }
+    }
+}
+
+/** All transition targets declared on a single state config (on / always / after / invoke / onDone / onError). */
+function collectStateTargets(config: ts.ObjectLiteralExpression): string[] {
+    const out: string[] = [];
+
+    for (const mapKey of ['on', 'after']) {
+        const map = findPropertyAssignment(config, mapKey)?.initializer;
+        if (map && ts.isObjectLiteralExpression(map)) {
+            for (const prop of map.properties) {
+                if (ts.isPropertyAssignment(prop)) { collectTransitionTargets(prop.initializer, out); }
+            }
         }
     }
 
-    for (const [name, stateRef] of context.stateReferences.entries()) {
-        if (!stateRef.isInitial && !targeted.has(name)) {
-            const diagnostic = createDiagnostic(
-                stateRef.range,
-                `State '${name}' appears to be unreachable. It is not an initial state and has no incoming transitions.`,
-                XSTATE_DIAGNOSTIC_CODES.unreachableState
-            );
-            diagnostic.severity = vscode.DiagnosticSeverity.Warning;
-            context.diagnostics.push(diagnostic);
+    for (const key of ['always', 'onDone', 'onError']) {
+        collectTransitionTargets(findPropertyAssignment(config, key)?.initializer, out);
+    }
+
+    const invoke = findPropertyAssignment(config, 'invoke')?.initializer;
+    const invokeObjects: ts.ObjectLiteralExpression[] = [];
+    if (invoke && ts.isObjectLiteralExpression(invoke)) {
+        invokeObjects.push(invoke);
+    } else if (invoke && ts.isArrayLiteralExpression(invoke)) {
+        for (const elem of invoke.elements) {
+            if (ts.isObjectLiteralExpression(elem)) { invokeObjects.push(elem); }
         }
+    }
+    for (const obj of invokeObjects) {
+        collectTransitionTargets(findPropertyAssignment(obj, 'onDone')?.initializer, out);
+        collectTransitionTargets(findPropertyAssignment(obj, 'onError')?.initializer, out);
+    }
+
+    return out;
+}
+
+/** Build a StateInfo tree from a machine/state config object. */
+function buildStateInfo(
+    name: string,
+    range: vscode.Range,
+    config: ts.ObjectLiteralExpression,
+    document: vscode.TextDocument,
+    parent: StateInfo | undefined,
+): StateInfo {
+    const info: StateInfo = {
+        name,
+        range,
+        parent,
+        children: [],
+        initialChild: getStringProperty(config, 'initial'),
+        isParallel: getStringProperty(config, 'type') === 'parallel',
+        targets: collectStateTargets(config),
+        id: getStringProperty(config, 'id'),
+    };
+
+    const states = findPropertyAssignment(config, 'states')?.initializer;
+    if (states && ts.isObjectLiteralExpression(states)) {
+        for (const property of states.properties) {
+            if (!ts.isPropertyAssignment(property) || !ts.isObjectLiteralExpression(property.initializer)) { continue; }
+            const childName = getPropertyName(property.name);
+            if (!childName) { continue; }
+            info.children.push(buildStateInfo(
+                childName,
+                propertyNameRange(document, property.name),
+                property.initializer,
+                document,
+                info,
+            ));
+        }
+    }
+
+    return info;
+}
+
+/**
+ * Flag states that cannot be entered from the machine's initial configuration.
+ *
+ * This is a true reachability walk, not a "targeted anywhere" check: starting at
+ * the machine's initial state(s), it follows transition targets (and initial-state
+ * chains / parallel regions) to a fixpoint. A state targeted only by an otherwise
+ * unreachable state is therefore still flagged — transitively-orphaned clusters are
+ * caught. Targets resolve by bare name (last path segment) or explicit `id`, matching
+ * the resolution used elsewhere in the extension.
+ */
+function checkUnreachableStates(machineConfig: ts.ObjectLiteralExpression, context: ValidationContext): void {
+    const dummyRange = new vscode.Range(0, 0, 0, 0);
+    const root = buildStateInfo('(machine)', dummyRange, machineConfig, context.document, undefined);
+
+    const all: StateInfo[] = [];
+    (function collect(state: StateInfo) {
+        for (const child of state.children) { all.push(child); collect(child); }
+    })(root);
+    if (all.length === 0) { return; }
+
+    const byName = new Map<string, StateInfo>();
+    const byId = new Map<string, StateInfo>();
+    for (const state of all) {
+        byName.set(state.name, state);
+        if (state.id) { byId.set(state.id, state); }
+    }
+
+    const resolve = (raw: string): StateInfo | undefined => {
+        const segments = raw.replace(/^#/, '').split('.').filter(Boolean);
+        if (segments.length === 0) { return undefined; }
+        return byName.get(segments[segments.length - 1]) ?? byId.get(segments[0]);
+    };
+
+    const reachable = new Set<StateInfo>();
+    const activate = (state: StateInfo): void => {
+        if (reachable.has(state)) { return; }
+        // Mark this state and its ancestors active (you cannot be in a child
+        // without its parents) — but not the parents' other children.
+        let cursor: StateInfo | undefined = state;
+        while (cursor && cursor !== root && !reachable.has(cursor)) {
+            reachable.add(cursor);
+            cursor = cursor.parent;
+        }
+        enterInitialConfig(state);
+    };
+    const enterInitialConfig = (state: StateInfo): void => {
+        if (state.children.length === 0) { return; }
+        if (state.isParallel) {
+            for (const child of state.children) { activate(child); }
+            return;
+        }
+        const initial = (state.initialChild && state.children.find(c => c.name === state.initialChild))
+            || state.children[0];
+        if (initial) { activate(initial); }
+    };
+
+    // Seed with the machine's own initial configuration, then follow transitions.
+    enterInitialConfig(root);
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const state of [...reachable]) {
+            for (const target of state.targets) {
+                const dest = resolve(target);
+                if (dest && !reachable.has(dest)) { activate(dest); changed = true; }
+            }
+        }
+    }
+
+    for (const state of all) {
+        if (reachable.has(state)) { continue; }
+        const diagnostic = createDiagnostic(
+            state.range,
+            `State '${state.name}' appears to be unreachable. It cannot be entered from the machine's initial state.`,
+            XSTATE_DIAGNOSTIC_CODES.unreachableState
+        );
+        diagnostic.severity = vscode.DiagnosticSeverity.Warning;
+        context.diagnostics.push(diagnostic);
     }
 }
 

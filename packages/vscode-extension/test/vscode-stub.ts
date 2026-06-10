@@ -1,12 +1,26 @@
-// Minimal `vscode` stand-in for unit-testing pure modules (the parser) without
-// the VS Code runtime. Only the surface the parser touches is implemented:
-// Position, Range, and Uri. Aliased in for `vscode` via vitest.config.ts.
+// Minimal `vscode` stand-in for unit-testing pure modules (parser, diagnostics)
+// without the VS Code runtime. Only the surface those modules touch is
+// implemented. Aliased in for `vscode` via vitest.config.ts.
 export class Position {
     constructor(public readonly line: number, public readonly character: number) {}
 }
 
 export class Range {
-    constructor(public readonly start: Position, public readonly end: Position) {}
+    public readonly start: Position;
+    public readonly end: Position;
+    // Mirrors VS Code's two constructor overloads: (start, end) and
+    // (startLine, startChar, endLine, endChar).
+    constructor(start: Position, end: Position);
+    constructor(startLine: number, startChar: number, endLine: number, endChar: number);
+    constructor(a: Position | number, b: Position | number, c?: number, d?: number) {
+        if (typeof a === 'number') {
+            this.start = new Position(a, b as number);
+            this.end = new Position(c as number, d as number);
+        } else {
+            this.start = a;
+            this.end = b as Position;
+        }
+    }
     contains(posOrRange: Position | Range): boolean {
         const lo = posOrRange instanceof Range ? posOrRange.start : posOrRange;
         const hi = posOrRange instanceof Range ? posOrRange.end : posOrRange;
@@ -21,3 +35,17 @@ export class Range {
 export const Uri = {
     file: (p: string) => ({ fsPath: p, path: p, scheme: 'file', toString: () => `file://${p}` }),
 };
+
+export enum DiagnosticSeverity { Error = 0, Warning = 1, Information = 2, Hint = 3 }
+
+export enum DiagnosticTag { Unnecessary = 1, Deprecated = 2 }
+
+export class Diagnostic {
+    public severity: DiagnosticSeverity = DiagnosticSeverity.Error;
+    public source?: string;
+    public code?: string | number;
+    public tags?: DiagnosticTag[];
+    constructor(public range: Range, public message: string, severity?: DiagnosticSeverity) {
+        if (severity !== undefined) { this.severity = severity; }
+    }
+}
