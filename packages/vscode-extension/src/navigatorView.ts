@@ -57,8 +57,8 @@ type TxRow = { kind: 'tx'; ref: TransitionRef };
 type Hint = { kind: 'hint'; text: string };
 type NavNode = TxRow | Hint;
 
-const arrowIn = 'arrow-small-left';
-const arrowOut = 'arrow-small-right';
+const arrowIn = 'arrow-left';
+const arrowOut = 'arrow-right';
 
 /**
  * "Transitions" pane — a single flat list, no group headers. The icon carries
