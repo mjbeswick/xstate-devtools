@@ -190,9 +190,10 @@ function validateTransitionObject(node: ts.ObjectLiteralExpression, context: Val
         const diagnostic = createDiagnostic(
             range,
             "'cond' is deprecated here; use 'guard' instead.",
-            XSTATE_DIAGNOSTIC_CODES.condDeprecated
+            XSTATE_DIAGNOSTIC_CODES.condDeprecated,
+            vscode.DiagnosticSeverity.Information
         );
-        diagnostic.severity = vscode.DiagnosticSeverity.Warning;
+        diagnostic.tags = [vscode.DiagnosticTag.Deprecated];
         context.diagnostics.push(diagnostic);
     }
 
@@ -241,7 +242,8 @@ function validateActionProperty(node: ts.Expression | undefined, context: Valida
         context.diagnostics.push(createDiagnostic(
             nodeRange(context.document, candidate.node),
             `Unknown action reference '${candidate.name}' in setup().`,
-            XSTATE_DIAGNOSTIC_CODES.unknownAction
+            XSTATE_DIAGNOSTIC_CODES.unknownAction,
+            vscode.DiagnosticSeverity.Error
         ));
     }
 }
@@ -265,7 +267,8 @@ function validateGuardProperty(node: ts.Expression | undefined, context: Validat
     context.diagnostics.push(createDiagnostic(
         nodeRange(context.document, candidate.node),
         `Unknown guard reference '${candidate.name}' in setup().`,
-        XSTATE_DIAGNOSTIC_CODES.unknownGuard
+        XSTATE_DIAGNOSTIC_CODES.unknownGuard,
+        vscode.DiagnosticSeverity.Error
     ));
 }
 
@@ -288,7 +291,8 @@ function validateActorProperty(node: ts.Expression | undefined, context: Validat
     context.diagnostics.push(createDiagnostic(
         nodeRange(context.document, candidate.node),
         `Unknown actor reference '${candidate.name}' in setup().`,
-        XSTATE_DIAGNOSTIC_CODES.unknownActor
+        XSTATE_DIAGNOSTIC_CODES.unknownActor,
+        vscode.DiagnosticSeverity.Error
     ));
 }
 
@@ -523,7 +527,8 @@ function validateExplicitId(node: ts.ObjectLiteralExpression, context: Validatio
     context.diagnostics.push(createDiagnostic(
         currentRange,
         `Duplicate explicit id '${idValue}' in this machine.`,
-        XSTATE_DIAGNOSTIC_CODES.duplicateId
+        XSTATE_DIAGNOSTIC_CODES.duplicateId,
+        vscode.DiagnosticSeverity.Error
     ));
 }
 
@@ -861,8 +866,13 @@ function nodeRange(document: vscode.TextDocument, node: ts.Node): vscode.Range {
     return new vscode.Range(document.positionAt(node.getStart()), document.positionAt(node.getEnd()));
 }
 
-function createDiagnostic(range: vscode.Range, message: string, code: string): vscode.Diagnostic {
-    const diagnostic = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
+function createDiagnostic(
+    range: vscode.Range,
+    message: string,
+    code: string,
+    severity: vscode.DiagnosticSeverity = vscode.DiagnosticSeverity.Warning,
+): vscode.Diagnostic {
+    const diagnostic = new vscode.Diagnostic(range, message, severity);
     diagnostic.source = XSTATE_DIAGNOSTIC_SOURCE;
     diagnostic.code = code;
     return diagnostic;

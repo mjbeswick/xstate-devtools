@@ -4,6 +4,9 @@ import { isSupportedXStateDocument, validateXStateDocument } from './diagnostics
 
 export type ErrorsGrouping = 'file' | 'severity' | 'flat';
 
+/** Minimum-severity filter: which problems the pane shows. */
+export type ErrorsFilter = 'all' | 'warning' | 'error';
+
 /** One file's validated diagnostics, cached by document version. */
 interface FileDiagnostics {
     uri: vscode.Uri;
@@ -69,13 +72,16 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
      * (fsPath) so a file arriving under two URI representations can't double up. */
     private results = new Map<string, FileDiagnostics>();
     private grouping: ErrorsGrouping;
+    private filter: ErrorsFilter;
 
     constructor(
         private readonly getScope: () => 'file' | 'workspace',
         private readonly workspaceScanner: WorkspaceScanner,
         initialGrouping: ErrorsGrouping,
+        initialFilter: ErrorsFilter,
     ) {
         this.grouping = initialGrouping;
+        this.filter = initialFilter;
     }
 
     setGrouping(grouping: ErrorsGrouping): void {
@@ -84,10 +90,28 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
         this._onDidChangeTreeData.fire();
     }
 
-    /** Total issues across all in-scope files — used for the view badge. */
+    setFilter(filter: ErrorsFilter): void {
+        if (this.filter === filter) { return; }
+        this.filter = filter;
+        this._onDidChangeTreeData.fire();
+    }
+
+    /** Does a severity pass the current minimum-severity filter? */
+    private severityVisible(severity: vscode.DiagnosticSeverity): boolean {
+        if (this.filter === 'error') { return severity === vscode.DiagnosticSeverity.Error; }
+        if (this.filter === 'warning') { return severity <= vscode.DiagnosticSeverity.Warning; }
+        return true;
+    }
+
+    /** A file's diagnostics that pass the current filter. */
+    private visible(fd: FileDiagnostics): vscode.Diagnostic[] {
+        return this.filter === 'all' ? fd.diagnostics : fd.diagnostics.filter(d => this.severityVisible(d.severity));
+    }
+
+    /** Total visible issues across all in-scope files — used for the view badge. */
     totalCount(): number {
         let n = 0;
-        for (const fd of this.results.values()) { n += fd.diagnostics.length; }
+        for (const fd of this.results.values()) { n += this.visible(fd).length; }
         return n;
     }
 
@@ -99,12 +123,12 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
         if (node.kind === 'file') {
             const fd = this.results.get(node.uri.fsPath);
             if (!fd) { return ''; }
-            return [node.relativePath, ...fd.diagnostics.map(d => '  ' + formatIssue(node.relativePath, d))].join('\n');
+            return [node.relativePath, ...this.visible(fd).map(d => '  ' + formatIssue(node.relativePath, d))].join('\n');
         }
         if (node.kind === 'severity') {
             const lines: string[] = [];
             for (const fd of this.results.values()) {
-                for (const d of fd.diagnostics) {
+                for (const d of this.visible(fd)) {
                     if (d.severity === node.severity) { lines.push('  ' + formatIssue(fd.relativePath, d)); }
                 }
             }
@@ -157,12 +181,12 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
         if (el.kind === 'file') {
             const fd = this.results.get(el.uri.fsPath);
             if (!fd) { return []; }
-            return fd.diagnostics.map(d => this.issueRow(el.uri, el.relativePath, d));
+            return this.visible(fd).map(d => this.issueRow(el.uri, el.relativePath, d));
         }
         if (el.kind === 'severity') {
             const rows: IssueRow[] = [];
             for (const fd of this.results.values()) {
-                for (const d of fd.diagnostics) {
+                for (const d of this.visible(fd)) {
                     if (d.severity === el.severity) { rows.push(this.issueRow(fd.uri, fd.relativePath, d)); }
                 }
             }
@@ -179,7 +203,8 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
         if (this.grouping === 'file') {
             const rows: FileGroupRow[] = [];
             for (const fd of this.results.values()) {
-                rows.push({ kind: 'file', uri: fd.uri, relativePath: fd.relativePath, count: fd.diagnostics.length });
+                const count = this.visible(fd).length;
+                if (count > 0) { rows.push({ kind: 'file', uri: fd.uri, relativePath: fd.relativePath, count }); }
             }
             return rows.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
         }
@@ -187,7 +212,7 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
         if (this.grouping === 'severity') {
             const counts = new Map<vscode.DiagnosticSeverity, number>();
             for (const fd of this.results.values()) {
-                for (const d of fd.diagnostics) { counts.set(d.severity, (counts.get(d.severity) ?? 0) + 1); }
+                for (const d of this.visible(fd)) { counts.set(d.severity, (counts.get(d.severity) ?? 0) + 1); }
             }
             return SEVERITY_META
                 .filter(m => counts.has(m.severity))
@@ -197,7 +222,7 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
         // flat
         const rows: IssueRow[] = [];
         for (const fd of this.results.values()) {
-            for (const d of fd.diagnostics) { rows.push(this.issueRow(fd.uri, fd.relativePath, d)); }
+            for (const d of this.visible(fd)) { rows.push(this.issueRow(fd.uri, fd.relativePath, d)); }
         }
         return rows;
     }

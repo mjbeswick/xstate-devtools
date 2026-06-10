@@ -98,6 +98,25 @@ describe('unreachable-state reachability walk', () => {
         expect(unreachable(src)).toEqual([]);
     });
 
+    it('marks unknown setup references as Errors and unreachable as a Warning', () => {
+        const src = `
+            import { setup } from 'xstate';
+            export const m = setup({
+                actions: { known: () => {} },
+            }).createMachine({
+                initial: 'idle',
+                states: {
+                    idle: { entry: 'mystery' },
+                    orphan: {},
+                },
+            });
+        `;
+        const diags = validateXStateDocument(makeDoc(src));
+        const byCode = (code: string) => diags.find(d => d.code === code);
+        expect(byCode(XSTATE_DIAGNOSTIC_CODES.unknownAction)?.severity).toBe(vscode.DiagnosticSeverity.Error);
+        expect(byCode(XSTATE_DIAGNOSTIC_CODES.unreachableState)?.severity).toBe(vscode.DiagnosticSeverity.Warning);
+    });
+
     it('resolves targets by explicit id', () => {
         const src = `
             createMachine({

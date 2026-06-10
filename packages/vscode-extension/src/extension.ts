@@ -13,7 +13,7 @@ import { XStateReferenceProvider, XStateRenameProvider } from './providers';
 import { XStateHoverProvider } from './hoverProvider';
 import { XStateGraphViewProvider } from './graphView';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
-import { ErrorsTreeProvider, ErrorsGrouping } from './errorsView';
+import { ErrorsTreeProvider, ErrorsGrouping, ErrorsFilter } from './errorsView';
 
 let selectionTimeout: NodeJS.Timeout | undefined;
 
@@ -29,6 +29,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const initialGroupEventHandlers = config.get<boolean>('groupEventHandlers', false);
     const initialSortChildren = config.get<string>('sortChildren', 'original');
     const initialErrorsGrouping = config.get<ErrorsGrouping>('errorsGrouping', 'file');
+    const initialErrorsFilter = config.get<ErrorsFilter>('errorsFilter', 'warning');
     let followCursor = config.get<boolean>('followCursor', true);
 
     let graphReflectsTreeExpansion = config.get<boolean>('graphReflectsTreeExpansion', true);
@@ -41,6 +42,7 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('setContext', 'xstateOutline.groupEventHandlers', initialGroupEventHandlers),
         vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenIsSorted', initialSortChildren === 'sorted'),
         vscode.commands.executeCommand('setContext', 'xstateErrors.grouping', initialErrorsGrouping),
+        vscode.commands.executeCommand('setContext', 'xstateErrors.filter', initialErrorsFilter),
         vscode.commands.executeCommand('setContext', 'xstateOutline.followCursor', followCursor),
         vscode.commands.executeCommand('setContext', 'xstateOutline.graphReflectsTreeExpansion', graphReflectsTreeExpansion),
     ]);
@@ -711,6 +713,7 @@ export async function activate(context: vscode.ExtensionContext) {
         () => treeProvider.getScope(),
         workspaceScanner,
         initialErrorsGrouping,
+        initialErrorsFilter,
     );
     const errorsView = vscode.window.createTreeView('xstateMachineErrors', { treeDataProvider: errorsProvider, showCollapseAll: true });
 
@@ -760,6 +763,22 @@ export async function activate(context: vscode.ExtensionContext) {
         'xstateMachineOutline.setErrorsGroupingSeverity', () => setErrorsGrouping('severity'));
     const setErrorsGroupingFlatCommand = vscode.commands.registerCommand(
         'xstateMachineOutline.setErrorsGroupingFlat', () => setErrorsGrouping('flat'));
+
+    const setErrorsFilter = (filter: ErrorsFilter) => {
+        const cfg = vscode.workspace.getConfiguration('xstateOutline');
+        cfg.update('errorsFilter', filter, vscode.ConfigurationTarget.Global);
+        vscode.commands.executeCommand('setContext', 'xstateErrors.filter', filter);
+        errorsProvider.setFilter(filter);
+        errorsView.badge = errorsProvider.totalCount() > 0
+            ? { value: errorsProvider.totalCount(), tooltip: 'XState problems' }
+            : undefined;
+    };
+    const setErrorsFilterAllCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.setErrorsFilterAll', () => setErrorsFilter('all'));
+    const setErrorsFilterWarningsCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.setErrorsFilterWarnings', () => setErrorsFilter('warning'));
+    const setErrorsFilterErrorsCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.setErrorsFilterErrors', () => setErrorsFilter('error'));
 
     // The Errors pane recomputes whenever the outline fully refreshes — this single
     // hook covers active-editor changes, document edits, scope toggles, workspace-scan
@@ -892,6 +911,9 @@ export async function activate(context: vscode.ExtensionContext) {
         setErrorsGroupingFileCommand,
         setErrorsGroupingSeverityCommand,
         setErrorsGroupingFlatCommand,
+        setErrorsFilterAllCommand,
+        setErrorsFilterWarningsCommand,
+        setErrorsFilterErrorsCommand,
         errorsRefreshListener,
         openTransitionCommand,
         showTransitionsCommand,

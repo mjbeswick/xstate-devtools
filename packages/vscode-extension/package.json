@@ -213,6 +213,21 @@
         "icon": "$(copy)"
       },
       {
+        "command": "xstateMachineOutline.setErrorsFilterAll",
+        "title": "Show: all",
+        "icon": "$(list-filter)"
+      },
+      {
+        "command": "xstateMachineOutline.setErrorsFilterWarnings",
+        "title": "Show: warnings & errors",
+        "icon": "$(warning)"
+      },
+      {
+        "command": "xstateMachineOutline.setErrorsFilterErrors",
+        "title": "Show: errors only",
+        "icon": "$(error)"
+      },
+      {
         "command": "xstateMachineOutline.navigateToNode",
         "title": "Go to Source"
       },
@@ -336,6 +351,21 @@
           ],
           "default": "file",
           "description": "How the Errors pane groups problems: by file, by severity, or a flat list"
+        },
+        "xstateOutline.errorsFilter": {
+          "type": "string",
+          "enum": [
+            "all",
+            "warning",
+            "error"
+          ],
+          "enumDescriptions": [
+            "Show everything, including deprecations and unused-setup hints",
+            "Show errors and warnings (hide informational hints)",
+            "Show only errors — problems that fail at runtime"
+          ],
+          "default": "warning",
+          "description": "Minimum severity shown in the Errors pane"
         }
       }
     },
@@ -415,6 +445,21 @@
           "command": "xstateMachineOutline.setSortChildrenOriginal",
           "when": "view == xstateMachineOutline && xstateOutline.sortChildrenIsSorted",
           "group": "5_sort@2"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsFilterAll",
+          "when": "view == xstateMachineErrors && xstateErrors.filter != all",
+          "group": "0_filter@1"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsFilterWarnings",
+          "when": "view == xstateMachineErrors && xstateErrors.filter != warning",
+          "group": "0_filter@2"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsFilterErrors",
+          "when": "view == xstateMachineErrors && xstateErrors.filter != error",
+          "group": "0_filter@3"
         },
         {
           "command": "xstateMachineOutline.setErrorsGroupingFile",
@@ -529,6 +574,18 @@
         },
         {
           "command": "xstateMachineOutline.setErrorsGroupingFlat",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsFilterAll",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsFilterWarnings",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsFilterErrors",
           "when": "false"
         },
         {
