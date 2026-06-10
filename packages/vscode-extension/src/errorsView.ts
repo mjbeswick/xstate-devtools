@@ -34,6 +34,12 @@ function severityMeta(severity: vscode.DiagnosticSeverity) {
     return SEVERITY_META.find(m => m.severity === severity) ?? SEVERITY_META[1];
 }
 
+/** A single issue as a paste-friendly line: `path:line:col - message`. */
+function formatIssue(relativePath: string, d: vscode.Diagnostic): string {
+    const { line, character } = d.range.start;
+    return `${relativePath}:${line + 1}:${character + 1} - ${d.message}`;
+}
+
 /**
  * "Errors" pane — aggregates every XState diagnostic produced by
  * `validateXStateDocument` (orphaned states, unknown refs, duplicate ids, invalid
@@ -68,6 +74,29 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
         let n = 0;
         for (const fd of this.results.values()) { n += fd.diagnostics.length; }
         return n;
+    }
+
+    /** Clipboard text for a node: a single issue, or every issue under a group. */
+    copyText(node: ErrorNode): string {
+        if (node.kind === 'issue') {
+            return formatIssue(node.relativePath, node.diagnostic);
+        }
+        if (node.kind === 'file') {
+            const fd = this.results.get(node.uri.toString());
+            if (!fd) { return ''; }
+            return [node.relativePath, ...fd.diagnostics.map(d => '  ' + formatIssue(node.relativePath, d))].join('\n');
+        }
+        if (node.kind === 'severity') {
+            const lines: string[] = [];
+            for (const [uriStr, fd] of this.results) {
+                void uriStr;
+                for (const d of fd.diagnostics) {
+                    if (d.severity === node.severity) { lines.push('  ' + formatIssue(fd.relativePath, d)); }
+                }
+            }
+            return [severityMeta(node.severity).label, ...lines].join('\n');
+        }
+        return '';
     }
 
     /** Re-validate the in-scope documents and refresh the tree. */
@@ -178,6 +207,7 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
             item.iconPath = new vscode.ThemeIcon('file');
             item.resourceUri = node.uri;
             item.tooltip = node.uri.fsPath;
+            item.contextValue = 'errorFileGroup';
             return item;
         }
 
@@ -186,12 +216,14 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
             const item = new vscode.TreeItem(meta.label, vscode.TreeItemCollapsibleState.Expanded);
             item.description = `${node.count}`;
             item.iconPath = new vscode.ThemeIcon(meta.icon, meta.color);
+            item.contextValue = 'errorSeverityGroup';
             return item;
         }
 
         // issue row
         const meta = severityMeta(node.diagnostic.severity);
         const item = new vscode.TreeItem(node.diagnostic.message);
+        item.contextValue = 'errorIssue';
         item.iconPath = new vscode.ThemeIcon(meta.icon, meta.color);
         const line = node.diagnostic.range.start.line + 1;
         item.description = this.grouping === 'flat' ? `${node.relativePath}:${line}` : `${line}`;

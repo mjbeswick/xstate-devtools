@@ -208,6 +208,11 @@
         "title": "Go to Problem"
       },
       {
+        "command": "xstateErrors.copy",
+        "title": "Copy",
+        "icon": "$(copy)"
+      },
+      {
         "command": "xstateMachineOutline.navigateToNode",
         "title": "Go to Source"
       },
@@ -467,6 +472,11 @@
           "command": "xstateMachineOutline.deleteNode",
           "when": "view == xstateMachineOutline && (viewItem == state || viewItem == transition || viewItem == target || viewItem == action || viewItem == guard || viewItem == invoke || viewItem == contextProperty || viewItem == actor || viewItem == delay || viewItem == invalid)",
           "group": "edit@5"
+        },
+        {
+          "command": "xstateErrors.copy",
+          "when": "view == xstateMachineErrors && (viewItem == errorIssue || viewItem == errorFileGroup || viewItem == errorSeverityGroup)",
+          "group": "9_copy@1"
         }
       ],
       "view/item/inline": [
@@ -506,6 +516,10 @@
           "when": "false"
         },
         {
+          "command": "xstateErrors.copy",
+          "when": "false"
+        },
+        {
           "command": "xstateMachineOutline.setErrorsGroupingFile",
           "when": "false"
         },
@@ -538,6 +552,12 @@
         "key": "f12",
         "mac": "f12",
         "when": "focusedView == xstateMachineOutline"
+      },
+      {
+        "command": "xstateErrors.copy",
+        "key": "ctrl+c",
+        "mac": "cmd+c",
+        "when": "focusedView == xstateMachineErrors"
       }
     ]
   },

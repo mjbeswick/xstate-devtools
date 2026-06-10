@@ -736,6 +736,18 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    // Copy one or more selected error rows / groups to the clipboard. Invoked
+    // from the context menu (passes the clicked node + the full selection) or via
+    // the keybinding (no args — fall back to the view's current selection).
+    const copyErrorCommand = vscode.commands.registerCommand(
+        'xstateErrors.copy',
+        async (node?: unknown, selection?: unknown[]) => {
+            const nodes = (selection && selection.length ? selection : node ? [node] : errorsView.selection) as Parameters<typeof errorsProvider.copyText>[0][];
+            const text = nodes.map(n => errorsProvider.copyText(n)).filter(Boolean).join('\n');
+            if (text) { await vscode.env.clipboard.writeText(text); }
+        }
+    );
+
     const setErrorsGrouping = (grouping: ErrorsGrouping) => {
         const cfg = vscode.workspace.getConfiguration('xstateOutline');
         cfg.update('errorsGrouping', grouping, vscode.ConfigurationTarget.Global);
@@ -876,6 +888,7 @@ export async function activate(context: vscode.ExtensionContext) {
         navigatorView,
         errorsView,
         openErrorCommand,
+        copyErrorCommand,
         setErrorsGroupingFileCommand,
         setErrorsGroupingSeverityCommand,
         setErrorsGroupingFlatCommand,
