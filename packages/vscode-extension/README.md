@@ -133,6 +133,22 @@ const machine = setup({
 - **Right-click** any tree node for editing actions and **Go to Implementation**.
 - In **Search**, use ↑/↓/Enter to move through results and the funnel button to filter by node type.
 
+## Keyboard shortcuts
+
+| Where | Keys | Action |
+| --- | --- | --- |
+| **Outline** (focused) | **F12** | Go to Implementation for the selected action / guard / target |
+| **Errors** pane (focused) | **Ctrl/Cmd+C** | Copy the selected problem(s) or group |
+| **Search** | **↑ / ↓ / Enter** | Move through results and open the selected one |
+| **Diagram** | **arrow keys** | Move the selection between states |
+| **Diagram** | **Enter** | Expand/collapse the selected compound, or jump a leaf state to its source |
+| **Diagram** | **Shift+arrows** | Pan |
+| **Diagram** | **`]` / `[`** (or **`+` / `-`**) | Zoom in / out |
+| **Diagram** | **`0`** or **`.`** | Fit to screen |
+| **Diagram** | **`1`** | Reset to actual size (100%) |
+
+> The **F12** and **Ctrl/Cmd+C** bindings are contributed defaults — rebind them in VS Code's *Keyboard Shortcuts* if you prefer.
+
 ## Settings
 
 | Setting | Default | Description |
