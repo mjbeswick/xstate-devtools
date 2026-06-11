@@ -932,14 +932,16 @@ function ensureSelectedVisible() {
 
 // `emphasize` (default true) gives an explicit selection the hover-style focus
 // effect. Passive selection (cursor sync, first open) passes false — just the ring.
-function selectNode(id: string | null, emphasize = true) {
+// `pan` (default true) brings the node into view; pass false on first open so the
+// highlight doesn't shove the freshly-centred diagram off to one edge.
+function selectNode(id: string | null, emphasize = true, pan = true) {
     const prev = selectedId;
     selectedId = id;
     emphasized = emphasize && !!id;
     if (prev && prev !== id) { applyNodeStyle(prev); }  // revert old to default
     if (id) { applyNodeStyle(id); }                     // paint new as selected
     refreshEdgeEmphasis();
-    ensureSelectedVisible();
+    if (pan) { ensureSelectedVisible(); }
 }
 
 // Move selection to the nearest selectable node in `dir`. Score favours travel
@@ -1180,6 +1182,7 @@ render({ fit: true }).then(() => {
     // auto-centres even if layout wasn't settled when the sync fit ran.
     fitWhenReady();
     container.focus();
-    // Select (and pan to) the node the panel was opened on, if any.
-    if (initialSelect) { selectNode(idByName.get(initialSelect) ?? null, false); }
+    // Highlight the node the panel was opened on, if any — but keep the diagram
+    // centred (no pan), so right-click → View Diagram opens centred.
+    if (initialSelect) { selectNode(idByName.get(initialSelect) ?? null, false, false); }
 }).catch(showError);
