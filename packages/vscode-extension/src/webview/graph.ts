@@ -71,11 +71,12 @@ const C = {
     selBg:  themeVar('--vscode-list-activeSelectionBackground', '#cce5ff'),
     desc:   themeVar('--vscode-descriptionForeground',          '#717171'),
     accent: themeVar('--vscode-charts-blue',                    '#3b82f6'),
-    // State-kind accents, mirroring the tree outline's icon colours: red final,
-    // blue parallel. The initial dot uses the foreground colour (the Harel solid
-    // black dot — black on light themes, adapting to white on dark).
-    stFinal:    themeVar('--vscode-charts-red',    '#d24b4b'),
-    stParallel: themeVar('--vscode-charts-blue',   '#3b82f6'),
+    // State-kind accents. The final-state double ring uses the neutral
+    // foreground colour (a red ring reads as an error); parallel uses blue. The
+    // initial dot uses the foreground colour (the Harel solid black dot — black
+    // on light themes, adapting to white on dark).
+    stFinal:    themeVar('--vscode-editor-foreground', '#1f1f1f'),
+    stParallel: themeVar('--vscode-charts-blue',       '#3b82f6'),
     // Simulator: the currently-active state configuration.
     simActive:  themeVar('--vscode-charts-green',  '#388a34'),
 };

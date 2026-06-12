@@ -99,7 +99,7 @@ The example above shows a parallel `checkout` machine: the dashed outer box with
 | 🔤 Context · 🔧 context property | Machine context |
 | ❌ Red error | Invalid / unknown property |
 
-In the diagram, state borders, arrows, and labels follow your editor's foreground color; state fills use the editor widget background; a **selected** state is filled with your theme's selection color and outlined with the focus color. The **initial** dot follows the foreground color (a solid black dot on light themes, per Harel convention); a **final** state's inner outline is red, and **parallel** states use a blue dashed border.
+In the diagram, state borders, arrows, and labels follow your editor's foreground color; state fills use the editor widget background; a **selected** state is filled with your theme's selection color and outlined with the focus color. The **initial** dot follows the foreground color (a solid black dot on light themes, per Harel convention); a **final** state gets a second inner outline in the foreground color (the Harel double border), and **parallel** states use a blue dashed border.
 
 ## Supported patterns
 
