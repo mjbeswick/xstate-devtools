@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.10.1] - 2026-06-12
+
+### Fixed
+- **Transition targets now resolve relative to the source state** (XState scoping — a bare `target` is a sibling). Previously a flat, global name lookup meant that in a machine with **duplicate state names** (e.g. a `token`/`basket` nested in a compound *and* a top-level one), a sibling-targeting transition could resolve to the wrong same-named state — drawing diagram edges to the wrong node and making downstream states wrongly report as **unreachable** in the simulator / "How Do I Reach This State?"
+- **Final states no longer look like errors** — the diagram's final-state double ring and the outline's final-state bullseye now use the neutral foreground colour instead of red
+
 ## [1.10.0] - 2026-06-12
 
 ### Added
