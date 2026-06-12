@@ -970,6 +970,40 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    // Shared: a state node's enclosing machine (for path/test-path commands).
+    const enclosingMachine = (node: MachineNode, uri?: vscode.Uri): MachineNode | undefined => {
+        if (node.type === 'machine') { return node; }
+        if (!uri) { return undefined; }
+        const fileMachines = workspaceScanner.getFile(uri);
+        return fileMachines?.machines.find(m => m.range.contains(node.range));
+    };
+
+    // "How do I reach this state?" — shortest event path from the initial state.
+    const howToReachCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.howToReach',
+        (treeItem) => {
+            const node: MachineNode | undefined = treeItem?.node;
+            if (!node) { return; }
+            const root = enclosingMachine(node, treeItem.uri);
+            if (root) { void graphViewProvider.howToReach(root, node); }
+        }
+    );
+
+    // Generate a coverage report + test skeletons for a whole machine.
+    const generateTestPathsCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.generateTestPaths',
+        (treeItem) => {
+            const node: MachineNode | undefined = treeItem?.node;
+            if (!node) { return; }
+            let root = node;
+            const hasChildStates = (node.children ?? []).some((c: MachineNode) => c.type === 'state');
+            if (node.type === 'state' && !hasChildStates) {
+                root = enclosingMachine(node, treeItem.uri) ?? node;
+            }
+            void graphViewProvider.generateTestPaths(root);
+        }
+    );
+
     // ── CodeLens: stats + "View Diagram" above each machine ─────────────────
     const codeLensProvider = new XStateCodeLensProvider();
     const codeLensRegistration = vscode.languages.registerCodeLensProvider(xstateLanguages, codeLensProvider);
@@ -982,6 +1016,8 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         openGraphViewForNodeCommand,
         exportMermaidCommand,
+        howToReachCommand,
+        generateTestPathsCommand,
         codeLensRegistration,
         codeLensDiagnosticsListener,
         codeLensConfigListener,

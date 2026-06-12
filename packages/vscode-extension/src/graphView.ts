@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { MachineNode } from './parser';
 import { XStateMachineTreeProvider } from './treeProvider';
 import { toMermaid } from './export/mermaid';
-import { SimModel, SimState, SimTransition } from './machineModel';
+import { SimModel, SimState, SimTransition, indexModel, shortestPathTo, shortestPaths } from './machineModel';
 
 interface PanelEntry {
     panel: vscode.WebviewPanel;
@@ -13,6 +13,9 @@ interface PanelEntry {
     // State (by label) to select once the diagram first renders — set when the
     // panel is opened from a specific tree/editor node.
     selectName?: string;
+    // Transition ids to auto-fire in the simulator once the diagram first
+    // renders — set when the panel is opened to replay a computed path.
+    replay?: string[];
     // Whether the webview HTML has been built yet. Once it has, model updates
     // are pushed incrementally via `setModel` so the user's pan/zoom survives.
     rendered?: boolean;
@@ -45,14 +48,15 @@ export class XStateGraphViewProvider {
         return `${path}::${line}::${machine.label}`;
     }
 
-    public show(machineNode: MachineNode, title: string, selectName?: string) {
+    public show(machineNode: MachineNode, title: string, selectName?: string, replay?: string[]) {
         const key = this.machineKey(machineNode);
         const existing = this.panels.get(key);
         if (existing) {
             existing.panel.reveal();
             this.activeKey = key;
-            // Already rendered — select the requested node via a live message.
-            if (selectName) { this.highlightState(selectName); }
+            // Already rendered — replay a path, or select the requested node.
+            if (replay && replay.length) { existing.panel.webview.postMessage({ command: 'simReplay', transitionIds: replay }); }
+            else if (selectName) { this.highlightState(selectName); }
             return;
         }
 
@@ -69,7 +73,7 @@ export class XStateGraphViewProvider {
             }
         );
 
-        const entry: PanelEntry = { panel, machine: machineNode, nodeById: new Map(), title, direction: this.autoDirection(machineNode), selectName };
+        const entry: PanelEntry = { panel, machine: machineNode, nodeById: new Map(), title, direction: this.autoDirection(machineNode), selectName, replay };
         this.panels.set(key, entry);
         this.activeKey = key;
 
@@ -233,6 +237,97 @@ export class XStateGraphViewProvider {
         await vscode.window.showTextDocument(doc, { preview: false });
     }
 
+    // Build the simulator model for a machine, plus a way to map a parsed
+    // MachineNode back to its (diagram-stable) sim state id.
+    private buildSimForMachine(machine: MachineNode): { model: SimModel; idOf: (n: MachineNode) => string | undefined } {
+        const nodeById = new Map<string, MachineNode>();
+        const payload = this.buildElements(machine, false, nodeById);
+        const idByNode = new Map<MachineNode, string>();
+        for (const [id, n] of nodeById) { idByNode.set(n, id); }
+        return { model: payload.sim!, idOf: (n) => idByNode.get(n) };
+    }
+
+    /**
+     * Find the shortest event sequence that reaches `target`, then offer to copy
+     * it or replay it in the simulator. Reachability uses the structural
+     * interpreter (guards are treated as always-takeable, since they can't be
+     * evaluated statically), so a reported path is a *possible* route.
+     */
+    public async howToReach(machine: MachineNode, target: MachineNode) {
+        const { model, idOf } = this.buildSimForMachine(machine);
+        const targetId = idOf(target);
+        if (!targetId) {
+            vscode.window.showInformationMessage(`Could not locate "${target.label}" in the machine.`);
+            return;
+        }
+        const idx = indexModel(model);
+        const path = shortestPathTo(idx, targetId);
+        if (path === null) {
+            vscode.window.showWarningMessage(`"${target.label}" is unreachable from the initial state.`);
+            return;
+        }
+        if (path.length === 0) {
+            vscode.window.showInformationMessage(`"${target.label}" is active from the initial state.`);
+            return;
+        }
+        const events = path.map(t => `${t.event}${t.guard ? ` [${t.guard}]` : ''}`);
+        const choice = await vscode.window.showInformationMessage(
+            `Reach "${target.label}":  ${events.join('  →  ')}`,
+            'Replay in Simulator', 'Copy',
+        );
+        if (choice === 'Copy') {
+            await vscode.env.clipboard.writeText(events.join(' → '));
+        } else if (choice === 'Replay in Simulator') {
+            this.show(machine, machine.label, undefined, path.map(t => t.id));
+        }
+    }
+
+    /**
+     * Open a Markdown report of the shortest path to every state (a coverage
+     * map), plus copy-paste test skeletons — handy for seeding `@xstate/test`
+     * style suites or just documenting how the machine is driven.
+     */
+    public async generateTestPaths(machine: MachineNode) {
+        const { model } = this.buildSimForMachine(machine);
+        const idx = indexModel(model);
+        const paths = shortestPaths(idx);
+
+        const states = model.states.filter(s => s.id !== model.rootId);
+        const reachable = states.filter(s => paths.get(s.id) !== null);
+        const unreachable = states.filter(s => paths.get(s.id) === null);
+        const eventsOf = (s: SimState) => (paths.get(s.id) ?? []).map(t => t.event);
+
+        const lines: string[] = [];
+        lines.push(`# Test paths — ${machine.label}`, '');
+        lines.push(`Shortest event sequence to reach each state, from the structural`,
+            `interpreter (guards assumed takeable). ${reachable.length}/${states.length} states reachable.`, '');
+
+        lines.push('## Reachable states', '');
+        for (const s of reachable) {
+            const ev = eventsOf(s);
+            lines.push(`- **${s.label}** — ${ev.length ? ev.map(e => `\`${e}\``).join(' → ') : '_initial_'}`);
+        }
+        if (unreachable.length) {
+            lines.push('', '## Unreachable states', '');
+            for (const s of unreachable) { lines.push(`- ${s.label}`); }
+        }
+
+        lines.push('', '## Test skeletons', '', '```ts',
+            `import { createActor } from 'xstate';`,
+            `// import { machine } from './your-machine';`, '');
+        for (const s of reachable) {
+            const ev = eventsOf(s);
+            lines.push(`test('reaches "${s.label}"', () => {`,
+                `  const actor = createActor(machine).start();`);
+            for (const e of ev) { lines.push(`  actor.send({ type: '${e}' });`); }
+            lines.push(`  // expect(actor.getSnapshot().matches('${s.label}')).toBe(true);`, `});`, '');
+        }
+        lines.push('```', '');
+
+        const doc = await vscode.workspace.openTextDocument({ language: 'markdown', content: lines.join('\n') });
+        await vscode.window.showTextDocument(doc, { preview: false });
+    }
+
     private updatePanel(key: string) {
         const entry = this.panels.get(key);
         if (!entry) { return; }
@@ -244,7 +339,7 @@ export class XStateGraphViewProvider {
             // Incremental update — preserve the webview's pan/zoom/selection.
             entry.panel.webview.postMessage({ command: 'setModel', payload, direction: entry.direction });
         } else {
-            entry.panel.webview.html = this.getHtmlForWebview(entry.panel.webview, payload, entry.direction, entry.selectName);
+            entry.panel.webview.html = this.getHtmlForWebview(entry.panel.webview, payload, entry.direction, entry.selectName, entry.replay);
             entry.rendered = true;
         }
     }
@@ -471,7 +566,7 @@ export class XStateGraphViewProvider {
         return { nodes, edges, collapsedIds, sim };
     }
 
-    private getHtmlForWebview(webview: vscode.Webview, payload: GraphPayload, direction: 'DOWN' | 'RIGHT', selectName?: string): string {
+    private getHtmlForWebview(webview: vscode.Webview, payload: GraphPayload, direction: 'DOWN' | 'RIGHT', selectName?: string, replay?: string[]): string {
         const scriptUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this.extensionUri, 'out', 'webview', 'graph.js')
         );
@@ -602,7 +697,7 @@ export class XStateGraphViewProvider {
         <div class="sim-section-title">Trace</div>
         <ol id="sim-trace"></ol>
     </div>
-    <script nonce="${nonce}">window.__GRAPH__ = ${json}; window.__DIRECTION__ = ${JSON.stringify(direction)}; window.__SELECT__ = ${JSON.stringify(selectName ? selectName.replace(/[^a-zA-Z0-9_]/g, '_') : '')};</script>
+    <script nonce="${nonce}">window.__GRAPH__ = ${json}; window.__DIRECTION__ = ${JSON.stringify(direction)}; window.__SELECT__ = ${JSON.stringify(selectName ? selectName.replace(/[^a-zA-Z0-9_]/g, '_') : '')}; window.__REPLAY__ = ${JSON.stringify(replay ?? [])};</script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

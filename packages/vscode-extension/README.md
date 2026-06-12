@@ -51,6 +51,7 @@ A dedicated **Errors** view collects every problem the static analyzer finds acr
 - **Hover to focus** — hovering a state emphasizes its transitions and dims the rest
 - **Export** the diagram as **SVG**, **PNG**, or **Mermaid** (`stateDiagram-v2` — drop it straight into Markdown/docs; also from the right-click menu of any machine/state in the outline)
 - **Interactive simulator** — hit **▷ Sim** to walk the machine: the active state configuration lights up green, every enabled transition becomes a button (each guarded branch its own choice, since guards can't be evaluated statically), and a **trace** records your path with **step-back** and **reset**. Correctly enters/exits compound and parallel regions; `after`/`always`/`onDone` are surfaced as explicitly fireable events
+- **Test paths & coverage** — right-click a state → **How Do I Reach This State?** for the shortest event sequence (copy it, or **replay it in the simulator**); right-click a machine → **Generate Test Paths** for a Markdown coverage report (shortest path to every state, unreachable states flagged) with copy-paste test skeletons
 - **Focus mode** — open the diagram on a compound state to see just that subtree
 
 ## Reading the diagram

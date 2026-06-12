@@ -1108,6 +1108,8 @@ window.addEventListener('message', (event: MessageEvent) => {
                 if (msg.select) { selectNode(idByName.get(msg.select) ?? selectedId, false); }
             })
             .catch(showError);
+    } else if (msg?.command === 'simReplay') {
+        simReplay(msg.transitionIds ?? []);
     }
 });
 
@@ -1306,7 +1308,7 @@ function stepBackSim(): void {
     renderSimPanel();
 }
 
-function enterSimMode(): void {
+function enterSimMode(afterReady?: () => void): void {
     if (!simIndex || simIndex.model.states.length === 0) { return; }
     simMode = true;
     simBtn?.classList.add('active');
@@ -1315,8 +1317,21 @@ function enterSimMode(): void {
     selectedId = null;
     const wasCollapsed = collapsed.size > 0;
     collapsed.clear();
-    const start = () => { resetSim(); };
+    const start = () => { resetSim(); afterReady?.(); };
     if (wasCollapsed) { render().then(start).catch(showError); } else { start(); }
+}
+
+// Replay a precomputed path (transition ids) from the initial config — used by
+// "How do I reach this state?" → Replay in Simulator.
+function simReplay(transitionIds: string[]): void {
+    const fireAll = () => {
+        if (!simIndex) { return; }
+        for (const id of transitionIds) {
+            const t = simIndex.model.transitions.find(x => x.id === id);
+            if (t) { fireSim(t); }
+        }
+    };
+    if (simMode) { resetSim(); fireAll(); } else { enterSimMode(fireAll); }
 }
 
 function exitSimMode(): void {
@@ -1355,4 +1370,7 @@ render({ fit: true }).then(() => {
     // Highlight the node the panel was opened on, if any — but keep the diagram
     // centred (no pan), so right-click → View Diagram opens centred.
     if (initialSelect) { selectNode(idByName.get(initialSelect) ?? null, false, false); }
+    // If opened to replay a path, enter the simulator and fire the sequence.
+    const initialReplay = (window as unknown as { __REPLAY__?: string[] }).__REPLAY__;
+    if (initialReplay && initialReplay.length) { simReplay(initialReplay); }
 }).catch(showError);

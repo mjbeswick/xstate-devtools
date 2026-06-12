@@ -159,3 +159,59 @@ export function isDone(idx: SimIndex, config: Set<string>): boolean {
     }
     return false;
 }
+
+// ── Path finding ────────────────────────────────────────────────────────────
+// BFS over the *configuration* graph: a node is a full active-state set, an edge
+// is firing one enabled transition. Keyed by the sorted active ids so cycles and
+// internal (no-op) transitions don't loop forever.
+
+const configKey = (config: Set<string>): string => [...config].sort().join('|');
+
+/** The shortest sequence of transitions that makes `targetStateId` active, or
+ *  `null` if it is unreachable. An empty array means it is already active initially. */
+export function shortestPathTo(idx: SimIndex, targetStateId: string): SimTransition[] | null {
+    const start = initialConfig(idx);
+    if (start.has(targetStateId)) { return []; }
+    const seen = new Set([configKey(start)]);
+    const queue: { config: Set<string>; path: SimTransition[] }[] = [{ config: start, path: [] }];
+    while (queue.length) {
+        const { config, path } = queue.shift()!;
+        for (const t of enabledTransitions(idx, config)) {
+            const next = fire(idx, config, t);
+            const k = configKey(next);
+            if (seen.has(k)) { continue; }
+            const nextPath = [...path, t];
+            if (next.has(targetStateId)) { return nextPath; }
+            seen.add(k);
+            queue.push({ config: next, path: nextPath });
+        }
+    }
+    return null;
+}
+
+/** Every state's shortest path from the initial config (BFS once, recording the
+ *  first time each state becomes active). States never reached map to `null`. */
+export function shortestPaths(idx: SimIndex): Map<string, SimTransition[] | null> {
+    const result = new Map<string, SimTransition[] | null>();
+    for (const s of idx.model.states) { result.set(s.id, null); }
+
+    const start = initialConfig(idx);
+    for (const id of start) { result.set(id, []); }
+    const seen = new Set([configKey(start)]);
+    const queue: { config: Set<string>; path: SimTransition[] }[] = [{ config: start, path: [] }];
+    while (queue.length) {
+        const { config, path } = queue.shift()!;
+        for (const t of enabledTransitions(idx, config)) {
+            const next = fire(idx, config, t);
+            const k = configKey(next);
+            if (seen.has(k)) { continue; }
+            seen.add(k);
+            const nextPath = [...path, t];
+            for (const id of next) {
+                if (result.get(id) === null) { result.set(id, nextPath); }
+            }
+            queue.push({ config: next, path: nextPath });
+        }
+    }
+    return result;
+}

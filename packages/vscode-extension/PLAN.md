@@ -111,14 +111,19 @@ The dependency both the simulator and the live inspector sit on. Build it once.
 
 ## Phase 3 — Test-path & coverage generation
 
-- [ ] On the Phase 0 transition graph, implement `shortestPaths(from,to)` and
-  `simplePaths(from)` (BFS/DFS over `enabledEvents`/`send`).
-- [ ] Commands: "How do I reach this state?" (tree/diagram context) → show event
-  sequence and optionally replay it in the simulator; "Generate test skeleton" →
-  emit an `@xstate/test`-style or plain assertion scaffold to a new file.
-- [ ] Coverage view (optional) — list states/transitions not covered by generated
-  simple paths; reuse the Errors-pane tree styling.
-- [ ] README: Features subsection.
+- [x] `machineModel.ts`: `shortestPathTo(idx, stateId)` and `shortestPaths(idx)` —
+  BFS over the *configuration* graph (keyed by sorted active ids so cycles and
+  internal no-ops terminate). Reuses `initialConfig`/`enabledTransitions`/`fire`.
+- [x] **How Do I Reach This State?** (outline → state) → shortest event sequence in
+  a notification, with **Copy** and **Replay in Simulator** (replay is injected as
+  `window.__REPLAY__` for a fresh panel, or pushed via a `simReplay` message to an
+  open one — no timing races).
+- [x] **Generate Test Paths** (outline → machine) → Markdown report: shortest path
+  to every reachable state, unreachable states flagged, plus `createActor` test
+  skeletons. (Subsumes the optional coverage view for now.)
+- [x] README: Features subsection (Test paths & coverage).
+- [ ] (Deferred) Dedicated coverage *tree view*; `simplePaths` enumeration for
+  exhaustive suites (shortest-path skeletons cover the common case).
 
 ## Phase 4 — Live runtime inspection (biggest)
 
