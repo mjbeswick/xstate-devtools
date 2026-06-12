@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.10.0] - 2026-06-12
+
+### Added
+- **Interactive simulator** — a **▷ Sim** toggle on the diagram lets you walk the machine: the active state configuration lights up green, every enabled transition becomes a button (each guarded branch its own choice, since guards can't be evaluated statically), and a **trace** records your path with **step-back** and **reset**. Correctly enters/exits compound and parallel regions; `after`/`always`/`onDone` are surfaced as explicitly fireable events
+- **Test paths & coverage** — right-click a state → **How Do I Reach This State?** for the shortest event sequence (copy it, or **replay it in the simulator**); right-click a machine → **Generate Test Paths** for a Markdown coverage report (shortest path to every state, unreachable states flagged) with copy-paste test skeletons
+- **CodeLens** — each `createMachine` gets an inline `▶ View Diagram` action plus live state / transition / problem counts, right above the code (toggle with `xstateOutline.codeLens`)
+- **Mermaid export** — export any diagram as `stateDiagram-v2` text to drop straight into Markdown/docs, from the diagram toolbar (`MMD`) or the outline's right-click menu
+
+### Fixed
+- The diagram now reliably **centres and fills** when opened — it keeps auto-fitting while the webview panel settles its size, so it no longer opens small in the top-left (most visible opening a focused state sub-diagram)
+- **Follow cursor** now expands collapsed ancestors so the cursor's node is revealed and selected, instead of hidden behind a collapsed parent
+- Opening the diagram via right-click now opens **centred** rather than nudged toward a corner
+
 ## [1.8.0] - 2026-06-09
 
 ### Added
