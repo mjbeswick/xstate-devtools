@@ -487,8 +487,10 @@ export async function activate(context: vscode.ExtensionContext) {
             // the already-selected item is what yanks the tree out from under the user.
             if (item && treeView.visible && treeView.selection[0] !== item) {
                 isTreeSelectionChange = true;
+                // Expand collapsed ancestors so the cursor's node is revealed, not
+                // just selected behind a collapsed parent.
                 // Tie the guard release to the reveal completing, not a fixed timer.
-                void Promise.resolve(treeView.reveal(item, { select: true, focus: false }))
+                void Promise.resolve(treeView.reveal(item, { select: true, focus: false, expand: true }))
                     .then(() => { isTreeSelectionChange = false; }, () => { isTreeSelectionChange = false; });
             }
 
@@ -695,7 +697,7 @@ export async function activate(context: vscode.ExtensionContext) {
             const position = vscode.window.activeTextEditor!.selection.active;
             const item = treeProvider.findItemAtPosition(position);
             if (item && treeView.visible) {
-                treeView.reveal(item, { select: true, focus: false });
+                treeView.reveal(item, { select: true, focus: false, expand: true });
             }
         }, 500);
     }
