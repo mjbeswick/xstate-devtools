@@ -125,6 +125,57 @@ The dependency both the simulator and the live inspector sit on. Build it once.
 - [ ] (Deferred) Dedicated coverage *tree view*; `simplePaths` enumeration for
   exhaustive suites (shortest-path skeletons cover the common case).
 
+## Phase 3b — Fuller test coverage
+
+**Goal.** "Generate Test Paths" today emits one shortest path per reachable
+state — that's *state* coverage. Add **transition coverage** (every edge
+traversed at least once) and optional **simple-path enumeration**, and let the
+user pick the strategy. Transition coverage is the primary deliverable; simple
+paths is bounded/opt-in because it can explode.
+
+**What today's output misses (the motivation).** A transition that isn't the
+shortest route to any new state is never exercised: self-loops, `RETRY`/back
+edges, the non-shortest branch of a guarded fork, alternate longer routes.
+State coverage can pass while those edges are untested.
+
+### Decisions / open questions
+- [ ] **UX: one report vs. a mode picker.** Recommended: a QuickPick on
+  "Generate Test Paths" — *State coverage* (current), *Transition coverage*
+  (new default), *Simple paths (bounded)*. Confirm vs. always emitting all three
+  sections in one report.
+- [ ] **Minimal path set vs. one-path-per-edge.** Recommended: greedy set-cover
+  so the skeleton has *few* paths that together cover all transitions, not one
+  test per edge. Confirm the extra reduction step is wanted (simpler = one path
+  per uncovered edge).
+- [ ] **Simple-path caps.** Hard caps required (e.g. ≤200 paths, ≤depth 40);
+  emit a "truncated — showed N, more exist" note. Confirm the default cap.
+- [ ] **Self-loops / internal transitions** count toward transition coverage?
+  Recommended yes (they're real edges), but they never change the config — the
+  covering "path" is `path-to-source + fire(self)`.
+
+### Steps
+- [ ] `machineModel.ts` — `transitionCoverage(idx)`: one BFS over the config
+  graph recording, per `SimTransition.id`, the first (shortest) path that
+  *fires* it (`pathToSourceConfig + [t]`). Returns `Map<transitionId,
+  SimTransition[]>` plus the set of **unreachable** transition ids (source
+  config never reached). Reuses `enabledTransitions`/`fire`/`configKey`.
+- [ ] `machineModel.ts` — `reducePathSet(paths)`: greedy set-cover — repeatedly
+  take the candidate path covering the most still-uncovered transitions until all
+  are covered. Pure, unit-testable.
+- [ ] `machineModel.ts` — `simplePaths(idx, { maxPaths, maxDepth })`: DFS
+  enumerating acyclic config paths (a config key may not repeat within a path),
+  capped; returns paths + a `truncated` flag.
+- [ ] `graphView.generateTestPaths` — branch on the chosen mode; render a
+  coverage summary (`X/Y transitions covered`, list uncovered/unreachable edges
+  as `source —EVENT→ target`) and `createActor` skeletons from the reduced set.
+- [ ] `extension.ts` — QuickPick for the mode before calling through; keep the
+  command id stable.
+- [ ] **Tests** (vitest, the suite exists): cover `transitionCoverage`
+  (every edge hit; back-edge/self-loop cases), `reducePathSet` (minimality),
+  and `simplePaths` capping. Fixtures with a guarded fork + a `RETRY` back edge.
+- [ ] README + CHANGELOG: note transition-coverage / simple-path modes.
+- [ ] PLAN: tick the deferred `simplePaths` item above.
+
 ## Phase 4 — Live runtime inspection (biggest)
 
 - [ ] Add `ws` dependency; `src/inspectServer.ts` runs a local WebSocket inspector

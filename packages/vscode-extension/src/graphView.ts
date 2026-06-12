@@ -352,6 +352,9 @@ export class XStateGraphViewProvider {
         const nodes: GraphNode[] = [];
         const nameToId = new Map<string, string>();
         const idByNode = new Map<MachineNode, string>();
+        // Each state's parent state node — for XState-style relative target
+        // resolution (a bare target is a sibling, not a same-named state elsewhere).
+        const parentNodeOf = new Map<MachineNode, MachineNode | undefined>();
         const collapsedIds: string[] = [];
         // Parallel structural model for the simulator (same ids as the diagram).
         const simStates: SimState[] = [];
@@ -424,7 +427,7 @@ export class XStateGraphViewProvider {
                 collapsedIds.push(id);
             }
 
-            for (const c of childStates) { collect(c, id, false); }
+            for (const c of childStates) { parentNodeOf.set(c, n); collect(c, id, false); }
         };
 
         // When the diagram is rooted at a single state (a sub-diagram), that
@@ -454,7 +457,34 @@ export class XStateGraphViewProvider {
         const rootStates = isSubDiagram
             ? [machine]
             : (machine.children ?? []).filter(c => c.type === 'state' && !c.isTypeMarker);
-        for (const r of rootStates) { collect(r, rootParentId, isSubDiagram); }
+        for (const r of rootStates) {
+            parentNodeOf.set(r, isSubDiagram ? undefined : machine);
+            collect(r, rootParentId, isSubDiagram);
+        }
+
+        // Resolve a transition's target string to a diagram node id, the way
+        // XState scopes it: a bare `target` is a sibling (child of the source's
+        // parent); a dotted path descends from there; a leading `.` is relative
+        // to the source itself; `#id` is global. Only when relative resolution
+        // fails do we fall back to the flat last-segment name map — which is what
+        // used to mis-resolve a sibling to a same-named state elsewhere.
+        const childStateNodes = (scope: MachineNode | undefined): MachineNode[] =>
+            scope ? (scope.children ?? []).filter(c => c.type === 'state' && !c.isTypeMarker) : rootStates;
+        const globalByLeaf = (raw: string): string | undefined =>
+            nameToId.get(sanitize(raw.replace(/^#/, '').split('.').pop() ?? ''));
+        const resolveTargetId = (source: MachineNode, raw: string): string | undefined => {
+            if (!raw) { return undefined; }
+            if (raw.startsWith('#')) { return globalByLeaf(raw); }
+            let scope = raw.startsWith('.') ? source : parentNodeOf.get(source);
+            const segs = (raw.startsWith('.') ? raw.slice(1) : raw).split('.').filter(Boolean);
+            let node: MachineNode | undefined;
+            for (const seg of segs) {
+                node = childStateNodes(scope).find(k => k.label === seg);
+                if (!node) { return globalByLeaf(raw); }
+                scope = node;
+            }
+            return node ? idByNode.get(node) : globalByLeaf(raw);
+        };
         // The simulator's root: the machine box, or the focused state itself.
         const simRootId = rootParentId ?? idByNode.get(machine) ?? '';
 
@@ -480,15 +510,18 @@ export class XStateGraphViewProvider {
                     // Emit one merged edge for source→target, building the Harel
                     // label `EVENT [guard] / action1, action2`.
                     const emitEdge = (targetRaw: string, eventLabel: string, guardLabel?: string, actionLabels: string[] = []) => {
-                        const targetName = sanitize(targetRaw.replace(/^#/, '').split('.').pop() ?? '');
-                        let targetId = nameToId.get(targetName);
+                        // Resolve relative to the source state (XState scoping), so a
+                        // sibling target isn't confused with a same-named state elsewhere.
+                        const realTarget = resolveTargetId(n, targetRaw);
+                        let targetId = realTarget;
                         if (!targetId) {
                             if (!isSubDiagram) { return; }
                             const display = targetRaw.replace(/^#/, '');
-                            targetId = ghostByName.get(targetName);
+                            const ghostName = sanitize(display.split('.').pop() ?? '');
+                            targetId = ghostByName.get(ghostName);
                             if (!targetId) {
                                 targetId = `n${counter++}`;
-                                ghostByName.set(targetName, targetId);
+                                ghostByName.set(ghostName, targetId);
                                 nodes.push({ data: { id: targetId, label: display, name: sanitize(display), parent: undefined, ghost: true } });
                             }
                         }
@@ -502,7 +535,6 @@ export class XStateGraphViewProvider {
                         if (label && !entry.labels.includes(label)) { entry.labels.push(label); }
                         // Simulator transition — only when the target is a real
                         // diagram state (skip ghost/out-of-diagram stubs).
-                        const realTarget = nameToId.get(targetName);
                         if (realTarget) {
                             simTransitions.push({
                                 id: `st${simCounter++}`, source: sourceId, event: eventLabel ?? '',
