@@ -21,6 +21,7 @@
 - **Cursor sync** — the tree highlights the node matching your editor cursor
 - **Transitions panel** — select a state to see every edge touching it, the icon showing direction: **`←`** incoming (a transition that leads in) and **`→`** outgoing (a transition out). Click any row to jump to the other state — it becomes the selected state and the panel updates to show _its_ transitions, so you can walk the machine edge by edge
 - **Search** — a dedicated search box (styled like the Extensions view) with type filtering and keyboard navigation
+- **CodeLens** — each `createMachine` gets an inline `▶ View Diagram` action plus live state / transition / problem counts, right above the code (toggle with `xstateOutline.codeLens`)
 
 ### ✏️ Editing & authoring
 - **Context-aware autocomplete** — suggests valid machine, state, transition, invoke, and setup properties, plus valid target / action / guard / actor references
@@ -48,7 +49,7 @@ A dedicated **Errors** view collects every problem the static analyzer finds acr
 - **Reflects the outline** — collapsed states render as single blocks; click a collapsed block to expand it, or a region's title bar to collapse it
 - **Two-way sync** — click a state to select it in the tree, click an event to select its transition, and selecting in the tree (or the editor cursor) highlights it in the diagram; a state's `description` shows as a hover tooltip
 - **Hover to focus** — hovering a state emphasizes its transitions and dims the rest
-- **Export** the diagram as **SVG** or **PNG**
+- **Export** the diagram as **SVG**, **PNG**, or **Mermaid** (`stateDiagram-v2` — drop it straight into Markdown/docs; also from the right-click menu of any machine/state in the outline)
 - **Focus mode** — open the diagram on a compound state to see just that subtree
 
 ## Reading the diagram
@@ -71,7 +72,7 @@ The example above shows a parallel `checkout` machine: the dashed outer box with
 | Curved arrow with a label | A transition, labelled `EVENT [guard] / actions` |
 | `entry/ …` and `exit/ …` inside a box | The state's entry/exit actions |
 
-**Diagram toolbar:** zoom out `−`, the live zoom-percent button (click to reset to **100%**), zoom in `+`, fit `⊡`, toggle direction `↧`/`↦`, expand all `⊞`, collapse all `⊟`, and export `SVG` / `PNG`.
+**Diagram toolbar:** zoom out `−`, the live zoom-percent button (click to reset to **100%**), zoom in `+`, fit `⊡`, toggle direction `↧`/`↦`, expand all `⊞`, collapse all `⊟`, and export `SVG` / `PNG` / `MMD` (Mermaid).
 
 **Diagram keyboard shortcuts:** **arrow keys** move the selection between states, **Enter** expands/collapses the selected compound (or jumps a leaf state to its source), **Shift+arrows** pan, `]`/`[` (or `+`/`-`) zoom, `0` or `.` fits to screen, and `1` resets to actual size.
 
@@ -158,6 +159,7 @@ const machine = setup({
 | `xstateOutline.showStateConfigs` | `false` | Include `createStateConfig`/`stateConfig` patterns in the outline |
 | `xstateOutline.followCursor` | `true` | Reveal the tree node matching the editor cursor |
 | `xstateOutline.graphReflectsTreeExpansion` | `true` | Make the diagram render only the states expanded in the outline |
+| `xstateOutline.codeLens` | `true` | Show a CodeLens (counts + "View Diagram") above each machine |
 | `xstateOutline.groupEventHandlers` | `false` | Group a state's event-handler transitions under an `on` node |
 | `xstateOutline.sortChildren` | `original` | Order child nodes by source order (`original`) or alphabetically (`sorted`) |
 | `xstateOutline.errorsGrouping` | `file` | How the Errors pane groups problems: `file`, `severity`, or `flat` |

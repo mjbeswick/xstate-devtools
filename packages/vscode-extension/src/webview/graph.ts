@@ -1166,6 +1166,7 @@ document.getElementById('btn-expand-all')?.addEventListener('click', expandAll);
 document.getElementById('btn-collapse-all')?.addEventListener('click', collapseAll);
 document.getElementById('btn-export-svg')?.addEventListener('click', exportSvg);
 document.getElementById('btn-export-png')?.addEventListener('click', exportPng);
+document.getElementById('btn-export-mermaid')?.addEventListener('click', () => vscode.postMessage({ command: 'exportMermaid' }));
 
 // ── Error display ─────────────────────────────────────────────────────────────
 function showError(err: unknown): void {

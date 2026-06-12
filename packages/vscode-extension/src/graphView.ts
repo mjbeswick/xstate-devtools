@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { MachineNode } from './parser';
 import { XStateMachineTreeProvider } from './treeProvider';
+import { toMermaid } from './export/mermaid';
 
 interface PanelEntry {
     panel: vscode.WebviewPanel;
@@ -94,6 +95,7 @@ export class XStateGraphViewProvider {
                 case 'setDirection': entry.direction = message.direction === 'RIGHT' ? 'RIGHT' : 'DOWN'; return;
                 case 'exportSvg':   this.saveExport(message.data, 'svg', title); return;
                 case 'exportPng':   this.saveExport(message.data, 'png', title); return;
+                case 'exportMermaid': void this.exportMermaid(entry.machine, title); return;
             }
         });
 
@@ -214,6 +216,20 @@ export class XStateGraphViewProvider {
             : Buffer.from(data.replace(/^data:image\/png;base64,/, ''), 'base64');
         await vscode.workspace.fs.writeFile(saveUri, bytes);
         vscode.window.showInformationMessage(`Graph exported: ${saveUri.fsPath}`);
+    }
+
+    /**
+     * Build the Mermaid `stateDiagram-v2` text for a machine (or compound state)
+     * and open it in a new Markdown document — previewable, copyable, savable.
+     * Drives the full tree (no collapse), so the export is complete regardless of
+     * the diagram's current expansion state.
+     */
+    public async exportMermaid(machine: MachineNode, title: string) {
+        const payload = this.buildElements(machine, false, new Map());
+        const mermaid = toMermaid(payload);
+        const content = `# ${title}\n\n\`\`\`mermaid\n${mermaid}\n\`\`\`\n`;
+        const doc = await vscode.workspace.openTextDocument({ language: 'markdown', content });
+        await vscode.window.showTextDocument(doc, { preview: false });
     }
 
     private updatePanel(key: string) {
@@ -483,6 +499,7 @@ export class XStateGraphViewProvider {
         <div class="tb-sep"></div>
         <button id="btn-export-svg" title="Export as SVG">SVG</button>
         <button id="btn-export-png" title="Export as PNG">PNG</button>
+        <button id="btn-export-mermaid" title="Export as Mermaid">MMD</button>
     </div>
     <script nonce="${nonce}">window.__GRAPH__ = ${json}; window.__DIRECTION__ = ${JSON.stringify(direction)}; window.__SELECT__ = ${JSON.stringify(selectName ? selectName.replace(/[^a-zA-Z0-9_]/g, '_') : '')};</script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
@@ -491,7 +508,7 @@ export class XStateGraphViewProvider {
     }
 }
 
-interface GraphNode {
+export interface GraphNode {
     data: {
         id: string; label: string; name: string;
         parent?: string; compound?: boolean;
@@ -501,10 +518,10 @@ interface GraphNode {
         invokes?: string[]; description?: string;
     };
 }
-interface GraphEdge {
+export interface GraphEdge {
     data: { id: string; source: string; target: string; label: string };
 }
-interface GraphPayload {
+export interface GraphPayload {
     nodes: GraphNode[];
     edges: GraphEdge[];
     collapsedIds?: string[];

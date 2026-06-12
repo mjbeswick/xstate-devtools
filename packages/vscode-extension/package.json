@@ -290,6 +290,17 @@
         "title": "View State Diagram",
         "category": "XState",
         "icon": "$(git-merge)"
+      },
+      {
+        "command": "xstateMachineOutline.openGraphViewForNode",
+        "title": "View State Diagram",
+        "category": "XState"
+      },
+      {
+        "command": "xstateMachineOutline.exportMermaid",
+        "title": "Export as Mermaid",
+        "category": "XState",
+        "icon": "$(markdown)"
       }
     ],
     "configuration": {
@@ -327,6 +338,11 @@
           "type": "boolean",
           "default": true,
           "description": "Make the visual graph selectively render only states that are expanded in the tree outline"
+        },
+        "xstateOutline.codeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a CodeLens above each machine with state/transition counts and a 'View Diagram' action"
         },
         "xstateOutline.groupEventHandlers": {
           "type": "boolean",
@@ -484,6 +500,11 @@
           "group": "navigation@0"
         },
         {
+          "command": "xstateMachineOutline.exportMermaid",
+          "when": "view == xstateMachineOutline && (viewItem == machine || viewItem == state)",
+          "group": "navigation@3"
+        },
+        {
           "command": "xstateMachineOutline.goToImplementation",
           "when": "view == xstateMachineOutline && (viewItem == action || viewItem == guard || viewItem == entry || viewItem == exit || viewItem == invoke || viewItem == target)",
           "group": "navigation@1"
@@ -546,6 +567,14 @@
       "commandPalette": [
         {
           "command": "xstateMachineOutline.openGraphView",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.openGraphViewForNode",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.exportMermaid",
           "when": "false"
         },
         {

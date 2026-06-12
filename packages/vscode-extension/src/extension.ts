@@ -14,6 +14,7 @@ import { XStateHoverProvider } from './hoverProvider';
 import { XStateGraphViewProvider } from './graphView';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
 import { ErrorsTreeProvider, ErrorsGrouping, ErrorsFilter } from './errorsView';
+import { XStateCodeLensProvider } from './codeLensProvider';
 
 let selectionTimeout: NodeJS.Timeout | undefined;
 
@@ -937,7 +938,53 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    // Open the diagram for a specific machine node (used by the editor CodeLens,
+    // which always passes a machine — no leaf-state fallback needed).
+    const openGraphViewForNodeCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.openGraphViewForNode',
+        (node: MachineNode) => {
+            if (!node) { return; }
+            graphViewProvider.show(node, node.label);
+        }
+    );
+
+    // Export a machine (or compound state) as Mermaid text, from the tree's
+    // context menu. A leaf state falls back to its enclosing machine, mirroring
+    // "View State Diagram".
+    const exportMermaidCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.exportMermaid',
+        (treeItem) => {
+            const node: MachineNode | undefined = treeItem?.node;
+            if (!node) { return; }
+            let root = node;
+            const hasChildStates = (node.children ?? []).some((c: MachineNode) => c.type === 'state');
+            if (node.type === 'state' && !hasChildStates && treeItem.uri) {
+                const fileMachines = workspaceScanner.getFile(treeItem.uri);
+                if (fileMachines) {
+                    for (const m of fileMachines.machines) {
+                        if (m.range.contains(node.range)) { root = m; break; }
+                    }
+                }
+            }
+            void graphViewProvider.exportMermaid(root, root.label);
+        }
+    );
+
+    // ── CodeLens: stats + "View Diagram" above each machine ─────────────────
+    const codeLensProvider = new XStateCodeLensProvider();
+    const codeLensRegistration = vscode.languages.registerCodeLensProvider(xstateLanguages, codeLensProvider);
+    // Refresh lenses when diagnostics land (the ⚠ problem count) or the setting flips.
+    const codeLensDiagnosticsListener = vscode.languages.onDidChangeDiagnostics(() => codeLensProvider.refresh());
+    const codeLensConfigListener = vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration('xstateOutline.codeLens')) { codeLensProvider.refresh(); }
+    });
+
     context.subscriptions.push(
+        openGraphViewForNodeCommand,
+        exportMermaidCommand,
+        codeLensRegistration,
+        codeLensDiagnosticsListener,
+        codeLensConfigListener,
         treeView,
         navigatorView,
         errorsView,
