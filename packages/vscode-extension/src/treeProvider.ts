@@ -959,9 +959,10 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
                     iconColor = new vscode.ThemeColor('charts.green');
                 } else if (this.node.isFinal) {
                     // Shape-distinct from initial (a plain filled circle) so the two
-                    // are tellable apart without relying on green-vs-red color.
+                    // are tellable apart by shape, not colour — final uses the
+                    // neutral foreground (a red ring reads as an error).
                     iconName = 'pass-filled';
-                    iconColor = new vscode.ThemeColor('charts.red');
+                    iconColor = new vscode.ThemeColor('foreground');
                 } else {
                     iconName = 'circle-filled';
                     iconColor = new vscode.ThemeColor('symbolIcon.fieldForeground');
