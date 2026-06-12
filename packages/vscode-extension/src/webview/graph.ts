@@ -1,6 +1,10 @@
 // Webview bundle: ELK layout + custom bezier edge rendering.
 // ELK computes node positions; all edge paths are drawn from node geometry.
 import ELK from 'elkjs/lib/elk.bundled.js';
+import {
+    indexModel, initialConfig, enabledTransitions, fire, isDone,
+    SimIndex, SimModel, SimTransition,
+} from '../machineModel';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 
@@ -15,6 +19,7 @@ interface GraphPayload {
     nodes: { data: NodeData }[];
     edges: { data: { id: string; source: string; target: string; label: string } }[];
     collapsedIds?: string[];
+    sim?: SimModel;
 }
 interface XY { x: number; y: number }
 interface ElkEdgeLabel { text?: string; width?: number; height?: number; x?: number; y?: number }
@@ -71,6 +76,8 @@ const C = {
     // black dot — black on light themes, adapting to white on dark).
     stFinal:    themeVar('--vscode-charts-red',    '#d24b4b'),
     stParallel: themeVar('--vscode-charts-blue',   '#3b82f6'),
+    // Simulator: the currently-active state configuration.
+    simActive:  themeVar('--vscode-charts-green',  '#388a34'),
 };
 const fontFamily = themeVar('--vscode-font-family', 'system-ui, sans-serif');
 
@@ -131,7 +138,9 @@ function loadModel(p: GraphPayload): void {
         childrenOf.set(k, [...(childrenOf.get(k) ?? []), n.data.id]);
     }
     for (const id of p.collapsedIds ?? []) { collapsed.add(id); }
+    simIndex = p.sim ? indexModel(p.sim) : null;
 }
+let simIndex: SimIndex | null = null;
 loadModel(payload);
 const childStateIds = (id: string) =>
     (childrenOf.get(id) ?? []).filter(cid => !nodeById.get(cid)?.start);
@@ -878,6 +887,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
     if (selectedId && !geom.has(selectedId)) { selectedId = null; }
     applyNodeStyle(selectedId);
     refreshEdgeEmphasis();  // re-assert the selected node's edge emphasis on the rebuilt edges
+    if (simMode) { paintSim(); }  // re-assert the active-state overlay onto fresh rects
 }
 
 // ── Keyboard navigation ─────────────────────────────────────────────────────
@@ -935,6 +945,8 @@ function ensureSelectedVisible() {
 // `pan` (default true) brings the node into view; pass false on first open so the
 // highlight doesn't shove the freshly-centred diagram off to one edge.
 function selectNode(id: string | null, emphasize = true, pan = true) {
+    // The simulator owns node styling while active — don't let selection fight it.
+    if (simMode) { return; }
     const prev = selectedId;
     selectedId = id;
     emphasized = emphasize && !!id;
@@ -1019,6 +1031,9 @@ let panMoved = false;
 container.addEventListener('click', (ev) => {
     container.focus();
     if (panMoved) { return; }
+    // In simulation, the panel drives everything — don't let canvas clicks
+    // collapse active states or hijack the selection.
+    if (simMode) { return; }
     const target = ev.target as Element;
     const lineEl = target.closest('[data-event]');
     if (lineEl) {
@@ -1087,7 +1102,11 @@ window.addEventListener('message', (event: MessageEvent) => {
         loadModel(payload);
         if (msg.direction === 'DOWN' || msg.direction === 'RIGHT') { direction = msg.direction; syncDirBtn(); }
         render({ fit: false })
-            .then(() => { if (msg.select) { selectNode(idByName.get(msg.select) ?? selectedId, false); } })
+            .then(() => {
+                // A live edit invalidates the simulation's state ids — restart it.
+                if (simMode) { collapsed.clear(); resetSim(); return; }
+                if (msg.select) { selectNode(idByName.get(msg.select) ?? selectedId, false); }
+            })
             .catch(showError);
     }
 });
@@ -1167,6 +1186,156 @@ document.getElementById('btn-collapse-all')?.addEventListener('click', collapseA
 document.getElementById('btn-export-svg')?.addEventListener('click', exportSvg);
 document.getElementById('btn-export-png')?.addEventListener('click', exportPng);
 document.getElementById('btn-export-mermaid')?.addEventListener('click', () => vscode.postMessage({ command: 'exportMermaid' }));
+
+// ── Interactive simulator ───────────────────────────────────────────────────
+// Walk the machine statically: highlight the active state configuration, offer
+// the enabled transitions as buttons, and keep a step-back-able trace. Guards
+// can't be evaluated statically, so each guarded branch is its own button.
+let simMode = false;
+let simConfig = new Set<string>();
+interface TraceEntry { label: string; leaves: string; prev: Set<string> }
+const simTrace: TraceEntry[] = [];
+
+const simPanel   = document.getElementById('sim-panel');
+const simStatus  = document.getElementById('sim-status');
+const simEvents  = document.getElementById('sim-events');
+const simTraceEl = document.getElementById('sim-trace');
+const simBtn     = document.getElementById('btn-simulate');
+
+const leafNames = (cfg: Set<string>): string => {
+    if (!simIndex) { return ''; }
+    return [...cfg]
+        .map(id => simIndex!.byId.get(id))
+        .filter(s => s && (s.type === 'atomic' || s.type === 'final'))
+        .map(s => s!.label)
+        .join(', ');
+};
+const transitionLabel = (t: SimTransition): string =>
+    `${t.event || '(always)'}${t.guard ? ` [${t.guard}]` : ''}`;
+
+// Paint the active configuration over the diagram: active states get a green
+// outline, everything else fades back.
+function paintSim(): void {
+    for (const id of nodeRectById.keys()) {
+        const rect = nodeRectById.get(id);
+        if (!rect) { continue; }
+        const base = nodeStyle(id);
+        const active = simConfig.has(id);
+        rect.setAttribute('fill', base.fill);
+        rect.setAttribute('stroke', active ? C.simActive : base.stroke);
+        rect.setAttribute('stroke-width', String(active ? 3 : base.sw));
+        rect.setAttribute('stroke-opacity', active ? '1' : String(base.so));
+        rect.setAttribute('opacity', active ? '1' : '0.4');
+    }
+    // Emphasise edges touching the active configuration.
+    resetEdgeStyles();
+    const mine = new Set<EdgeEntry>();
+    for (const id of simConfig) { for (const e of (nodeEdgeMap.get(id) ?? [])) { mine.add(e); } }
+    for (const e of allEdges) {
+        if (mine.has(e)) {
+            e.path.setAttribute('opacity', '1');
+            e.path.setAttribute('stroke-opacity', '0.95');
+            e.path.setAttribute('stroke-width', '2');
+        } else {
+            e.path.setAttribute('opacity', '0.1');
+            if (e.labelG) { e.labelG.setAttribute('opacity', '0.12'); }
+        }
+    }
+}
+
+function renderSimPanel(): void {
+    if (!simIndex || !simEvents || !simTraceEl || !simStatus) { return; }
+    const done = isDone(simIndex, simConfig);
+    simStatus.textContent = `${done ? '✓ done · ' : ''}active: ${leafNames(simConfig) || '—'}`;
+
+    // Enabled transitions → one button each (guarded branches stay distinct).
+    simEvents.replaceChildren();
+    const enabled = enabledTransitions(simIndex, simConfig);
+    if (enabled.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'sim-empty';
+        empty.textContent = done ? 'Reached a final state.' : 'No enabled transitions.';
+        simEvents.appendChild(empty);
+    }
+    for (const t of enabled) {
+        const btn = document.createElement('button');
+        btn.className = 'sim-event';
+        const tgt = t.target ? simIndex.byId.get(t.target)?.label : undefined;
+        btn.innerHTML = `<span class="sim-ev">${escapeHtml(transitionLabel(t))}</span>`
+            + (tgt ? `<span class="sim-to">→ ${escapeHtml(tgt)}</span>` : `<span class="sim-to sim-internal">internal</span>`);
+        btn.addEventListener('click', () => fireSim(t));
+        simEvents.appendChild(btn);
+    }
+
+    // Trace.
+    simTraceEl.replaceChildren();
+    simTrace.forEach((entry, i) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="sim-ev">${escapeHtml(entry.label)}</span><span class="sim-to">${escapeHtml(entry.leaves || '—')}</span>`;
+        if (i === simTrace.length - 1) { li.className = 'sim-current'; }
+        simTraceEl.appendChild(li);
+    });
+}
+
+function escapeHtml(s: string): string {
+    return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+}
+
+function fireSim(t: SimTransition): void {
+    if (!simIndex) { return; }
+    const prev = simConfig;
+    simConfig = fire(simIndex, simConfig, t);
+    simTrace.push({ label: transitionLabel(t), leaves: leafNames(simConfig), prev });
+    paintSim();
+    renderSimPanel();
+}
+
+function resetSim(): void {
+    if (!simIndex) { return; }
+    simConfig = initialConfig(simIndex);
+    simTrace.length = 0;
+    paintSim();
+    renderSimPanel();
+}
+
+function stepBackSim(): void {
+    const entry = simTrace.pop();
+    if (!entry) { return; }
+    simConfig = entry.prev;
+    paintSim();
+    renderSimPanel();
+}
+
+function enterSimMode(): void {
+    if (!simIndex || simIndex.model.states.length === 0) { return; }
+    simMode = true;
+    simBtn?.classList.add('active');
+    if (simPanel) { simPanel.hidden = false; }
+    // Clear any selection styling, then expand so every active state is visible.
+    selectedId = null;
+    const wasCollapsed = collapsed.size > 0;
+    collapsed.clear();
+    const start = () => { resetSim(); };
+    if (wasCollapsed) { render().then(start).catch(showError); } else { start(); }
+}
+
+function exitSimMode(): void {
+    simMode = false;
+    simBtn?.classList.remove('active');
+    if (simPanel) { simPanel.hidden = true; }
+    // Restore the normal node/edge styling (paintSim dimmed inactive rects via
+    // `opacity`, which applyNodeStyle doesn't touch — clear it explicitly).
+    for (const id of nodeRectById.keys()) {
+        nodeRectById.get(id)?.setAttribute('opacity', '1');
+        applyNodeStyle(id);
+    }
+    resetEdgeStyles();
+}
+
+simBtn?.addEventListener('click', () => { if (simMode) { exitSimMode(); } else { enterSimMode(); } });
+document.getElementById('sim-reset')?.addEventListener('click', resetSim);
+document.getElementById('sim-back')?.addEventListener('click', stepBackSim);
+document.getElementById('sim-close')?.addEventListener('click', exitSimMode);
 
 // ── Error display ─────────────────────────────────────────────────────────────
 function showError(err: unknown): void {

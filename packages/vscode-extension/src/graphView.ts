@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { MachineNode } from './parser';
 import { XStateMachineTreeProvider } from './treeProvider';
 import { toMermaid } from './export/mermaid';
+import { SimModel, SimState, SimTransition } from './machineModel';
 
 interface PanelEntry {
     panel: vscode.WebviewPanel;
@@ -257,6 +258,10 @@ export class XStateGraphViewProvider {
         const nameToId = new Map<string, string>();
         const idByNode = new Map<MachineNode, string>();
         const collapsedIds: string[] = [];
+        // Parallel structural model for the simulator (same ids as the diagram).
+        const simStates: SimState[] = [];
+        const simTransitions: SimTransition[] = [];
+        let simCounter = 0;
         let counter = 0;
 
         const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9_]/g, '_');
@@ -305,6 +310,16 @@ export class XStateGraphViewProvider {
                 },
             });
 
+            // Mirror the state into the simulator model (same id as the diagram).
+            const simType: SimState['type'] = n.isFinal ? 'final'
+                : n.isParallel ? 'parallel'
+                : childStates.length > 0 ? 'compound'
+                : 'atomic';
+            simStates.push({
+                id, label: n.label, parent: parentId, type: simType,
+                initial: !!n.isInitial, historyType: n.historyType,
+            });
+
             // A compound state renders as a single collapsed block unless it is
             // currently expanded in the tree. Using the live expansion set (not
             // the cached tree item) means this is correct even for nodes whose
@@ -335,12 +350,18 @@ export class XStateGraphViewProvider {
                     parent: undefined, compound: true, parallel: !!machine.isParallel,
                 },
             });
+            simStates.push({
+                id: rootParentId, label: machine.label, parent: undefined,
+                type: machine.isParallel ? 'parallel' : 'compound',
+            });
         }
 
         const rootStates = isSubDiagram
             ? [machine]
             : (machine.children ?? []).filter(c => c.type === 'state' && !c.isTypeMarker);
         for (const r of rootStates) { collect(r, rootParentId, isSubDiagram); }
+        // The simulator's root: the machine box, or the focused state itself.
+        const simRootId = rootParentId ?? idByNode.get(machine) ?? '';
 
         // Edges: merge transitions between the same source→target pair so multiple
         // events on one arrow don't stack into an unreadable blob.
@@ -384,6 +405,15 @@ export class XStateGraphViewProvider {
                         if (actionLabels.length) { label += ` / ${actionLabels.join(', ')}`; }
                         label = label.trim();
                         if (label && !entry.labels.includes(label)) { entry.labels.push(label); }
+                        // Simulator transition — only when the target is a real
+                        // diagram state (skip ghost/out-of-diagram stubs).
+                        const realTarget = nameToId.get(targetName);
+                        if (realTarget) {
+                            simTransitions.push({
+                                id: `st${simCounter++}`, source: sourceId, event: eventLabel ?? '',
+                                guard: guardLabel, target: realTarget, actions: actionLabels,
+                            });
+                        }
                     };
 
                     for (const t of [...directT, ...invokeT]) {
@@ -401,9 +431,19 @@ export class XStateGraphViewProvider {
                             continue;
                         }
                         const target = t.children?.find(c => c.type === 'target');
-                        if (!target) { continue; }
                         const guard   = t.children?.find(c => c.type === 'guard');
                         const actions = (t.children ?? []).filter(c => c.type === 'action').map(a => a.label);
+                        if (!target) {
+                            // Internal transition (event, no target): no state change,
+                            // but still a fireable event in the simulator.
+                            if (t.label) {
+                                simTransitions.push({
+                                    id: `st${simCounter++}`, source: sourceId,
+                                    event: t.label, guard: guard?.label, actions,
+                                });
+                            }
+                            continue;
+                        }
                         emitEdge(target.label, t.label ?? '', guard?.label, actions);
                     }
                 }
@@ -427,7 +467,8 @@ export class XStateGraphViewProvider {
         }
         nodes.push(...starts);
 
-        return { nodes, edges, collapsedIds };
+        const sim: SimModel = { rootId: simRootId, states: simStates, transitions: simTransitions };
+        return { nodes, edges, collapsedIds, sim };
     }
 
     private getHtmlForWebview(webview: vscode.Webview, payload: GraphPayload, direction: 'DOWN' | 'RIGHT', selectName?: string): string {
@@ -483,6 +524,50 @@ export class XStateGraphViewProvider {
         #toolbar button:hover { background: var(--vscode-toolbar-hoverBackground, rgba(127,127,127,0.1)); }
         #toolbar button:active { background: var(--vscode-toolbar-activeBackground, rgba(127,127,127,0.2)); }
         .tb-sep { width: 1px; height: 14px; background: var(--vscode-widget-border, rgba(127,127,127,0.3)); margin: 0 2px; }
+        #toolbar button#btn-simulate.active { background: var(--vscode-charts-green, #388a34); color: #fff; }
+        /* ── Simulator panel ───────────────────────────────────────────── */
+        #sim-panel {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 10;
+            width: 260px;
+            max-height: calc(100% - 90px);
+            display: flex;
+            flex-direction: column;
+            background: var(--vscode-editorWidget-background);
+            border: 1px solid var(--vscode-widget-border, rgba(127,127,127,0.3));
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.16);
+            font-family: var(--vscode-font-family, system-ui, sans-serif);
+            font-size: 12px;
+            user-select: none;
+        }
+        #sim-panel[hidden] { display: none; }
+        #sim-head { display: flex; align-items: center; gap: 2px; padding: 6px 8px; border-bottom: 1px solid var(--vscode-widget-border, rgba(127,127,127,0.3)); }
+        #sim-title { font-weight: 600; }
+        .sim-spacer { flex: 1; }
+        #sim-head button { background: none; border: none; color: var(--vscode-icon-foreground, var(--vscode-editor-foreground)); cursor: pointer; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+        #sim-head button:hover { background: var(--vscode-toolbar-hoverBackground, rgba(127,127,127,0.1)); }
+        #sim-status { padding: 6px 8px; color: var(--vscode-descriptionForeground); border-bottom: 1px solid var(--vscode-widget-border, rgba(127,127,127,0.3)); word-break: break-word; }
+        .sim-section-title { padding: 6px 8px 2px; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.04em; color: var(--vscode-descriptionForeground); }
+        #sim-events { display: flex; flex-direction: column; gap: 2px; padding: 2px 6px 6px; overflow-y: auto; }
+        .sim-event {
+            display: flex; align-items: baseline; gap: 6px;
+            text-align: left; width: 100%;
+            background: var(--vscode-button-secondaryBackground, rgba(127,127,127,0.12));
+            color: var(--vscode-button-secondaryForeground, var(--vscode-editor-foreground));
+            border: none; border-radius: 4px; cursor: pointer;
+            padding: 5px 8px; font-size: 12px; font-family: inherit;
+        }
+        .sim-event:hover { background: var(--vscode-button-secondaryHoverBackground, rgba(127,127,127,0.22)); }
+        .sim-ev { font-weight: 600; }
+        .sim-to { color: var(--vscode-descriptionForeground); font-size: 11px; }
+        .sim-internal { font-style: italic; }
+        .sim-empty { padding: 4px 8px; color: var(--vscode-descriptionForeground); font-style: italic; }
+        #sim-trace { list-style: decimal inside; margin: 0; padding: 2px 8px 8px; overflow-y: auto; max-height: 30%; }
+        #sim-trace li { padding: 2px 0; display: flex; gap: 6px; justify-content: space-between; }
+        #sim-trace li.sim-current { color: var(--vscode-charts-green, #388a34); }
     </style>
 </head>
 <body>
@@ -500,6 +585,22 @@ export class XStateGraphViewProvider {
         <button id="btn-export-svg" title="Export as SVG">SVG</button>
         <button id="btn-export-png" title="Export as PNG">PNG</button>
         <button id="btn-export-mermaid" title="Export as Mermaid">MMD</button>
+        <div class="tb-sep"></div>
+        <button id="btn-simulate" title="Simulate (walk the machine interactively)">▷ Sim</button>
+    </div>
+    <div id="sim-panel" hidden>
+        <div id="sim-head">
+            <span id="sim-title">Simulator</span>
+            <span class="sim-spacer"></span>
+            <button id="sim-back" title="Step back">↶</button>
+            <button id="sim-reset" title="Reset to initial state">⟲</button>
+            <button id="sim-close" title="Exit simulator">✕</button>
+        </div>
+        <div id="sim-status"></div>
+        <div class="sim-section-title">Events</div>
+        <div id="sim-events"></div>
+        <div class="sim-section-title">Trace</div>
+        <ol id="sim-trace"></ol>
     </div>
     <script nonce="${nonce}">window.__GRAPH__ = ${json}; window.__DIRECTION__ = ${JSON.stringify(direction)}; window.__SELECT__ = ${JSON.stringify(selectName ? selectName.replace(/[^a-zA-Z0-9_]/g, '_') : '')};</script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
@@ -525,6 +626,8 @@ export interface GraphPayload {
     nodes: GraphNode[];
     edges: GraphEdge[];
     collapsedIds?: string[];
+    /** Structural model for the interactive simulator. */
+    sim?: SimModel;
 }
 
 function getNonce(): string {

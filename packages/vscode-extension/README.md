@@ -50,6 +50,7 @@ A dedicated **Errors** view collects every problem the static analyzer finds acr
 - **Two-way sync** — click a state to select it in the tree, click an event to select its transition, and selecting in the tree (or the editor cursor) highlights it in the diagram; a state's `description` shows as a hover tooltip
 - **Hover to focus** — hovering a state emphasizes its transitions and dims the rest
 - **Export** the diagram as **SVG**, **PNG**, or **Mermaid** (`stateDiagram-v2` — drop it straight into Markdown/docs; also from the right-click menu of any machine/state in the outline)
+- **Interactive simulator** — hit **▷ Sim** to walk the machine: the active state configuration lights up green, every enabled transition becomes a button (each guarded branch its own choice, since guards can't be evaluated statically), and a **trace** records your path with **step-back** and **reset**. Correctly enters/exits compound and parallel regions; `after`/`always`/`onDone` are surfaced as explicitly fireable events
 - **Focus mode** — open the diagram on a compound state to see just that subtree
 
 ## Reading the diagram
@@ -72,7 +73,7 @@ The example above shows a parallel `checkout` machine: the dashed outer box with
 | Curved arrow with a label | A transition, labelled `EVENT [guard] / actions` |
 | `entry/ …` and `exit/ …` inside a box | The state's entry/exit actions |
 
-**Diagram toolbar:** zoom out `−`, the live zoom-percent button (click to reset to **100%**), zoom in `+`, fit `⊡`, toggle direction `↧`/`↦`, expand all `⊞`, collapse all `⊟`, and export `SVG` / `PNG` / `MMD` (Mermaid).
+**Diagram toolbar:** zoom out `−`, the live zoom-percent button (click to reset to **100%**), zoom in `+`, fit `⊡`, toggle direction `↧`/`↦`, expand all `⊞`, collapse all `⊟`, export `SVG` / `PNG` / `MMD` (Mermaid), and **▷ Sim** to enter the interactive simulator.
 
 **Diagram keyboard shortcuts:** **arrow keys** move the selection between states, **Enter** expands/collapses the selected compound (or jumps a leaf state to its source), **Shift+arrows** pan, `]`/`[` (or `+`/`-`) zoom, `0` or `.` fits to screen, and `1` resets to actual size.
 

@@ -50,21 +50,22 @@ overlay** on the existing diagram — so that work is sequenced to be reused, no
 
 The dependency both the simulator and the live inspector sit on. Build it once.
 
-- [ ] `src/machineModel.ts` — pure, source-of-truth structural model derived from a
-  `MachineNode` (no VS Code imports). Compute: state hierarchy & ids (mirroring
-  `graphView` `idByNode`/`nameToId`), each state's initial child, parallel regions,
-  entry/exit/transition lists, and the resolved transition graph (event → guarded
-  targets). Reuse/extract the edge-resolution logic currently inline in
-  `buildElements()` so both stay consistent.
-- [ ] `interpret(model)` — structural interpreter exposing:
-  `initialConfig()`, `enabledEvents(config)`, `send(config, event, branchChoice?)
-  → nextConfig`, with correct enter/exit of compound & parallel states and
-  shallow/deep history. A `config` is the set of active leaf+ancestor state ids.
-- [ ] Active-state overlay in `webview/graph.ts` — given a set of active state ids,
-  paint them (reuse `nodeStyle`/`applyNodeStyle` with a new "active" variant) and
-  emphasize currently-enabled edges. Add `setActive(ids)` message handling.
-- [ ] Host plumbing in `graphView.ts` — `postActiveConfig(ids)` and a generic
-  `postMessage({command:'setActive', ids})`.
+- [x] `src/machineModel.ts` — pure, serializable `SimModel` (`SimState[]` +
+  `SimTransition[]` + `rootId`), no VS Code imports. Built **inside**
+  `buildElements()` so it reuses the exact diagram ids and the existing
+  target-resolution logic (no second traversal to drift out of sync). Carried on
+  the payload as `payload.sim`.
+- [x] Structural interpreter in the same module: `indexModel`, `initialConfig`,
+  `enabledTransitions(config)`, `fire(config, transition)`, `isDone`. LCA-based
+  exit/entry correctly isolates parallel regions and defaults sibling regions on
+  entry. A `config` is the set of active state ids (leaves + ancestors).
+  (History pseudo-states resolve structurally only — deep/shallow restore is a
+  known MVP gap; guards are never auto-evaluated.)
+- [x] Active-state overlay in `webview/graph.ts` — `paintSim()` greens the active
+  config, fades the rest, and emphasizes edges touching it. Re-asserted after
+  every `render()`; selection styling yields to it while simulating.
+- [x] Host plumbing — the model rides on `payload.sim`; no per-step host round-trip
+  needed (the interpreter runs in the webview).
 
 ## Phase 1 — Quick wins (ship first, low risk, self-contained)
 
@@ -92,17 +93,21 @@ The dependency both the simulator and the live inspector sit on. Build it once.
 
 ## Phase 2 — Interactive simulator (flagship)
 
-- [ ] "Simulate" toggle on the diagram toolbar → enters simulate mode: diagram
-  shows initial config via the Phase 0 overlay.
-- [ ] Event affordances — render enabled events as clickable buttons (reuse
-  `eventClicked` plumbing) or highlight fireable edges; clicking sends the event
-  through `interpret().send()` and re-renders the overlay. Guarded branches render
-  as a small chooser.
-- [ ] Trace panel — ordered list of fired events + resulting state; **step back**
-  (pop trace, recompute) and **reset**. Persist per-panel in `PanelEntry`.
-- [ ] `after`/`always`/`onDone`/`onError` — surface as explicitly fireable
-  pseudo-events (can't time them statically); label them as such.
-- [ ] README: new Features subsection; Keyboard shortcuts if any added.
+- [x] **▷ Sim** toggle on the diagram toolbar → enters simulate mode (expands all,
+  shows the initial config via the Phase 0 overlay). A side panel hosts the UI.
+- [x] Event affordances — each enabled transition is its own button
+  (`EVENT [guard] → target`), so guarded branches are explicit user choices;
+  clicking calls `fire()` and repaints. Edges touching the active config are
+  emphasized.
+- [x] Trace panel — ordered list of fired events + resulting leaf states, with
+  **step-back** (restores the pre-fire config) and **reset**. Canvas clicks are
+  suppressed while simulating so nothing collapses out from under it; live source
+  edits restart the run.
+- [x] `after`/`always`/`onDone`/`onError` — surfaced as explicitly fireable events
+  (labelled by the parser, e.g. `after 1000ms`), since timing/guards aren't static.
+- [x] README: simulator added to the Diagram features + toolbar line.
+- [ ] (Deferred) Keyboard shortcuts for the simulator; per-panel trace persistence
+  across diagram reloads.
 
 ## Phase 3 — Test-path & coverage generation
 
