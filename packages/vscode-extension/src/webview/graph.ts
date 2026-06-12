@@ -304,6 +304,11 @@ const idByName = new Map<string, string>();
 const container = document.getElementById('cy')!;
 let viewport: SVGElement;
 let scale = 1, tx = 0, ty = 0;
+// While true, the diagram keeps re-fitting on container resize. The webview
+// panel often keeps resizing for a few frames after it opens (editor-column
+// animation), so a one-shot fit can lock onto a transient, too-small viewport
+// and strand the diagram in a corner. Any manual pan/zoom turns this off.
+let autoFit = true;
 let lastW = 100, lastH = 100;
 
 // Keyboard navigation: the currently-selected state, and the primary shape for
@@ -364,12 +369,15 @@ function applyTransform() {
 }
 // Reset to 100% (actual size), keeping the viewport centre fixed.
 function actualSize() {
+    autoFit = false;
     const cx = container.clientWidth / 2, cy = container.clientHeight / 2;
     tx = cx - ((cx - tx) / scale);
     ty = cy - ((cy - ty) / scale);
     scale = 1;
     applyTransform();
 }
+// Explicit user-driven fit (button / keyboard): re-fit now and resume auto-fit.
+function fitNow() { autoFit = true; fitToScreen(); }
 function fitToScreen() {
     const cw = container.clientWidth || 800, ch = container.clientHeight || 600;
     scale = Math.min(cw / lastW, ch / lastH, 1.5) * 0.92 || 1;
@@ -377,16 +385,15 @@ function fitToScreen() {
     ty = (ch - lastH * scale) / 2;
     applyTransform();
 }
-// Fit once the container actually has a size. At first paint clientWidth can
-// still be 0 (webview layout not settled), which would mis-centre the initial
-// fit against the 800×600 fallback — so wait for a real size, then fit once.
+// Fit as soon as the container has a real size, and keep re-fitting on every
+// resize until the user takes control (`autoFit`). At first paint clientWidth
+// can still be 0 (webview layout not settled) and the panel can keep growing for
+// several frames after opening — a one-shot fit would mis-centre against the
+// transient size, so we stay subscribed.
 function fitWhenReady() {
-    if (container.clientWidth > 0 && container.clientHeight > 0) { fitToScreen(); return; }
+    if (container.clientWidth > 0 && container.clientHeight > 0) { fitToScreen(); }
     const ro = new ResizeObserver(() => {
-        if (container.clientWidth > 0 && container.clientHeight > 0) {
-            ro.disconnect();
-            fitToScreen();
-        }
+        if (autoFit && container.clientWidth > 0 && container.clientHeight > 0) { fitToScreen(); }
     });
     ro.observe(container);
 }
@@ -1002,6 +1009,7 @@ function activateSelected() {
 }
 
 function panBy(dir: 'up' | 'down' | 'left' | 'right', step = 90) {
+    autoFit = false;
     if (dir === 'right') { tx -= step; } else if (dir === 'left') { tx += step; }
     else if (dir === 'down') { ty -= step; } else { ty += step; }
     applyTransform();
@@ -1014,7 +1022,7 @@ container.addEventListener('keydown', (ev) => {
     const k = ev.key;
     if (k === ']' || k === '+' || k === '=') { zoomAround(1.25); ev.preventDefault(); return; }
     if (k === '[' || k === '-' || k === '_') { zoomAround(1 / 1.25); ev.preventDefault(); return; }
-    if (k === '0' || k === '.') { fitToScreen(); ev.preventDefault(); return; }
+    if (k === '0' || k === '.') { fitNow(); ev.preventDefault(); return; }
     if (k === '1') { actualSize(); ev.preventDefault(); return; }
     if (k === 'Escape') { if (selectedId) { selectNode(null); ev.preventDefault(); } return; }
     const dir = ARROW[k];
@@ -1062,6 +1070,7 @@ container.addEventListener('click', (ev) => {
 
 container.addEventListener('wheel', (ev) => {
     ev.preventDefault();
+    autoFit = false;
     const rect = container.getBoundingClientRect();
     const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
     const factor = ev.deltaY < 0 ? 1.1 : 1/1.1;
@@ -1080,7 +1089,7 @@ container.addEventListener('pointerdown', (ev) => {
 container.addEventListener('pointermove', (ev) => {
     if (!dragging) { return; }
     const dx = ev.clientX - lastX, dy = ev.clientY - lastY;
-    if (Math.abs(dx) + Math.abs(dy) > 3) { panMoved = true; }
+    if (Math.abs(dx) + Math.abs(dy) > 3) { panMoved = true; autoFit = false; }
     tx += dx; ty += dy; lastX = ev.clientX; lastY = ev.clientY;
     applyTransform();
 });
@@ -1148,6 +1157,7 @@ function exportPng(): void {
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 function zoomAround(factor: number) {
+    autoFit = false;
     const cx = container.clientWidth/2, cy = container.clientHeight/2;
     const ns = Math.min(3, Math.max(0.1, scale * factor));
     tx = cx - ((cx - tx) / scale) * ns;
@@ -1182,7 +1192,7 @@ dirBtn?.addEventListener('click', () => {
 document.getElementById('btn-zoom-in')?.addEventListener('click',    () => zoomAround(1.25));
 document.getElementById('btn-zoom-out')?.addEventListener('click',   () => zoomAround(1/1.25));
 document.getElementById('btn-zoom-reset')?.addEventListener('click', actualSize);
-document.getElementById('btn-fit')?.addEventListener('click',        fitToScreen);
+document.getElementById('btn-fit')?.addEventListener('click',        fitNow);
 document.getElementById('btn-expand-all')?.addEventListener('click', expandAll);
 document.getElementById('btn-collapse-all')?.addEventListener('click', collapseAll);
 document.getElementById('btn-export-svg')?.addEventListener('click', exportSvg);

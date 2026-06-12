@@ -1,6 +1,6 @@
 # xState Devtools
 
-**Explore, navigate, and visualize your [XState](https://stately.ai/docs) machines without leaving VS Code.** xState Devtools turns your state machines into an interactive **outline** and a live **statechart diagram**, analyzing your source statically — no need to run your app. Works with XState **v4 and v5**, in JavaScript and TypeScript.
+**Explore, navigate, and visualize your [XState](https://stately.ai/docs) machines without leaving VS Code.** xState Devtools turns your state machines into an interactive **outline** and a live **statechart diagram** you can **simulate** and **generate test paths** from — all by analyzing your source statically, with no need to run your app. Works with XState **v4 and v5**, in JavaScript and TypeScript.
 
 ![xState Devtools showing the machine outline, search, and source navigation](https://github.com/mjbeswick/xstate-devtools/raw/main/packages/vscode-extension/images/screenshot.png)
 
@@ -177,7 +177,8 @@ const machine = setup({
 - Detects statically defined machines only (not dynamically generated ones)
 - Context values are shown one level deep to avoid clutter
 - Tree editing focuses on common object/string forms; advanced shapes may still need manual source edits
-- In a focused sub-diagram, transitions whose target lies outside the selected subtree are not drawn
+- In a focused sub-diagram, transitions whose target lies outside the selected subtree point to a faded stub labelled with that target
+- The **simulator** and **test paths** are structural: guards and `after` delays aren't evaluated (you pick each branch yourself), and history states restore structurally only — a reported path is a *possible* route, not a guard-validated one
 
 ## Credits & acknowledgements
 
