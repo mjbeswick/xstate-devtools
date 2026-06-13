@@ -1252,6 +1252,64 @@ internalBtn?.addEventListener('click', () => {
     syncInternalBtn();
     rerenderCollapse();  // box heights change — recenter (if autoFit) like a collapse
 });
+
+// ── Right-click context menu ────────────────────────────────────────────────
+// Replace the webview's default (and inert) copy/cut/paste menu with diagram
+// actions. The clicked node, if any, gets its own items at the top.
+const ctxMenu = document.getElementById('ctx-menu')!;
+function hideCtx() { ctxMenu.hidden = true; ctxMenu.replaceChildren(); }
+function ctxItem(label: string, fn: () => void): HTMLElement {
+    const el = document.createElement('div');
+    el.className = 'ctx-item';
+    el.textContent = label;
+    el.addEventListener('click', () => { hideCtx(); fn(); });
+    return el;
+}
+function ctxSep(): HTMLElement { const s = document.createElement('div'); s.className = 'ctx-sep'; return s; }
+
+document.addEventListener('contextmenu', (ev) => {
+    ev.preventDefault();  // kill the default copy/cut/paste menu everywhere
+    hideCtx();
+    const items: HTMLElement[] = [];
+    const nodeG = (ev.target as Element).closest?.('[data-id]');
+    const id = nodeG?.getAttribute('data-id') ?? undefined;
+    const kind = nodeG?.getAttribute('data-kind');
+    if (id && kind !== 'start' && !nodeById.get(id)?.ghost) {
+        items.push(ctxItem('Go to Source', () => vscode.postMessage({ command: 'goToSource', id })));
+        if (childStateIds(id).length) {
+            const collapsedNow = collapsed.has(id);
+            items.push(ctxItem(collapsedNow ? 'Expand State' : 'Collapse State', () => {
+                if (collapsedNow) { collapsed.delete(id); } else { collapsed.add(id); }
+                rerenderCollapse();
+            }));
+        }
+        items.push(ctxSep());
+    }
+    items.push(ctxItem('Fit to Screen', fitNow));
+    items.push(ctxItem('Actual Size (100%)', actualSize));
+    items.push(ctxItem('Expand All', expandAll));
+    items.push(ctxItem('Collapse All', collapseAll));
+    items.push(ctxItem(showInternal ? 'Hide Internal Transitions' : 'Show Internal Transitions',
+        () => { showInternal = !showInternal; syncInternalBtn(); rerenderCollapse(); }));
+    items.push(ctxSep());
+    items.push(ctxItem('Export as SVG', exportSvg));
+    items.push(ctxItem('Export as PNG', exportPng));
+    items.push(ctxItem('Export as Mermaid', () => vscode.postMessage({ command: 'exportMermaid' })));
+    ctxMenu.replaceChildren(...items);
+
+    ctxMenu.hidden = false;
+    // Position at the cursor, clamped inside the window.
+    let x = ev.clientX, y = ev.clientY;
+    const mw = ctxMenu.offsetWidth, mh = ctxMenu.offsetHeight;
+    if (x + mw > window.innerWidth) { x = window.innerWidth - mw - 4; }
+    if (y + mh > window.innerHeight) { y = window.innerHeight - mh - 4; }
+    ctxMenu.style.left = Math.max(2, x) + 'px';
+    ctxMenu.style.top = Math.max(2, y) + 'px';
+});
+window.addEventListener('click', hideCtx);
+window.addEventListener('blur', hideCtx);
+container.addEventListener('wheel', hideCtx, { passive: true });
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { hideCtx(); } });
 document.getElementById('btn-export-svg')?.addEventListener('click', exportSvg);
 document.getElementById('btn-export-png')?.addEventListener('click', exportPng);
 document.getElementById('btn-export-mermaid')?.addEventListener('click', () => vscode.postMessage({ command: 'exportMermaid' }));

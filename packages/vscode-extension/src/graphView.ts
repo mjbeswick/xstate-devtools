@@ -101,6 +101,7 @@ export class XStateGraphViewProvider {
                 case 'exportSvg':   this.saveExport(message.data, 'svg', title); return;
                 case 'exportPng':   this.saveExport(message.data, 'png', title); return;
                 case 'exportMermaid': void this.exportMermaid(entry.machine, title); return;
+                case 'goToSource': void this.goToSource(message.id, entry); return;
             }
         });
 
@@ -207,6 +208,14 @@ export class XStateGraphViewProvider {
     private selectInTree(id: string, entry: PanelEntry) {
         const node = entry.nodeById.get(id);
         if (node) { this.revealInTree?.(node); }
+    }
+
+    // Open a diagram node's source location in the editor (context-menu action).
+    private async goToSource(id: string, entry: PanelEntry) {
+        const node = entry.nodeById.get(id);
+        if (node?.uri && node.range) {
+            await vscode.window.showTextDocument(node.uri, { selection: node.range, preview: false });
+        }
     }
 
     private async saveExport(data: string, format: 'svg' | 'png', machineTitle: string) {
@@ -701,6 +710,19 @@ export class XStateGraphViewProvider {
         #sim-trace li.sim-clickable:hover { background: var(--vscode-toolbar-hoverBackground, rgba(127,127,127,0.12)); }
         .sim-link { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; text-decoration-style: dotted; }
         .sim-link:hover { color: var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground)); }
+        /* ── Right-click context menu ──────────────────────────────────── */
+        #ctx-menu {
+            position: absolute; z-index: 20; min-width: 184px;
+            background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+            color: var(--vscode-menu-foreground, var(--vscode-editor-foreground));
+            border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border, rgba(127,127,127,0.3)));
+            border-radius: 5px; padding: 4px; box-shadow: 0 2px 12px rgba(0,0,0,0.32);
+            font-family: var(--vscode-font-family, system-ui, sans-serif); font-size: 13px; user-select: none;
+        }
+        #ctx-menu[hidden] { display: none; }
+        #ctx-menu .ctx-item { padding: 4px 10px; border-radius: 3px; cursor: pointer; white-space: nowrap; }
+        #ctx-menu .ctx-item:hover { background: var(--vscode-menu-selectionBackground, var(--vscode-list-activeSelectionBackground)); color: var(--vscode-menu-selectionForeground, inherit); }
+        #ctx-menu .ctx-sep { height: 1px; margin: 4px 2px; background: var(--vscode-menu-separatorBackground, rgba(127,127,127,0.3)); }
     </style>
 </head>
 <body>
@@ -736,6 +758,7 @@ export class XStateGraphViewProvider {
         <div class="sim-section-title">Trace</div>
         <ol id="sim-trace"></ol>
     </div>
+    <div id="ctx-menu" hidden></div>
     <script nonce="${nonce}">window.__GRAPH__ = ${json}; window.__DIRECTION__ = ${JSON.stringify(direction)}; window.__SELECT__ = ${JSON.stringify(selectName ? selectName.replace(/[^a-zA-Z0-9_]/g, '_') : '')}; window.__REPLAY__ = ${JSON.stringify(replay ?? [])}; window.__SHOWINTERNAL__ = ${JSON.stringify(showInternal)};</script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

@@ -74,7 +74,9 @@ The example above shows a parallel `checkout` machine: the dashed outer box with
 | Curved arrow with a label | A transition, labelled `EVENT [guard] / actions` |
 | `entry/ …` and `exit/ …` inside a box | The state's entry/exit actions |
 
-**Diagram toolbar:** zoom out `−`, the live zoom-percent button (click to reset to **100%**), zoom in `+`, fit `⊡`, toggle direction `↧`/`↦`, expand all `⊞`, collapse all `⊟`, export `SVG` / `PNG` / `MMD` (Mermaid), and **▷ Sim** to enter the interactive simulator.
+**Diagram toolbar:** zoom out `−`, the live zoom-percent button (click to reset to **100%**), zoom in `+`, fit `⊡`, toggle direction `↧`/`↦`, expand all `⊞`, collapse all `⊟`, toggle internal-transition rows `/ƒ`, export `SVG` / `PNG` / `MMD` (Mermaid), and **▷ Sim** to enter the interactive simulator.
+
+**Right-click** anywhere in the diagram for a context menu — **Go to Source** and **Expand/Collapse** for the state under the cursor, plus fit, actual size, expand/collapse all, toggle internal transitions, and export.
 
 **Diagram keyboard shortcuts:** **arrow keys** move the selection between states, **Enter** expands/collapses the selected compound (or jumps a leaf state to its source), **Shift+arrows** pan, `]`/`[` (or `+`/`-`) zoom, `0` or `.` fits to screen, and `1` resets to actual size.
 
