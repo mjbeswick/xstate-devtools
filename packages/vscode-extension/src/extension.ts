@@ -394,7 +394,10 @@ export async function activate(context: vscode.ExtensionContext) {
             preserveFocus: true,
             preview: false
         });
-        treeView.reveal(treeItem, { select: true, focus: false, expand: true });
+        // Select (keep highlighted) but do NOT force-expand: expanding the clicked
+        // item here re-opens a machine/compound the moment the user collapses it.
+        // `reveal` still auto-expands ancestors to keep the item visible.
+        treeView.reveal(treeItem, { select: true, focus: false });
     };
 
     // Double-click behavior. Returns true if it handled the click; false if the
