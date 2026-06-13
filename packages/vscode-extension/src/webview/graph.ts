@@ -857,7 +857,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
     // ── Draw labels ──────────────────────────────────────────────────────
     for (const L of lbls) {
         const bx = L.cx - L.w / 2, by = L.cy - L.h / 2;
-        const labelG = el('g', { 'data-src': L.srcId });
+        const labelG = el('g', { 'data-src': L.srcId, 'data-tgt': L.tgtId });
         (labelG as SVGElement).style.cursor = 'pointer';
         labelG.appendChild(el('rect', {
             x: bx - 2, y: by, width: L.w + 4, height: L.h + 2,
@@ -1085,11 +1085,18 @@ container.addEventListener('click', (ev) => {
     const lineEl = target.closest('[data-event]');
     if (lineEl) {
         const grp = lineEl.closest('[data-src]');
-        vscode.postMessage({
-            command: 'eventClicked',
-            eventName: lineEl.getAttribute('data-event'),
-            src: grp?.getAttribute('data-src'),
-        });
+        // Clicking an event selects the state it leads to (its target), panning
+        // it into view, and syncs the outline. The transition itself is still
+        // surfaced via the eventClicked message (tree highlight).
+        const tgt = grp?.getAttribute('data-tgt');
+        if (tgt && geom.has(tgt)) { selectNode(tgt); vscode.postMessage({ command: 'stateClicked', id: tgt }); }
+        else {
+            vscode.postMessage({
+                command: 'eventClicked',
+                eventName: lineEl.getAttribute('data-event'),
+                src: grp?.getAttribute('data-src'),
+            });
+        }
         return;
     }
     const nodeG = target.closest('[data-id]');
@@ -1243,7 +1250,7 @@ document.getElementById('btn-export-mermaid')?.addEventListener('click', () => v
 // can't be evaluated statically, so each guarded branch is its own button.
 let simMode = false;
 let simConfig = new Set<string>();
-interface TraceEntry { label: string; leaves: string; prev: Set<string> }
+interface TraceEntry { label: string; leaves: string; prev: Set<string>; leaf?: string }
 const simTrace: TraceEntry[] = [];
 
 const simPanel   = document.getElementById('sim-panel');
@@ -1252,14 +1259,21 @@ const simEvents  = document.getElementById('sim-events');
 const simTraceEl = document.getElementById('sim-trace');
 const simBtn     = document.getElementById('btn-simulate');
 
-const leafNames = (cfg: Set<string>): string => {
-    if (!simIndex) { return ''; }
+const activeLeafList = (cfg: Set<string>): { id: string; label: string }[] => {
+    if (!simIndex) { return []; }
     return [...cfg]
         .map(id => simIndex!.byId.get(id))
-        .filter(s => s && (s.type === 'atomic' || s.type === 'final'))
-        .map(s => s!.label)
-        .join(', ');
+        .filter((s): s is NonNullable<typeof s> => !!s && (s.type === 'atomic' || s.type === 'final'))
+        .map(s => ({ id: s.id, label: s.label }));
 };
+const leafNames = (cfg: Set<string>): string => activeLeafList(cfg).map(l => l.label).join(', ');
+// Pan a state into view and select it in the outline — used by the clickable
+// active/trace items so you can jump to any state from the simulator panel.
+function focusSimState(id: string | undefined): void {
+    if (!id || !geom.has(id)) { return; }
+    ensureNodeVisible(id);
+    vscode.postMessage({ command: 'stateClicked', id });
+}
 const transitionLabel = (t: SimTransition): string =>
     `${t.event || '(always)'}${t.guard ? ` [${t.guard}]` : ''}`;
 
@@ -1296,7 +1310,19 @@ function paintSim(): void {
 function renderSimPanel(): void {
     if (!simIndex || !simEvents || !simTraceEl || !simStatus) { return; }
     const done = isDone(simIndex, simConfig);
-    simStatus.textContent = `${done ? '✓ done · ' : ''}active: ${leafNames(simConfig) || '—'}`;
+    // Active state(s) as clickable chips — click to pan to & select the state.
+    simStatus.replaceChildren();
+    simStatus.appendChild(document.createTextNode(`${done ? '✓ done · ' : ''}active: `));
+    const leaves = activeLeafList(simConfig);
+    if (!leaves.length) { simStatus.appendChild(document.createTextNode('—')); }
+    leaves.forEach((l, i) => {
+        if (i) { simStatus.appendChild(document.createTextNode(', ')); }
+        const chip = document.createElement('span');
+        chip.className = 'sim-link';
+        chip.textContent = l.label;
+        chip.addEventListener('click', () => focusSimState(l.id));
+        simStatus.appendChild(chip);
+    });
 
     // Enabled transitions → one button each (guarded branches stay distinct).
     simEvents.replaceChildren();
@@ -1323,6 +1349,8 @@ function renderSimPanel(): void {
         const li = document.createElement('li');
         li.innerHTML = `<span class="sim-ev">${escapeHtml(entry.label)}</span><span class="sim-to">${escapeHtml(entry.leaves || '—')}</span>`;
         if (i === simTrace.length - 1) { li.className = 'sim-current'; }
+        // Click a trace row to pan to & select the state it landed on.
+        if (entry.leaf) { li.classList.add('sim-clickable'); li.addEventListener('click', () => focusSimState(entry.leaf)); }
         simTraceEl.appendChild(li);
     });
 }
@@ -1358,7 +1386,7 @@ function fireSim(t: SimTransition): void {
     if (!simIndex) { return; }
     const prev = simConfig;
     simConfig = fire(simIndex, simConfig, t);
-    simTrace.push({ label: transitionLabel(t), leaves: leafNames(simConfig), prev });
+    simTrace.push({ label: transitionLabel(t), leaves: leafNames(simConfig), prev, leaf: simPrimaryLeaf() });
     paintSim();
     renderSimPanel();
     simSync();

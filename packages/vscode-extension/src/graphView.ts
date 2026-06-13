@@ -695,6 +695,10 @@ export class XStateGraphViewProvider {
         #sim-trace { list-style: decimal inside; margin: 0; padding: 2px 8px 8px; overflow-y: auto; max-height: 30%; }
         #sim-trace li { padding: 2px 0; display: flex; gap: 6px; justify-content: space-between; }
         #sim-trace li.sim-current { color: var(--vscode-charts-green, #388a34); }
+        #sim-trace li.sim-clickable { cursor: pointer; border-radius: 3px; }
+        #sim-trace li.sim-clickable:hover { background: var(--vscode-toolbar-hoverBackground, rgba(127,127,127,0.12)); }
+        .sim-link { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; text-decoration-style: dotted; }
+        .sim-link:hover { color: var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground)); }
     </style>
 </head>
 <body>
