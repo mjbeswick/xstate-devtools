@@ -368,23 +368,57 @@ function applyTransform() {
     viewport.setAttribute('transform', `translate(${tx} ${ty}) scale(${scale})`);
     if (zoomReadout) { zoomReadout.textContent = `${Math.round(scale * 100)}%`; }
 }
+
+// ── Eased transform animation ───────────────────────────────────────────────
+// Programmatic transform changes (fit, zoom buttons, pan-to-node, recenter)
+// ease to their target; direct manipulation (wheel/drag) stays instant and
+// cancels any running animation via cancelAnim().
+let animId = 0;
+function cancelAnim() { if (animId) { cancelAnimationFrame(animId); animId = 0; } }
+const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+function animateTo(ntx: number, nty: number, ns: number, dur = 240): void {
+    cancelAnim();
+    const sx = tx, sy = ty, ss = scale, t0 = performance.now();
+    const tick = (now: number) => {
+        const e = easeOutCubic(Math.min(1, (now - t0) / dur));
+        tx = sx + (ntx - sx) * e;
+        ty = sy + (nty - sy) * e;
+        scale = ss + (ns - ss) * e;
+        applyTransform();
+        animId = e < 1 ? requestAnimationFrame(tick) : 0;
+    };
+    animId = requestAnimationFrame(tick);
+}
+
 // Reset to 100% (actual size), keeping the viewport centre fixed.
 function actualSize() {
     autoFit = false;
     const cx = container.clientWidth / 2, cy = container.clientHeight / 2;
-    tx = cx - ((cx - tx) / scale);
-    ty = cy - ((cy - ty) / scale);
-    scale = 1;
+    animateTo(cx - ((cx - tx) / scale), cy - ((cy - ty) / scale), 1);
+}
+// The transform that fits the whole diagram, centred (no side effects).
+function fitTarget(): { tx: number; ty: number; scale: number } {
+    const cw = container.clientWidth || 800, ch = container.clientHeight || 600;
+    const s = Math.min(cw / lastW, ch / lastH, 1.5) * 0.92 || 1;
+    return { tx: (cw - lastW * s) / 2, ty: (ch - lastH * s) / 2, scale: s };
+}
+// Instant fit — used by the auto-fit resize observer and the initial paint,
+// where the panel is still settling and a per-frame tween would be janky.
+function fitToScreen() {
+    cancelAnim();
+    const t = fitTarget();
+    tx = t.tx; ty = t.ty; scale = t.scale;
     applyTransform();
 }
-// Explicit user-driven fit (button / keyboard): re-fit now and resume auto-fit.
-function fitNow() { autoFit = true; fitToScreen(); }
-function fitToScreen() {
-    const cw = container.clientWidth || 800, ch = container.clientHeight || 600;
-    scale = Math.min(cw / lastW, ch / lastH, 1.5) * 0.92 || 1;
-    tx = (cw - lastW * scale) / 2;
-    ty = (ch - lastH * scale) / 2;
-    applyTransform();
+// Explicit user-driven fit (button / keyboard): ease there and resume auto-fit.
+function fitNow() { autoFit = true; const t = fitTarget(); animateTo(t.tx, t.ty, t.scale); }
+// Re-render after a collapse/expand and, if the user hasn't taken manual control
+// of the view (autoFit still on), ease back to a centred fit so a big subtree
+// collapsing/expanding doesn't strand the diagram off to one side.
+function rerenderCollapse(): void {
+    render().then(() => {
+        if (autoFit) { const t = fitTarget(); animateTo(t.tx, t.ty, t.scale); }
+    }).catch(showError);
 }
 // Fit as soon as the container has a real size, and keep re-fitting on every
 // resize until the user takes control (`autoFit`). At first paint clientWidth
@@ -935,18 +969,22 @@ function applyNodeStyle(id: string | null) {
     rect.setAttribute('stroke-opacity', String(sel ? 1 : base.so));
 }
 
-// Pan the minimum amount so the selected node sits inside the viewport (margin
-// of 48px). Keeps the selected node on screen as selection moves.
-function ensureSelectedVisible() {
-    if (!selectedId) { return; }
-    const r = geom.get(selectedId);
+// Pan (eased) the minimum amount so a node sits inside the viewport (48px
+// margin). Only moves when the node is actually off-screen, so an already-
+// visible node never jumps.
+function ensureNodeVisible(id: string | null) {
+    if (!id) { return; }
+    const r = geom.get(id);
     if (!r) { return; }
     const cw = container.clientWidth, ch = container.clientHeight, m = 48;
     const sx = r.x * scale + tx, sy = r.y * scale + ty, sw = r.w * scale, sh = r.h * scale;
-    if (sx < m) { tx += m - sx; } else if (sx + sw > cw - m) { tx -= sx + sw - (cw - m); }
-    if (sy < m) { ty += m - sy; } else if (sy + sh > ch - m) { ty -= sy + sh - (ch - m); }
-    applyTransform();
+    let ntx = tx, nty = ty;
+    if (sx < m) { ntx += m - sx; } else if (sx + sw > cw - m) { ntx -= sx + sw - (cw - m); }
+    if (sy < m) { nty += m - sy; } else if (sy + sh > ch - m) { nty -= sy + sh - (ch - m); }
+    if (ntx !== tx || nty !== ty) { animateTo(ntx, nty, scale, 200); }
 }
+// Keep the selected node on screen as selection moves.
+function ensureSelectedVisible() { ensureNodeVisible(selectedId); }
 
 // `emphasize` (default true) gives an explicit selection the hover-style focus
 // effect. Passive selection (cursor sync, first open) passes false — just the ring.
@@ -1003,7 +1041,7 @@ function activateSelected() {
     const hasChildren = childStateIds(selectedId).length > 0;
     if (hasChildren) {
         if (collapsed.has(selectedId)) { collapsed.delete(selectedId); } else { collapsed.add(selectedId); }
-        render().catch(showError);
+        rerenderCollapse();
         return;
     }
     vscode.postMessage({ command: 'stateClicked', id: selectedId });
@@ -1063,7 +1101,7 @@ container.addEventListener('click', (ev) => {
     selectNode(id);
     if (kind === 'region' || collapsed.has(id)) {
         if (collapsed.has(id)) { collapsed.delete(id); } else { collapsed.add(id); }
-        render().catch(showError);
+        rerenderCollapse();
         return;
     }
     vscode.postMessage({ command: 'stateClicked', id });
@@ -1072,6 +1110,7 @@ container.addEventListener('click', (ev) => {
 container.addEventListener('wheel', (ev) => {
     ev.preventDefault();
     autoFit = false;
+    cancelAnim();
     const rect = container.getBoundingClientRect();
     const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
     const factor = ev.deltaY < 0 ? 1.1 : 1/1.1;
@@ -1084,6 +1123,7 @@ container.addEventListener('wheel', (ev) => {
 
 let dragging = false, lastX = 0, lastY = 0;
 container.addEventListener('pointerdown', (ev) => {
+    cancelAnim();
     dragging = true; panMoved = false; lastX = ev.clientX; lastY = ev.clientY;
     (ev.target as Element).setPointerCapture?.(ev.pointerId);
 });
@@ -1161,20 +1201,17 @@ function zoomAround(factor: number) {
     autoFit = false;
     const cx = container.clientWidth/2, cy = container.clientHeight/2;
     const ns = Math.min(3, Math.max(0.1, scale * factor));
-    tx = cx - ((cx - tx) / scale) * ns;
-    ty = cy - ((cy - ty) / scale) * ns;
-    scale = ns;
-    applyTransform();
+    animateTo(cx - ((cx - tx) / scale) * ns, cy - ((cy - ty) / scale) * ns, ns, 180);
 }
 // Every node that has child states is a candidate for collapsing.
 function compoundIds(): string[] {
     return [...nodeById.keys()].filter(id => childStateIds(id).length > 0);
 }
-function expandAll() { collapsed.clear(); render().catch(showError); }
+function expandAll() { collapsed.clear(); rerenderCollapse(); }
 function collapseAll() {
     collapsed.clear();
     for (const id of compoundIds()) { collapsed.add(id); }
-    render().catch(showError);
+    rerenderCollapse();
 }
 
 const dirBtn = document.getElementById('btn-direction');
@@ -1294,6 +1331,29 @@ function escapeHtml(s: string): string {
     return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 }
 
+// The deepest active leaf (atomic/final) — the "current" state to surface in the
+// tree and keep on screen as the simulation advances.
+function simPrimaryLeaf(): string | undefined {
+    if (!simIndex) { return undefined; }
+    let best: string | undefined, bestDepth = -1;
+    for (const id of simConfig) {
+        const s = simIndex.byId.get(id);
+        if (!s || (s.type !== 'atomic' && s.type !== 'final')) { continue; }
+        let d = 0, cur = s.parent;
+        while (cur) { d++; cur = simIndex.byId.get(cur)?.parent; }
+        if (d > bestDepth) { bestDepth = d; best = id; }
+    }
+    return best;
+}
+// After the active config changes: pan the active state into view and select it
+// in the tree outline (reusing the click→reveal plumbing).
+function simSync(): void {
+    const leaf = simPrimaryLeaf();
+    if (!leaf) { return; }
+    ensureNodeVisible(leaf);
+    vscode.postMessage({ command: 'stateClicked', id: leaf });
+}
+
 function fireSim(t: SimTransition): void {
     if (!simIndex) { return; }
     const prev = simConfig;
@@ -1301,6 +1361,7 @@ function fireSim(t: SimTransition): void {
     simTrace.push({ label: transitionLabel(t), leaves: leafNames(simConfig), prev });
     paintSim();
     renderSimPanel();
+    simSync();
 }
 
 function resetSim(): void {
@@ -1309,6 +1370,7 @@ function resetSim(): void {
     simTrace.length = 0;
     paintSim();
     renderSimPanel();
+    simSync();
 }
 
 function stepBackSim(): void {
@@ -1317,6 +1379,7 @@ function stepBackSim(): void {
     simConfig = entry.prev;
     paintSim();
     renderSimPanel();
+    simSync();
 }
 
 function enterSimMode(afterReady?: () => void): void {
@@ -1329,7 +1392,14 @@ function enterSimMode(afterReady?: () => void): void {
     const wasCollapsed = collapsed.size > 0;
     collapsed.clear();
     const start = () => { resetSim(); afterReady?.(); };
-    if (wasCollapsed) { render().then(start).catch(showError); } else { start(); }
+    if (wasCollapsed) {
+        // Expanding changed the layout — refit (if auto) so the whole machine is
+        // visible before stepping. simSync then pans to the active state.
+        render().then(() => {
+            if (autoFit) { const t = fitTarget(); animateTo(t.tx, t.ty, t.scale); }
+            start();
+        }).catch(showError);
+    } else { start(); }
 }
 
 // Replay a precomputed path (transition ids) from the initial config — used by
