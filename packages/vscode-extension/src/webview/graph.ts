@@ -56,6 +56,10 @@ let direction: 'DOWN' | 'RIGHT' =
 // Sanitized state name to auto-select on first render (set when the panel is
 // opened from a specific tree or editor node).
 const initialSelect = (window as unknown as { __SELECT__?: string }).__SELECT__ || '';
+// Whether internal (action-only) transition rows show inside state boxes. Seeded
+// from the `showInternalTransitions` setting; toggled live from the toolbar.
+let showInternal = (window as unknown as { __SHOWINTERNAL__?: boolean }).__SHOWINTERNAL__ !== false;
+const internalRows = (d: NodeData): string[] => (showInternal ? d.internalTransitions ?? [] : []);
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 const rootStyle = getComputedStyle(document.documentElement);
@@ -166,7 +170,7 @@ function buildElkNode(id: string): ElkNode {
         // time; the title's clip width is narrowed there to leave room for it.
         const display = d.label;
         // Compartment rows below the title: internal transitions + invoked services.
-        const extraRows = [...(d.internalTransitions ?? []), ...(d.invokes ?? []).map(s => `invoke ${s}`)];
+        const extraRows = [...internalRows(d), ...(d.invokes ?? []).map(s => `invoke ${s}`)];
         return {
             id,
             width:  nw(display, d.entryActions ?? [], d.exitActions ?? [], extraRows),
@@ -618,7 +622,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                 }
                 const entry = d.entryActions ?? [];
                 const exit  = d.exitActions  ?? [];
-                const internal = d.internalTransitions ?? [];
+                const internal = internalRows(d);
                 const invokes = d.invokes ?? [];
                 const collapsedToggle = isCollapsed && hasChildren;
                 const label = d.label;
@@ -1240,6 +1244,14 @@ document.getElementById('btn-zoom-reset')?.addEventListener('click', actualSize)
 document.getElementById('btn-fit')?.addEventListener('click',        fitNow);
 document.getElementById('btn-expand-all')?.addEventListener('click', expandAll);
 document.getElementById('btn-collapse-all')?.addEventListener('click', collapseAll);
+const internalBtn = document.getElementById('btn-internal');
+function syncInternalBtn() { internalBtn?.classList.toggle('active', showInternal); }
+syncInternalBtn();
+internalBtn?.addEventListener('click', () => {
+    showInternal = !showInternal;
+    syncInternalBtn();
+    rerenderCollapse();  // box heights change — recenter (if autoFit) like a collapse
+});
 document.getElementById('btn-export-svg')?.addEventListener('click', exportSvg);
 document.getElementById('btn-export-png')?.addEventListener('click', exportPng);
 document.getElementById('btn-export-mermaid')?.addEventListener('click', () => vscode.postMessage({ command: 'exportMermaid' }));

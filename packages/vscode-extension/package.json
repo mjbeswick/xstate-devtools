@@ -356,6 +356,11 @@
           "default": true,
           "description": "Show a CodeLens above each machine with state/transition counts and a 'View Diagram' action"
         },
+        "xstateOutline.showInternalTransitions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show internal (action-only) transitions inside state boxes in the diagram (toggle live from the diagram toolbar)"
+        },
         "xstateOutline.groupEventHandlers": {
           "type": "boolean",
           "default": false,

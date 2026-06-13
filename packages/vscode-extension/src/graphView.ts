@@ -604,6 +604,7 @@ export class XStateGraphViewProvider {
         );
         const nonce = getNonce();
         const json = JSON.stringify(payload);
+        const showInternal = vscode.workspace.getConfiguration('xstateOutline').get<boolean>('showInternalTransitions', true);
 
         return `<!DOCTYPE html>
 <html lang="en">
@@ -652,6 +653,7 @@ export class XStateGraphViewProvider {
         #toolbar button:active { background: var(--vscode-toolbar-activeBackground, rgba(127,127,127,0.2)); }
         .tb-sep { width: 1px; height: 14px; background: var(--vscode-widget-border, rgba(127,127,127,0.3)); margin: 0 2px; }
         #toolbar button#btn-simulate.active { background: var(--vscode-charts-green, #388a34); color: #fff; }
+        #toolbar button#btn-internal.active { background: var(--vscode-toolbar-activeBackground, rgba(127,127,127,0.25)); }
         /* ── Simulator panel ───────────────────────────────────────────── */
         #sim-panel {
             position: absolute;
@@ -712,6 +714,7 @@ export class XStateGraphViewProvider {
         <div class="tb-sep"></div>
         <button id="btn-expand-all"   title="Expand all states">⊞</button>
         <button id="btn-collapse-all" title="Collapse all states">⊟</button>
+        <button id="btn-internal" title="Show internal (action-only) transitions">/ƒ</button>
         <div class="tb-sep"></div>
         <button id="btn-export-svg" title="Export as SVG">SVG</button>
         <button id="btn-export-png" title="Export as PNG">PNG</button>
@@ -733,7 +736,7 @@ export class XStateGraphViewProvider {
         <div class="sim-section-title">Trace</div>
         <ol id="sim-trace"></ol>
     </div>
-    <script nonce="${nonce}">window.__GRAPH__ = ${json}; window.__DIRECTION__ = ${JSON.stringify(direction)}; window.__SELECT__ = ${JSON.stringify(selectName ? selectName.replace(/[^a-zA-Z0-9_]/g, '_') : '')}; window.__REPLAY__ = ${JSON.stringify(replay ?? [])};</script>
+    <script nonce="${nonce}">window.__GRAPH__ = ${json}; window.__DIRECTION__ = ${JSON.stringify(direction)}; window.__SELECT__ = ${JSON.stringify(selectName ? selectName.replace(/[^a-zA-Z0-9_]/g, '_') : '')}; window.__REPLAY__ = ${JSON.stringify(replay ?? [])}; window.__SHOWINTERNAL__ = ${JSON.stringify(showInternal)};</script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

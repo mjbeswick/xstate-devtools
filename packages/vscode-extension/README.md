@@ -162,6 +162,7 @@ const machine = setup({
 | `xstateOutline.followCursor` | `true` | Reveal the tree node matching the editor cursor |
 | `xstateOutline.graphReflectsTreeExpansion` | `true` | Make the diagram render only the states expanded in the outline |
 | `xstateOutline.codeLens` | `true` | Show a CodeLens (counts + "View Diagram") above each machine |
+| `xstateOutline.showInternalTransitions` | `true` | Show internal (action-only) transitions inside state boxes in the diagram (toggle live from the diagram toolbar) |
 | `xstateOutline.groupEventHandlers` | `false` | Group a state's event-handler transitions under an `on` node |
 | `xstateOutline.sortChildren` | `original` | Order child nodes by source order (`original`) or alphabetically (`sorted`) |
 | `xstateOutline.errorsGrouping` | `file` | How the Errors pane groups problems: `file`, `severity`, or `flat` |
