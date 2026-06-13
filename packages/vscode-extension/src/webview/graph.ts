@@ -1210,9 +1210,19 @@ function exportPng(): void {
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 function zoomAround(factor: number) {
     autoFit = false;
-    const cx = container.clientWidth/2, cy = container.clientHeight/2;
+    const cw = container.clientWidth, ch = container.clientHeight;
     const ns = Math.min(3, Math.max(0.1, scale * factor));
-    animateTo(cx - ((cx - tx) / scale) * ns, cy - ((cy - ty) / scale) * ns, ns, 180);
+    // Zoom centred on the selected state (or, in the simulator, the active state)
+    // so you zoom into/out of it; otherwise keep the viewport centre fixed.
+    const focalId = simMode ? simPrimaryLeaf() : selectedId;
+    const r = focalId ? geom.get(focalId) : undefined;
+    if (r) {
+        const lx = r.x + r.w / 2, ly = r.y + r.h / 2;
+        animateTo(cw / 2 - lx * ns, ch / 2 - ly * ns, ns, 180);
+    } else {
+        const cx = cw / 2, cy = ch / 2;
+        animateTo(cx - ((cx - tx) / scale) * ns, cy - ((cy - ty) / scale) * ns, ns, 180);
+    }
 }
 // Every node that has child states is a candidate for collapsing.
 function compoundIds(): string[] {
@@ -1443,12 +1453,12 @@ function simPrimaryLeaf(): string | undefined {
     }
     return best;
 }
-// After the active config changes: pan the active state into view and select it
-// in the tree outline (reusing the click→reveal plumbing).
-function simSync(): void {
+// After the active config changes: pan the active state into view (unless the
+// caller just centred the diagram) and select it in the tree outline.
+function simSync(pan = true): void {
     const leaf = simPrimaryLeaf();
     if (!leaf) { return; }
-    ensureNodeVisible(leaf);
+    if (pan) { ensureNodeVisible(leaf); }
     vscode.postMessage({ command: 'stateClicked', id: leaf });
 }
 
@@ -1462,13 +1472,13 @@ function fireSim(t: SimTransition): void {
     simSync();
 }
 
-function resetSim(): void {
+function resetSim(pan = true): void {
     if (!simIndex) { return; }
     simConfig = initialConfig(simIndex);
     simTrace.length = 0;
     paintSim();
     renderSimPanel();
-    simSync();
+    simSync(pan);
 }
 
 function stepBackSim(): void {
@@ -1489,15 +1499,16 @@ function enterSimMode(afterReady?: () => void): void {
     selectedId = null;
     const wasCollapsed = collapsed.size > 0;
     collapsed.clear();
-    const start = () => { resetSim(); afterReady?.(); };
-    if (wasCollapsed) {
-        // Expanding changed the layout — refit (if auto) so the whole machine is
-        // visible before stepping. simSync then pans to the active state.
-        render().then(() => {
-            if (autoFit) { const t = fitTarget(); animateTo(t.tx, t.ty, t.scale); }
-            start();
-        }).catch(showError);
-    } else { start(); }
+    // Always centre the whole machine when the simulator starts. resetSim(false)
+    // sets the initial config and syncs the tree but doesn't pan, so the fit wins.
+    const start = () => {
+        resetSim(false);
+        autoFit = true;
+        const t = fitTarget();
+        animateTo(t.tx, t.ty, t.scale);
+        afterReady?.();
+    };
+    if (wasCollapsed) { render().then(start).catch(showError); } else { start(); }
 }
 
 // Replay a precomputed path (transition ids) from the initial config — used by
