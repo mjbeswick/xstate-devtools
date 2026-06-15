@@ -303,12 +303,6 @@
         "icon": "$(markdown)"
       },
       {
-        "command": "xstateMachineOutline.howToReach",
-        "title": "How Do I Reach This State?",
-        "category": "XState",
-        "icon": "$(target)"
-      },
-      {
         "command": "xstateMachineOutline.generateTestPaths",
         "title": "Generate Test Paths",
         "category": "XState",
@@ -522,11 +516,6 @@
           "group": "navigation@3"
         },
         {
-          "command": "xstateMachineOutline.howToReach",
-          "when": "view == xstateMachineOutline && viewItem == state",
-          "group": "navigation@4"
-        },
-        {
           "command": "xstateMachineOutline.generateTestPaths",
           "when": "view == xstateMachineOutline && viewItem == machine",
           "group": "navigation@5"
@@ -602,10 +591,6 @@
         },
         {
           "command": "xstateMachineOutline.exportMermaid",
-          "when": "false"
-        },
-        {
-          "command": "xstateMachineOutline.howToReach",
           "when": "false"
         },
         {

@@ -111,13 +111,12 @@ The dependency both the simulator and the live inspector sit on. Build it once.
 
 ## Phase 3 — Test-path & coverage generation
 
-- [x] `machineModel.ts`: `shortestPathTo(idx, stateId)` and `shortestPaths(idx)` —
-  BFS over the *configuration* graph (keyed by sorted active ids so cycles and
-  internal no-ops terminate). Reuses `initialConfig`/`enabledTransitions`/`fire`.
-- [x] **How Do I Reach This State?** (outline → state) → shortest event sequence in
-  a notification, with **Copy** and **Replay in Simulator** (replay is injected as
-  `window.__REPLAY__` for a fresh panel, or pushed via a `simReplay` message to an
-  open one — no timing races).
+- [x] `machineModel.ts`: `shortestPaths(idx)` — BFS over the *configuration*
+  graph (keyed by sorted active ids so cycles and internal no-ops terminate).
+  Reuses `initialConfig`/`enabledTransitions`/`fire`.
+- [~] ~~**How Do I Reach This State?**~~ — built (shortest path + Copy + Replay in
+  Simulator), then **removed** (low value); the replay/`__REPLAY__`/`simReplay`
+  plumbing and `shortestPathTo` were removed with it.
 - [x] **Generate Test Paths** (outline → machine) → Markdown report: shortest path
   to every reachable state, unreachable states flagged, plus `createActor` test
   skeletons. (Subsumes the optional coverage view for now.)

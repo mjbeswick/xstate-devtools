@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { MachineNode } from './parser';
 import { XStateMachineTreeProvider } from './treeProvider';
 import { toMermaid } from './export/mermaid';
-import { SimModel, SimState, SimTransition, indexModel, shortestPathTo, shortestPaths } from './machineModel';
+import { SimModel, SimState, SimTransition, indexModel, shortestPaths } from './machineModel';
 
 interface PanelEntry {
     panel: vscode.WebviewPanel;
@@ -13,9 +13,6 @@ interface PanelEntry {
     // State (by label) to select once the diagram first renders — set when the
     // panel is opened from a specific tree/editor node.
     selectName?: string;
-    // Transition ids to auto-fire in the simulator once the diagram first
-    // renders — set when the panel is opened to replay a computed path.
-    replay?: string[];
     // Whether the webview HTML has been built yet. Once it has, model updates
     // are pushed incrementally via `setModel` so the user's pan/zoom survives.
     rendered?: boolean;
@@ -48,15 +45,14 @@ export class XStateGraphViewProvider {
         return `${path}::${line}::${machine.label}`;
     }
 
-    public show(machineNode: MachineNode, title: string, selectName?: string, replay?: string[]) {
+    public show(machineNode: MachineNode, title: string, selectName?: string) {
         const key = this.machineKey(machineNode);
         const existing = this.panels.get(key);
         if (existing) {
             existing.panel.reveal();
             this.activeKey = key;
-            // Already rendered — replay a path, or select the requested node.
-            if (replay && replay.length) { existing.panel.webview.postMessage({ command: 'simReplay', transitionIds: replay }); }
-            else if (selectName) { this.highlightState(selectName); }
+            // Already rendered — select the requested node via a live message.
+            if (selectName) { this.highlightState(selectName); }
             return;
         }
 
@@ -73,7 +69,7 @@ export class XStateGraphViewProvider {
             }
         );
 
-        const entry: PanelEntry = { panel, machine: machineNode, nodeById: new Map(), title, direction: this.autoDirection(machineNode), selectName, replay };
+        const entry: PanelEntry = { panel, machine: machineNode, nodeById: new Map(), title, direction: this.autoDirection(machineNode), selectName };
         this.panels.set(key, entry);
         this.activeKey = key;
 
@@ -246,49 +242,10 @@ export class XStateGraphViewProvider {
         await vscode.window.showTextDocument(doc, { preview: false });
     }
 
-    // Build the simulator model for a machine, plus a way to map a parsed
-    // MachineNode back to its (diagram-stable) sim state id.
-    private buildSimForMachine(machine: MachineNode): { model: SimModel; idOf: (n: MachineNode) => string | undefined } {
-        const nodeById = new Map<string, MachineNode>();
-        const payload = this.buildElements(machine, false, nodeById);
-        const idByNode = new Map<MachineNode, string>();
-        for (const [id, n] of nodeById) { idByNode.set(n, id); }
-        return { model: payload.sim!, idOf: (n) => idByNode.get(n) };
-    }
-
-    /**
-     * Find the shortest event sequence that reaches `target`, then offer to copy
-     * it or replay it in the simulator. Reachability uses the structural
-     * interpreter (guards are treated as always-takeable, since they can't be
-     * evaluated statically), so a reported path is a *possible* route.
-     */
-    public async howToReach(machine: MachineNode, target: MachineNode) {
-        const { model, idOf } = this.buildSimForMachine(machine);
-        const targetId = idOf(target);
-        if (!targetId) {
-            vscode.window.showInformationMessage(`Could not locate "${target.label}" in the machine.`);
-            return;
-        }
-        const idx = indexModel(model);
-        const path = shortestPathTo(idx, targetId);
-        if (path === null) {
-            vscode.window.showWarningMessage(`"${target.label}" is unreachable from the initial state.`);
-            return;
-        }
-        if (path.length === 0) {
-            vscode.window.showInformationMessage(`"${target.label}" is active from the initial state.`);
-            return;
-        }
-        const events = path.map(t => `${t.event}${t.guard ? ` [${t.guard}]` : ''}`);
-        const choice = await vscode.window.showInformationMessage(
-            `Reach "${target.label}":  ${events.join('  →  ')}`,
-            'Replay in Simulator', 'Copy',
-        );
-        if (choice === 'Copy') {
-            await vscode.env.clipboard.writeText(events.join(' → '));
-        } else if (choice === 'Replay in Simulator') {
-            this.show(machine, machine.label, undefined, path.map(t => t.id));
-        }
+    // Build the simulator model for a machine (used by the test-path report).
+    private buildSimForMachine(machine: MachineNode): { model: SimModel } {
+        const payload = this.buildElements(machine, false, new Map());
+        return { model: payload.sim! };
     }
 
     /**
@@ -348,7 +305,7 @@ export class XStateGraphViewProvider {
             // Incremental update — preserve the webview's pan/zoom/selection.
             entry.panel.webview.postMessage({ command: 'setModel', payload, direction: entry.direction });
         } else {
-            entry.panel.webview.html = this.getHtmlForWebview(entry.panel.webview, payload, entry.direction, entry.selectName, entry.replay);
+            entry.panel.webview.html = this.getHtmlForWebview(entry.panel.webview, payload, entry.direction, entry.selectName);
             entry.rendered = true;
         }
     }
@@ -607,7 +564,7 @@ export class XStateGraphViewProvider {
         return { nodes, edges, collapsedIds, sim };
     }
 
-    private getHtmlForWebview(webview: vscode.Webview, payload: GraphPayload, direction: 'DOWN' | 'RIGHT', selectName?: string, replay?: string[]): string {
+    private getHtmlForWebview(webview: vscode.Webview, payload: GraphPayload, direction: 'DOWN' | 'RIGHT', selectName?: string): string {
         const scriptUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this.extensionUri, 'out', 'webview', 'graph.js')
         );
@@ -759,7 +716,7 @@ export class XStateGraphViewProvider {
         <ol id="sim-trace"></ol>
     </div>
     <div id="ctx-menu" hidden></div>
-    <script nonce="${nonce}">window.__GRAPH__ = ${json}; window.__DIRECTION__ = ${JSON.stringify(direction)}; window.__SELECT__ = ${JSON.stringify(selectName ? selectName.replace(/[^a-zA-Z0-9_]/g, '_') : '')}; window.__REPLAY__ = ${JSON.stringify(replay ?? [])}; window.__SHOWINTERNAL__ = ${JSON.stringify(showInternal)};</script>
+    <script nonce="${nonce}">window.__GRAPH__ = ${json}; window.__DIRECTION__ = ${JSON.stringify(direction)}; window.__SELECT__ = ${JSON.stringify(selectName ? selectName.replace(/[^a-zA-Z0-9_]/g, '_') : '')}; window.__SHOWINTERNAL__ = ${JSON.stringify(showInternal)};</script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
