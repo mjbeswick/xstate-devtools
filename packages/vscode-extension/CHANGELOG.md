@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.11.0] - 2026-06-15
+
+### Added
+- **Eased pan & zoom** — programmatic view changes (fit, zoom buttons/keys, actual-size, pan-to-state, recenter) now animate smoothly; direct wheel/drag stays instant
+- **Pan to selected** — selecting a state that's off-screen (from the tree, cursor sync, or keyboard) pans it into view
+- **Recenter on collapse** — collapsing/expanding (or toggling internal rows) recenters the diagram, until you take manual control of the view
+- **Zoom centres on the focused state** — the zoom buttons/keys zoom into/out of the selected state (or, in the simulator, the active state); wheel zoom still zooms toward the cursor
+- **Simulator ↔ outline sync** — the diagram centres when the simulator opens; as you step, the active state is kept on screen and selected in the outline. Click any **active-state chip** or **trace row** to jump to that state
+- **Click an event → go to its target** — clicking an event label selects the state it leads to and pans it into view (internal/out-of-diagram targets keep highlighting the transition)
+- **Internal-transition toggle** — `xstateOutline.showInternalTransitions` (default true) plus a live diagram-toolbar toggle (`/ƒ`) to show/hide internal (action-only) rows inside state boxes
+- **Diagram right-click menu** — replaces the inert copy/cut/paste with **Go to Source** & **Expand/Collapse** for the state under the cursor, plus fit, actual size, expand/collapse all, toggle internal transitions, and SVG/PNG/Mermaid export
+
+### Fixed
+- **Collapsing machines/compounds in the outline now sticks** — the click handler no longer force-re-expands the item it just collapsed
+
 ## [1.10.1] - 2026-06-12
 
 ### Fixed
