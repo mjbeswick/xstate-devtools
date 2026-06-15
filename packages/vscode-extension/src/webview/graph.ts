@@ -424,6 +424,11 @@ function rerenderCollapse(): void {
         if (autoFit) { const t = fitTarget(); animateTo(t.tx, t.ty, t.scale); }
     }).catch(showError);
 }
+// Re-render and always centre (re-enabling auto-fit). Used by expand-all /
+// collapse-all, which are explicit "show everything / nothing" actions.
+function rerenderAndFit(): void {
+    render().then(() => { autoFit = true; const t = fitTarget(); animateTo(t.tx, t.ty, t.scale); }).catch(showError);
+}
 // Fit as soon as the container has a real size, and keep re-fitting on every
 // resize until the user takes control (`autoFit`). At first paint clientWidth
 // can still be 0 (webview layout not settled) and the panel can keep growing for
@@ -1226,11 +1231,11 @@ function zoomAround(factor: number) {
 function compoundIds(): string[] {
     return [...nodeById.keys()].filter(id => childStateIds(id).length > 0);
 }
-function expandAll() { collapsed.clear(); rerenderCollapse(); }
+function expandAll() { collapsed.clear(); rerenderAndFit(); }
 function collapseAll() {
     collapsed.clear();
     for (const id of compoundIds()) { collapsed.add(id); }
-    rerenderCollapse();
+    rerenderAndFit();
 }
 
 const dirBtn = document.getElementById('btn-direction');
