@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.14.0] - 2026-06-15
+
+### Fixed
+- **Go to Implementation now works for guards nested in `and`/`or`/`not`** — for a guard string inside a combinator, the TypeScript definition provider resolves the array element's *type* into xstate's `.d.ts`, so the jump landed in `node_modules` instead of the implementation. Definition results in `node_modules` / `.d.ts` are now ignored, falling through to the name-based finder that resolves the guard against `setup({ guards })` (covers object-form `{ type }` guards too).
+
 ## [1.13.0] - 2026-06-15
 
 ### Fixed
