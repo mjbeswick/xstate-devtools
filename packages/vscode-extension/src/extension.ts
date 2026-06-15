@@ -33,6 +33,9 @@ export async function activate(context: vscode.ExtensionContext) {
     const initialErrorsGrouping = config.get<ErrorsGrouping>('errorsGrouping', 'file');
     const initialErrorsFilter = config.get<ErrorsFilter>('errorsFilter', 'warning');
     let followCursor = config.get<boolean>('followCursor', true);
+    // Where a tree-node click navigates: 'code' (jump to source) or 'diagram'
+    // (focus the state/machine in the diagram, opening it if needed).
+    let navTarget = config.get<'code' | 'diagram'>('navTarget', 'code');
 
     let graphReflectsTreeExpansion = config.get<boolean>('graphReflectsTreeExpansion', true);
     vscode.commands.executeCommand('setContext', 'xstateOutline.graphReflectsTreeExpansion', graphReflectsTreeExpansion);
@@ -47,6 +50,7 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('setContext', 'xstateErrors.filter', initialErrorsFilter),
         vscode.commands.executeCommand('setContext', 'xstateOutline.followCursor', followCursor),
         vscode.commands.executeCommand('setContext', 'xstateOutline.graphReflectsTreeExpansion', graphReflectsTreeExpansion),
+        vscode.commands.executeCommand('setContext', 'xstateOutline.navIsDiagram', navTarget === 'diagram'),
     ]);
 
     const outputChannel = vscode.window.createOutputChannel('XState Outline');
@@ -163,6 +167,14 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.commands.executeCommand('setContext', 'xstateOutline.followCursor', followCursor);
         }
     );
+
+    const setNavTarget = (target: 'code' | 'diagram') => {
+        navTarget = target;
+        vscode.workspace.getConfiguration('xstateOutline').update('navTarget', target, vscode.ConfigurationTarget.Global);
+        vscode.commands.executeCommand('setContext', 'xstateOutline.navIsDiagram', target === 'diagram');
+    };
+    const setNavCodeCommand = vscode.commands.registerCommand('xstateMachineOutline.setNavCode', () => setNavTarget('code'));
+    const setNavDiagramCommand = vscode.commands.registerCommand('xstateMachineOutline.setNavDiagram', () => setNavTarget('diagram'));
 
     // ── Filter commands ───────────────────────────────────────────────────────
 
@@ -388,6 +400,17 @@ export async function activate(context: vscode.ExtensionContext) {
             && expandedItems.has(treeItem)) {
             treeProvider.collapseItem(treeItem);
             expandedItems.delete(treeItem);
+            return;
+        }
+        // Diagram-nav mode: focus the state/machine in the diagram (opening it if
+        // needed) instead of jumping the editor. Other node types (actions, guards,
+        // …) have no diagram target, so they still navigate to source.
+        const nodeType = treeItem.node?.type;
+        if (navTarget === 'diagram' && (nodeType === 'state' || nodeType === 'machine')) {
+            const node: MachineNode = treeItem.node;
+            const root = node.type === 'machine' ? node : (enclosingMachine(node, treeItem.uri) ?? node);
+            graphViewProvider.show(root, root.label, node.type === 'state' ? node.label : undefined);
+            treeView.reveal(treeItem, { select: true, focus: false });
             return;
         }
         await vscode.window.showTextDocument(treeItem.uri, {
@@ -1068,6 +1091,8 @@ export async function activate(context: vscode.ExtensionContext) {
         setSortChildrenOriginalCommand,
         toggleFollowCursorCommand,
         toggleFollowCursorActiveCommand,
+        setNavCodeCommand,
+        setNavDiagramCommand,
         toggleGraphSyncExpansionCommand,
         toggleGraphSyncExpansionActiveCommand,
         filterCommand,

@@ -163,6 +163,14 @@
         "title": "Cursor: do not follow"
       },
       {
+        "command": "xstateMachineOutline.setNavDiagram",
+        "title": "Navigate: diagram"
+      },
+      {
+        "command": "xstateMachineOutline.setNavCode",
+        "title": "Navigate: code"
+      },
+      {
         "command": "xstateMachineOutline.toggleGraphSyncExpansion",
         "title": "Graph: reflect tree expansion",
         "icon": "$(list-filter)"
@@ -346,6 +354,16 @@
           "default": true,
           "description": "Automatically reveal the tree item corresponding to the cursor position"
         },
+        "xstateOutline.navTarget": {
+          "type": "string",
+          "enum": ["code", "diagram"],
+          "enumDescriptions": [
+            "Clicking a state/machine in the outline jumps to its source",
+            "Clicking a state/machine focuses it in the diagram (opening the diagram if needed)"
+          ],
+          "default": "code",
+          "description": "Where clicking a tree node navigates: source code or the statechart diagram"
+        },
         "xstateOutline.graphReflectsTreeExpansion": {
           "type": "boolean",
           "default": true,
@@ -428,6 +446,16 @@
           "command": "xstateMachineOutline.toggleFollowCursorActive",
           "when": "view == xstateMachineOutline && xstateOutline.followCursor",
           "group": "0_cursor@1"
+        },
+        {
+          "command": "xstateMachineOutline.setNavDiagram",
+          "when": "view == xstateMachineOutline && !xstateOutline.navIsDiagram",
+          "group": "0_cursor@2"
+        },
+        {
+          "command": "xstateMachineOutline.setNavCode",
+          "when": "view == xstateMachineOutline && xstateOutline.navIsDiagram",
+          "group": "0_cursor@2"
         },
         {
           "command": "xstateMachineOutline.setScopeFile",

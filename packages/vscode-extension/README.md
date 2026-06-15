@@ -135,7 +135,7 @@ const machine = setup({
 
 ## Tips
 
-- The Outline title bar has toggles for **scope** (file/workspace), **view mode** (grouped/flat), **state configs**, **cursor following**, whether the **diagram reflects tree expansion**, **grouping event handlers** under `on`, and **child sort order**.
+- The Outline title bar has toggles for **scope** (file/workspace), **view mode** (grouped/flat), **state configs**, **cursor following**, **navigation target** (clicking a node jumps to **code** or focuses it in the **diagram**), whether the **diagram reflects tree expansion**, **grouping event handlers** under `on`, and **child sort order**.
 - **Right-click** any tree node for editing actions and **Go to Implementation**.
 - In **Search**, use ↑/↓/Enter to move through results and the funnel button to filter by node type.
 
@@ -163,6 +163,7 @@ const machine = setup({
 | `xstateOutline.defaultViewMode` | `flat` | Flat list of machines, or grouped by file |
 | `xstateOutline.showStateConfigs` | `false` | Include `createStateConfig`/`stateConfig` patterns in the outline |
 | `xstateOutline.followCursor` | `true` | Reveal the tree node matching the editor cursor |
+| `xstateOutline.navTarget` | `code` | Where clicking a tree node navigates: `code` (jump to source) or `diagram` (focus the state in the diagram). Toggle from the outline title menu |
 | `xstateOutline.graphReflectsTreeExpansion` | `true` | Make the diagram render only the states expanded in the outline |
 | `xstateOutline.codeLens` | `true` | Show a CodeLens (counts + "View Diagram") above each machine |
 | `xstateOutline.showInternalTransitions` | `true` | Show internal (action-only) transitions inside state boxes in the diagram (toggle live from the diagram toolbar) |
