@@ -52,6 +52,7 @@ A dedicated **Errors** view collects every problem the static analyzer finds acr
 - **Export** the diagram as **SVG**, **PNG**, or **Mermaid** (`stateDiagram-v2` — drop it straight into Markdown/docs; also from the right-click menu of any machine/state in the outline)
 - **Interactive simulator** — hit **▷ Sim** to walk the machine: the active state configuration lights up green, every enabled transition becomes a button (each guarded branch its own choice, since guards can't be evaluated statically), and a **trace** records your path with **step-back** and **reset**. The diagram centres when the simulator opens; as you step, the active state is kept on screen and selected in the outline; click any active-state chip or trace row to jump to that state. Correctly enters/exits compound and parallel regions; `after`/`always`/`onDone` are surfaced as explicitly fireable events
 - **Test paths & coverage** — right-click a machine → **Generate Test Paths** for a Markdown coverage report (shortest path to every reachable state, unreachable states flagged) with copy-paste test skeletons
+- **Generate Setup Stubs** — right-click a machine → scaffold a `setup({ actions, guards, actors, delays })` block with a typed stub for every implementation the machine references, each flagged as already in `setup()` or missing from it (XState built-ins like `assign`/`not` are skipped)
 - **Focus mode** — open the diagram on a compound state to see just that subtree
 
 ## Reading the diagram

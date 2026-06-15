@@ -15,6 +15,7 @@ import { XStateGraphViewProvider } from './graphView';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
 import { ErrorsTreeProvider, ErrorsGrouping, ErrorsFilter } from './errorsView';
 import { XStateCodeLensProvider } from './codeLensProvider';
+import { toSetupStubs } from './export/setupStubs';
 
 let selectionTimeout: NodeJS.Timeout | undefined;
 
@@ -996,6 +997,20 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    // Scaffold a setup({ actions, guards, actors, delays }) block of stubs for
+    // every implementation the machine references (flagging which are missing).
+    const generateSetupStubsCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.generateSetupStubs',
+        async (treeItem) => {
+            const node: MachineNode | undefined = treeItem?.node;
+            if (!node) { return; }
+            const root = node.type === 'machine' ? node : enclosingMachine(node, treeItem.uri);
+            if (!root) { return; }
+            const doc = await vscode.workspace.openTextDocument({ language: 'typescript', content: toSetupStubs(root) });
+            await vscode.window.showTextDocument(doc, { preview: false });
+        }
+    );
+
     // ── CodeLens: stats + "View Diagram" above each machine ─────────────────
     const codeLensProvider = new XStateCodeLensProvider();
     const codeLensRegistration = vscode.languages.registerCodeLensProvider(xstateLanguages, codeLensProvider);
@@ -1009,6 +1024,7 @@ export async function activate(context: vscode.ExtensionContext) {
         openGraphViewForNodeCommand,
         exportMermaidCommand,
         generateTestPathsCommand,
+        generateSetupStubsCommand,
         codeLensRegistration,
         codeLensDiagnosticsListener,
         codeLensConfigListener,

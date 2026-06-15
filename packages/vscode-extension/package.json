@@ -303,6 +303,12 @@
         "icon": "$(markdown)"
       },
       {
+        "command": "xstateMachineOutline.generateSetupStubs",
+        "title": "Generate Setup Stubs",
+        "category": "XState",
+        "icon": "$(symbol-method)"
+      },
+      {
         "command": "xstateMachineOutline.generateTestPaths",
         "title": "Generate Test Paths",
         "category": "XState",
@@ -521,6 +527,11 @@
           "group": "navigation@5"
         },
         {
+          "command": "xstateMachineOutline.generateSetupStubs",
+          "when": "view == xstateMachineOutline && viewItem == machine",
+          "group": "navigation@6"
+        },
+        {
           "command": "xstateMachineOutline.goToImplementation",
           "when": "view == xstateMachineOutline && (viewItem == action || viewItem == guard || viewItem == entry || viewItem == exit || viewItem == invoke || viewItem == target)",
           "group": "navigation@1"
@@ -595,6 +606,10 @@
         },
         {
           "command": "xstateMachineOutline.generateTestPaths",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.generateSetupStubs",
           "when": "false"
         },
         {
