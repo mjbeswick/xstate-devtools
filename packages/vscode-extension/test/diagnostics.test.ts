@@ -237,3 +237,99 @@ describe('unreachable-state reachability walk', () => {
         expect(unreachable(src)).toEqual([]);
     });
 });
+
+/** Guard names flagged as unused (never referenced) by the validator. */
+function unusedGuards(src: string): string[] {
+    return validateXStateDocument(makeDoc(src))
+        .filter(d => d.code === XSTATE_DIAGNOSTIC_CODES.unusedGuard)
+        .map(d => /Guard '([^']+)'/.exec(d.message)?.[1] ?? '')
+        .sort();
+}
+
+/** Guard names flagged as unknown (not defined in setup) by the validator. */
+function unknownGuards(src: string): string[] {
+    return validateXStateDocument(makeDoc(src))
+        .filter(d => d.code === XSTATE_DIAGNOSTIC_CODES.unknownGuard)
+        .map(d => /Guard '([^']+)'/.exec(d.message)?.[1] ?? '')
+        .sort();
+}
+
+/** Wrap a transition `guard:` value in a minimal setup() machine that defines `names` as guards. */
+function machineWithGuard(guardExpr: string, names: string[]): string {
+    const guards = names.map(n => `${n}: () => true`).join(', ');
+    return `
+        import { setup, and, or, not, stateIn } from 'xstate';
+        export const m = setup({
+            guards: { ${guards} },
+        }).createMachine({
+            initial: 'idle',
+            states: {
+                idle: { on: { GO: { target: 'idle', guard: ${guardExpr} } } },
+            },
+        });
+    `;
+}
+
+describe('guard reference resolution (and/or/not, issue #1)', () => {
+    it('does not flag guards referenced via and([...])', () => {
+        expect(unusedGuards(machineWithGuard(`and(['isA', 'isB'])`, ['isA', 'isB']))).toEqual([]);
+    });
+
+    it('does not flag guards referenced via or([...])', () => {
+        expect(unusedGuards(machineWithGuard(`or(['isA', 'isB'])`, ['isA', 'isB']))).toEqual([]);
+    });
+
+    it('does not flag a guard referenced via not(...)', () => {
+        expect(unusedGuards(machineWithGuard(`not('isA')`, ['isA']))).toEqual([]);
+    });
+
+    it('resolves guards nested inside combinators', () => {
+        const src = machineWithGuard(`and(['isA', or(['isB', 'isC'])])`, ['isA', 'isB', 'isC']);
+        expect(unusedGuards(src)).toEqual([]);
+    });
+
+    it('resolves the guard named by a { type, params } object', () => {
+        const src = machineWithGuard(`{ type: 'isGreaterThan', params: { n: 10 } }`, ['isGreaterThan']);
+        expect(unusedGuards(src)).toEqual([]);
+        expect(unknownGuards(src)).toEqual([]);
+    });
+
+    it('resolves guards inside a { type: "and", params: [...] } combinator object', () => {
+        const src = machineWithGuard(`{ type: 'and', params: ['isA', 'isB'] }`, ['isA', 'isB']);
+        expect(unusedGuards(src)).toEqual([]);
+    });
+
+    it('still flags a genuinely unused guard alongside a used one', () => {
+        const src = machineWithGuard(`and(['isA'])`, ['isA', 'lonely']);
+        expect(unusedGuards(src)).toEqual(['lonely']);
+    });
+
+    it('still flags an unknown guard string referenced inside a combinator', () => {
+        const src = machineWithGuard(`and(['isA', 'typo'])`, ['isA']);
+        expect(unknownGuards(src)).toEqual(['typo']);
+    });
+
+    it('does not treat stateIn(...) as a guard reference', () => {
+        // stateIn('active') names a *state*, not a setup guard — the string must not
+        // be resolved as a guard (no spurious unknown), and a real unused guard
+        // alongside it is still reported.
+        const src = machineWithGuard(`and([stateIn('active'), 'isA'])`, ['isA', 'lonely']);
+        expect(unknownGuards(src)).toEqual([]);
+        expect(unusedGuards(src)).toEqual(['lonely']);
+    });
+
+    it('resolves guards inside a combinator written with the v4 cond alias', () => {
+        const src = `
+            import { and } from 'xstate';
+            export const m = setup({
+                guards: { isA: () => true, isB: () => true },
+            }).createMachine({
+                initial: 'idle',
+                states: {
+                    idle: { on: { GO: { target: 'idle', cond: and(['isA', 'isB']) } } },
+                },
+            });
+        `;
+        expect(unusedGuards(src)).toEqual([]);
+    });
+});

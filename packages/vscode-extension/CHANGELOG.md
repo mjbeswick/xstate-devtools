@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- **Guards inside `and`/`or`/`not` are no longer flagged as unused** — guards referenced through the XState v5 higher-order guard helpers (`and(['a', 'b'])`, `or([…])`, `not('c')`), nested combinations, and the `{ type, params }` object form are now recognised as used. `stateIn(…)` is correctly treated as a state reference, not a guard. ([#1](https://github.com/mjbeswick/xstate-devtools/issues/1))
+
 ## [1.12.0] - 2026-06-15
 
 ### Added

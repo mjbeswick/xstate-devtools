@@ -254,22 +254,19 @@ function validateGuardProperty(node: ts.Expression | undefined, context: Validat
         return;
     }
 
-    const candidate = collectSimpleReference(node);
-    if (!candidate) {
-        return;
-    }
-    
-    if (knownGuards.has(candidate.name)) {
-        knownGuards.get(candidate.name)!.used = true;
-        return;
-    }
+    for (const candidate of collectGuardReferences(node)) {
+        if (knownGuards.has(candidate.name)) {
+            knownGuards.get(candidate.name)!.used = true;
+            continue;
+        }
 
-    context.diagnostics.push(createDiagnostic(
-        nodeRange(context.document, candidate.node),
-        `Guard '${candidate.name}' is not defined in setup({ guards }). Add it there, or pass the guard inline.`,
-        XSTATE_DIAGNOSTIC_CODES.unknownGuard,
-        vscode.DiagnosticSeverity.Error
-    ));
+        context.diagnostics.push(createDiagnostic(
+            nodeRange(context.document, candidate.node),
+            `Guard '${candidate.name}' is not defined in setup({ guards }). Add it there, or pass the guard inline.`,
+            XSTATE_DIAGNOSTIC_CODES.unknownGuard,
+            vscode.DiagnosticSeverity.Error
+        ));
+    }
 }
 
 function validateActorProperty(node: ts.Expression | undefined, context: ValidationContext): void {
@@ -694,6 +691,52 @@ function collectActionReferences(node: ts.Expression): ReferenceCandidate[] {
 
     const candidate = collectSimpleReference(node);
     return candidate ? [candidate] : [];
+}
+
+// The XState v5 higher-order guard helpers. Their arguments are themselves
+// guards (string names, nested helpers, or guard objects), so we recurse into
+// them. `stateIn` is deliberately NOT here: its argument names a *state*, not a
+// setup guard, and must not be resolved as one.
+const GUARD_COMBINATORS = new Set(['and', 'or', 'not']);
+
+// Unwrap a guard value to the setup-guard *string* names it references, mirroring
+// collectActionReferences. Handles `'name'`, `['a', 'b']`, the `and`/`or`/`not`
+// helper calls, and the `{ type, params }` object form (including a combinator
+// `type` whose `params` are nested guards). A bare identifier is an inline
+// implementation — no setup name, so it yields nothing (TS validates it).
+function collectGuardReferences(node: ts.Node): ReferenceCandidate[] {
+    if (ts.isStringLiteralLike(node)) {
+        return [{ name: node.text, node }];
+    }
+
+    if (ts.isArrayLiteralExpression(node)) {
+        return node.elements.flatMap(collectGuardReferences);
+    }
+
+    if (ts.isCallExpression(node)) {
+        const callee = node.expression;
+        if (ts.isIdentifier(callee) && GUARD_COMBINATORS.has(callee.text)) {
+            return node.arguments.flatMap(collectGuardReferences);
+        }
+        return [];
+    }
+
+    if (ts.isObjectLiteralExpression(node)) {
+        const typeProperty = findPropertyAssignment(node, 'type');
+        if (!typeProperty) {
+            return [];
+        }
+        // `{ type: 'and', params: [...] }` — combinator object form; the guards
+        // live in `params`.
+        if (ts.isStringLiteralLike(typeProperty.initializer) && GUARD_COMBINATORS.has(typeProperty.initializer.text)) {
+            const params = findPropertyAssignment(node, 'params')?.initializer;
+            return params ? collectGuardReferences(params) : [];
+        }
+        // `{ type: 'guardName', params: {...} }` — the type names the guard.
+        return collectGuardReferences(typeProperty.initializer);
+    }
+
+    return [];
 }
 
 function collectActionObjectReference(node: ts.ObjectLiteralExpression): ReferenceCandidate[] {
