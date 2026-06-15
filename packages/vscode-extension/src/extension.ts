@@ -330,9 +330,17 @@ export async function activate(context: vscode.ExtensionContext) {
                         treeItem.uri,
                         treeItem.range.start
                     );
-                    if (defs && defs.length > 0) {
-                        await vscode.window.showTextDocument(defs[0].uri, {
-                            selection: defs[0].range,
+                    // Ignore definitions that land in dependencies or type declarations:
+                    // a guard/action implementation lives in the user's own source. For a
+                    // guard string nested in and()/or()/not(), the TS server resolves the
+                    // *type* of the array element into xstate's .d.ts — following that would
+                    // jump into node_modules instead of the impl. Skip those and fall through
+                    // to the AST finder, which resolves the name against setup({ guards }).
+                    const usable = (defs ?? []).find(d =>
+                        !/[/\\]node_modules[/\\]/.test(d.uri.fsPath) && !d.uri.fsPath.endsWith('.d.ts'));
+                    if (usable) {
+                        await vscode.window.showTextDocument(usable.uri, {
+                            selection: usable.range,
                             preserveFocus: false
                         });
                         return;
