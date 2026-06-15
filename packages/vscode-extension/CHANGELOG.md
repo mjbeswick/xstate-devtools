@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.0] - 2026-06-15
+
+### Added
+- **Generate Setup Stubs** — right-click a machine to scaffold a `setup({ actions, guards, actors, delays })` block with a typed stub for every implementation the machine references, each flagged as already in `setup()` or missing from it. XState built-ins (`assign`, `raise`, `not`, `and`, `stateIn`, …) are skipped
+
+### Removed
+- **How Do I Reach This State?** — removed; it added little over **Generate Test Paths**. (The simulator path-replay plumbing it relied on was removed with it.)
+
 ## [1.11.0] - 2026-06-15
 
 ### Added
