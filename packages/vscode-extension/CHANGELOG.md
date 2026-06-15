@@ -1,9 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [1.13.0] - 2026-06-15
 
 ### Fixed
-- **Guards inside `and`/`or`/`not` are no longer flagged as unused** — guards referenced through the XState v5 higher-order guard helpers (`and(['a', 'b'])`, `or([…])`, `not('c')`), nested combinations, and the `{ type, params }` object form are now recognised as used. `stateIn(…)` is correctly treated as a state reference, not a guard. ([#1](https://github.com/mjbeswick/xstate-devtools/issues/1))
+- **Guards inside `and`/`or`/`not` are no longer flagged as unused** — guards referenced through the XState v5 higher-order guard helpers (`and(['a', 'b'])`, `or([…])`, `not('c')`), arbitrarily nested combinations, and the `{ type, params }` object form (including `and([not({ type: 'isX' }), …])`) are now recognised as used. `stateIn(…)` is correctly treated as a state reference, not a guard. ([#1](https://github.com/mjbeswick/xstate-devtools/issues/1))
+
+### Changed
+- **Tree outline surfaces inner guards of `and`/`or`/`not`** — a combinator now renders as a `guard` group with one navigable child per referenced inner guard (recursively), so each inner guard — including object-form `{ type, params }` guards — is clickable for **Go to Implementation** instead of showing the bare `not`/`and`/`or` helper name. Conditional-array branches (`always: [{ … }]`, multi-branch `on`/`onDone`) now also emit a navigable `target` node, matching the string/object transition forms, and their labels read e.g. `when not(isHealthFail) → location`.
 
 ## [1.12.0] - 2026-06-15
 

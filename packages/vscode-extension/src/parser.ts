@@ -530,13 +530,7 @@ export class XStateMachineParser {
             // guard (XState v5) or cond (XState v4)
             const guardProp = this.findProperty(node, 'guard') ?? this.findProperty(node, 'cond');
             if (guardProp) {
-                const guardLabel = this.extractFunctionName(guardProp) || '(inline guard)';
-                children.push({
-                    type: 'guard',
-                    label: guardLabel,
-                    range: this.nodeToRange(guardProp, document),
-                    uri: document.uri
-                });
+                children.push(this.buildGuardNode(guardProp, document));
             }
 
             // target
@@ -628,6 +622,62 @@ export class XStateMachineParser {
             }
         }
         return null;
+    }
+
+    // XState v5 higher-order guard helpers. Their arguments are themselves guards,
+    // so we render them as a group node with one child per referenced inner guard.
+    private static readonly GUARD_COMBINATORS = new Set(['and', 'or', 'not']);
+
+    /**
+     * Build the tree node for a guard value. A plain guard (string / identifier /
+     * `{ type }` object) becomes a single `guard` leaf; an `and`/`or`/`not` helper
+     * becomes a `guard` group labelled by the combinator, with one child `guard`
+     * node per referenced inner guard (recursively) so each stays clickable.
+     */
+    private static buildGuardNode(node: ts.Expression, document: vscode.TextDocument): MachineNode {
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && this.GUARD_COMBINATORS.has(node.expression.text)) {
+            const children = node.arguments.flatMap(arg => this.buildGuardChildren(arg, document));
+            return {
+                type: 'guard',
+                label: node.expression.text,
+                range: this.nodeToRange(node, document),
+                uri: document.uri,
+                children: children.length > 0 ? children : undefined
+            };
+        }
+        return {
+            type: 'guard',
+            label: this.extractFunctionName(node) || '(inline guard)',
+            range: this.nodeToRange(node, document),
+            uri: document.uri
+        };
+    }
+
+    /** Inner guard nodes of a combinator argument, flattening arrays (`and(['a', 'b'])`). */
+    private static buildGuardChildren(node: ts.Expression, document: vscode.TextDocument): MachineNode[] {
+        if (ts.isArrayLiteralExpression(node)) {
+            return node.elements.flatMap(e => this.buildGuardChildren(e, document));
+        }
+        return [this.buildGuardNode(node, document)];
+    }
+
+    /**
+     * A readable one-line guard label for transition branches, e.g. `not(isHealthFail)`.
+     * Returns null for an anonymous inline guard (no resolvable name) so branch labels
+     * fall back to the target — only *named* guards lead the branch label.
+     */
+    private static composeGuardLabel(node: ts.Expression): string | null {
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && this.GUARD_COMBINATORS.has(node.expression.text)) {
+            return `${node.expression.text}(${node.arguments.flatMap(arg => this.guardLabelParts(arg)).join(', ')})`;
+        }
+        return this.extractFunctionName(node);
+    }
+
+    private static guardLabelParts(node: ts.Expression): string[] {
+        if (ts.isArrayLiteralExpression(node)) {
+            return node.elements.flatMap(e => this.guardLabelParts(e));
+        }
+        return [this.composeGuardLabel(node) ?? '(inline guard)'];
     }
 
     private static findProperty(
@@ -920,12 +970,18 @@ export class XStateMachineParser {
 
         // Guard
         const guardProp = this.findProperty(obj, 'guard') || this.findProperty(obj, 'cond');
-        const guardName = guardProp ? this.extractFunctionName(guardProp) : null;
+        const guardName = guardProp ? this.composeGuardLabel(guardProp) : null;
         if (guardProp) {
+            children.push(this.buildGuardNode(guardProp, document));
+        }
+
+        // Target — render as its own node, uniform with the string/object transition
+        // forms, so the destination state stays clickable from an array branch.
+        if (targetProp && target) {
             children.push({
-                type: 'guard',
-                label: guardName || '(inline guard)',
-                range: this.nodeToRange(guardProp, document),
+                type: 'target',
+                label: target,
+                range: this.nodeToRange(targetProp, document),
                 uri: document.uri
             });
         }
@@ -1052,18 +1108,10 @@ export class XStateMachineParser {
             }
 
             // Parse guard
-            const guardProp = this.findProperty(transitionProp, 'guard') || 
+            const guardProp = this.findProperty(transitionProp, 'guard') ||
                             this.findProperty(transitionProp, 'cond');
             if (guardProp) {
-                const guardName = this.extractFunctionName(guardProp);
-                if (guardName) {
-                    children.push({
-                        type: 'guard',
-                        label: guardName,
-                        range: this.nodeToRange(guardProp, document),
-                        uri: document.uri
-                    });
-                }
+                children.push(this.buildGuardNode(guardProp, document));
             }
 
             children.push(...this.parseInvalidProperties(transitionProp, document, this.TRANSITION_PROPERTIES));

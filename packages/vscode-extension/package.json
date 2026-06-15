@@ -2,7 +2,7 @@
   "name": "xstate-devtools",
   "displayName": "xState Devtools",
   "description": "XState developer tools: interactive outline, search, and navigation",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "publisher": "MichaelBeswick",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -356,7 +356,10 @@
         },
         "xstateOutline.navTarget": {
           "type": "string",
-          "enum": ["code", "diagram"],
+          "enum": [
+            "code",
+            "diagram"
+          ],
           "enumDescriptions": [
             "Clicking a state/machine in the outline jumps to its source",
             "Clicking a state/machine focuses it in the diagram (opening the diagram if needed)"

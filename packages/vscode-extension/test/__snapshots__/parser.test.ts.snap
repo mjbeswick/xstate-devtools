@@ -14,11 +14,21 @@ exports[`parser snapshots > parses advancedTransitions.machine.ts 1`] = `
                     "label": "isValid",
                     "type": "guard",
                   },
+                  {
+                    "label": "submitting",
+                    "type": "target",
+                  },
                 ],
                 "label": "when isValid → submitting",
                 "type": "transition",
               },
               {
+                "children": [
+                  {
+                    "label": "invalid",
+                    "type": "target",
+                  },
+                ],
                 "label": "invalid",
                 "type": "transition",
               },
@@ -244,6 +254,10 @@ exports[`parser snapshots > parses checkout.machine.ts 1`] = `
                         "type": "guard",
                       },
                       {
+                        "label": "authorizing",
+                        "type": "target",
+                      },
+                      {
                         "label": "incrementRetry",
                         "type": "action",
                       },
@@ -252,6 +266,12 @@ exports[`parser snapshots > parses checkout.machine.ts 1`] = `
                     "type": "transition",
                   },
                   {
+                    "children": [
+                      {
+                        "label": "declined",
+                        "type": "target",
+                      },
+                    ],
                     "label": "declined",
                     "type": "transition",
                   },
@@ -2389,6 +2409,10 @@ exports[`parser snapshots > parses complexMachine.ts 1`] = `
                     "type": "guard",
                   },
                   {
+                    "label": "loading",
+                    "type": "target",
+                  },
+                  {
                     "label": "assign",
                     "type": "action",
                   },
@@ -2397,6 +2421,12 @@ exports[`parser snapshots > parses complexMachine.ts 1`] = `
                 "type": "transition",
               },
               {
+                "children": [
+                  {
+                    "label": "failure",
+                    "type": "target",
+                  },
+                ],
                 "label": "failure",
                 "type": "transition",
               },

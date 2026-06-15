@@ -207,6 +207,51 @@ export const m = createMachine({
     });
 });
 
+describe('higher-order guards (and/or/not) and array-branch targets', () => {
+    const SRC = `
+import { setup, and, not } from 'xstate';
+export const m = setup({
+  guards: { isHealthServiceFail: () => true, isHealthComponentFail: () => true, isHealthFail: () => true },
+}).createMachine({
+  id: 'hog',
+  initial: 's',
+  states: {
+    s: {
+      on: {
+        'print.receipt': {
+          guard: and([
+            not({ type: 'isHealthServiceFail', params: { service: 'contact' } }),
+            not({ type: 'isHealthComponentFail', params: { service: 'contact', name: 'Printer' } }),
+          ]),
+        },
+      },
+      always: [{ target: 'done', guard: not('isHealthFail') }],
+    },
+    done: { type: 'final' },
+  },
+});`;
+    const roots = () => XStateMachineParser.parseMachines(makeDoc(SRC, '/hog.ts'));
+
+    it('renders a combinator as a guard group with one child per inner guard (object-form types resolved)', () => {
+        const s = findState(roots(), 's');
+        const t = s?.children?.find(c => c.type === 'transition' && c.label === 'print.receipt');
+        const and = t?.children?.find(c => c.type === 'guard' && c.label === 'and');
+        const nots = (and?.children ?? []).filter(c => c.type === 'guard');
+        expect(nots.map(n => n.label)).toEqual(['not', 'not']);
+        expect(nots.flatMap(n => childLabels(n, 'guard'))).toEqual(['isHealthServiceFail', 'isHealthComponentFail']);
+    });
+
+    it('emits a target node for an array (always) branch and a composed guard label', () => {
+        const s = findState(roots(), 's');
+        const always = s?.children?.find(c => c.type === 'transition' && c.label === 'always');
+        const branch = always?.children?.find(c => c.type === 'transition');
+        expect(branch?.label).toBe('when not(isHealthFail) → done');
+        expect(childLabels(branch, 'target')).toEqual(['done']);
+        const not = branch?.children?.find(c => c.type === 'guard' && c.label === 'not');
+        expect(childLabels(not, 'guard')).toEqual(['isHealthFail']);
+    });
+});
+
 describe('structure', () => {
     it('trafficLight: red is a compound state with initial walk', () => {
         const red = findState(parseFixture('trafficLight.machine.ts'), 'red');

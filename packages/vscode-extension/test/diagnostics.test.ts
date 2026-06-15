@@ -318,6 +318,16 @@ describe('guard reference resolution (and/or/not, issue #1)', () => {
         expect(unusedGuards(src)).toEqual(['lonely']);
     });
 
+    it('resolves object-form guards nested inside combinators (and([not({type}), not({type})]))', () => {
+        const guardExpr = `and([
+            not({ type: 'isServiceFail', params: { service: 'contact' } }),
+            not({ type: 'isComponentFail', params: { name: 'Printer' } }),
+        ])`;
+        const src = machineWithGuard(guardExpr, ['isServiceFail', 'isComponentFail']);
+        expect(unusedGuards(src)).toEqual([]);
+        expect(unknownGuards(src)).toEqual([]);
+    });
+
     it('resolves guards inside a combinator written with the v4 cond alias', () => {
         const src = `
             import { and } from 'xstate';
