@@ -20,6 +20,7 @@ export interface MachineNode {
     isParallel?: boolean; // Flag for parallel (orthogonal) state
     historyType?: 'shallow' | 'deep'; // Set for `type: 'history'` states
     isTypeMarker?: boolean; // Synthetic `type: …` child — shown in the tree, hidden in the graph
+    guardCombinator?: 'and' | 'or' | 'not'; // Set for `and`/`or`/`not` guard helper groups
     description?: string; // XState `description` property, shown on hover
 }
 
@@ -642,6 +643,7 @@ export class XStateMachineParser {
                 label: node.expression.text,
                 range: this.nodeToRange(node, document),
                 uri: document.uri,
+                guardCombinator: node.expression.text as 'and' | 'or' | 'not',
                 children: children.length > 0 ? children : undefined
             };
         }

@@ -849,7 +849,9 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
             // grey variants); everything else (and any node with a diagnostic,
             // so the error/warning tint still shows) falls back to themed codicons.
             const base = XStateMachineTreeItem.iconBase;
-            const stateIcon = base && !hasError && !hasWarning ? this.stateIconFile() : undefined;
+            const stateIcon = base && !hasError && !hasWarning
+                ? (this.stateIconFile() ?? this.guardIconFile())
+                : undefined;
             this.iconPath = stateIcon && base
                 ? {
                     light: vscode.Uri.joinPath(base, 'light', stateIcon),
@@ -934,6 +936,13 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
         if (n.isInitial)   { return 'state-initial.svg'; }
         if (n.isFinal)     { return 'state-final.svg'; }
         return 'state.svg';
+    }
+
+    // Bundled square-badge icons for `and`/`or`/`not` guard combinator groups
+    // (resources/icons); leaf guards keep the themed `shield` codicon.
+    private guardIconFile(): string | undefined {
+        const c = this.node.guardCombinator;
+        return c ? `guard-${c}.svg` : undefined;
     }
 
     private getIcon(hasError = false, hasWarning = false): vscode.ThemeIcon {

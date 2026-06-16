@@ -97,6 +97,7 @@ The example above shows a parallel `checkout` machine: the dashed outer box with
 | 🎯 Magenta target | Transition target |
 | 🚀 Action · ⤓ entry · ⤒ exit | Actions (entry/exit/transition) |
 | 🛡️ Cyan shield | Guard |
+| `AND` · `OR` · `NOT` cyan badge | Guard combinator group (`and`/`or`/`not`), with each inner guard nested beneath |
 | 🔌 Yellow board | Invoke · ▶️ actor |
 | 🕘 Delay · ⚙️ setup section | Timing & v5 `setup` blocks |
 | 🔤 Context · 🔧 context property | Machine context |
