@@ -1037,7 +1037,7 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
                 iconColor = new vscode.ThemeColor('symbolIcon.propertyForeground');
                 break;
             case 'actor':
-                iconName = 'play-circle';
+                iconName = 'account';
                 iconColor = new vscode.ThemeColor('charts.yellow');
                 break;
             case 'delay':
