@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.15.1] - 2026-06-16
+
+### Fixed
+- **Function-valued context properties no longer show parentheses** — a context property whose value is a function rendered as `name: (function)`; it now reads `name: function`, consistent with the other inline labels.
+- **Selecting another diagram state no longer flashes** — clicking a state applied the edge-focus effect, then the tree reveal it triggers echoed back a passive highlight that reset the edges one frame later. The echo is now ignored when it names the already-selected state.
+
 ## [1.15.0] - 2026-06-16
 
 ### Changed
