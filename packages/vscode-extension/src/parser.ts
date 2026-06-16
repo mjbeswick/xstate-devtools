@@ -841,7 +841,7 @@ export class XStateMachineParser {
             return `[${node.elements.length} ${node.elements.length === 1 ? 'item' : 'items'}]`;
         }
         if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
-            return '(function)';
+            return 'function';
         }
         if (ts.isIdentifier(node)) {
             return node.text;
