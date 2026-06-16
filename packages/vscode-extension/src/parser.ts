@@ -574,7 +574,7 @@ export class XStateMachineParser {
                 const actionName = this.extractFunctionName(element);
                 actions.push({
                     type,
-                    label: actionName || `(inline ${type})`,
+                    label: actionName || `inline ${type}`,
                     range: this.nodeToRange(element, document),
                     uri: document.uri
                 });
@@ -582,7 +582,7 @@ export class XStateMachineParser {
         } else {
             // Single action
             const actionName = this.extractFunctionName(node);
-            const label = actionName || `(inline ${type})`;
+            const label = actionName || `inline ${type}`;
             actions.push({
                 type,
                 label,
@@ -649,7 +649,7 @@ export class XStateMachineParser {
         }
         return {
             type: 'guard',
-            label: this.extractFunctionName(node) || '(inline guard)',
+            label: this.extractFunctionName(node) || 'inline guard',
             range: this.nodeToRange(node, document),
             uri: document.uri
         };
@@ -679,7 +679,7 @@ export class XStateMachineParser {
         if (ts.isArrayLiteralExpression(node)) {
             return node.elements.flatMap(e => this.guardLabelParts(e));
         }
-        return [this.composeGuardLabel(node) ?? '(inline guard)'];
+        return [this.composeGuardLabel(node) ?? 'inline guard'];
     }
 
     private static findProperty(
