@@ -1160,7 +1160,13 @@ window.addEventListener('message', (event: MessageEvent) => {
         // moves, so the two never fight over a node's colours. A name that
         // isn't currently visible (e.g. inside a collapsed state) clears it.
         // Passive (no edge emphasis) so editing doesn't flicker the diagram.
-        selectNode(idByName.get(msg.stateId) ?? null, false);
+        const hid = idByName.get(msg.stateId) ?? null;
+        // A diagram click reveals its node in the tree, whose selection bounces
+        // straight back here as a `highlight`. Re-applying it passively would
+        // strip the focus effect the click just set — a one-frame flash. Ignore
+        // the echo when it names the node we're already emphasising.
+        if (hid && hid === selectedId && emphasized) { return; }
+        selectNode(hid, false);
     } else if (msg?.command === 'setModel') {
         // Live model push (source edit, tree expansion). Swap the data and
         // re-render in place, preserving the user's pan/zoom.
