@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.15.0] - 2026-06-16
+
+### Changed
+- **Guard combinators show a logic-symbol badge** — `and`/`or`/`not` groups now render with a cyan square badge carrying the connective glyph (∧ conjunction, ∨ disjunction, ¬ negation) instead of the shield, distinguishing the logical grouping from leaf guards. Drawn as vector paths for crisp, cross-platform rendering at any size.
+- **Inline and combinator guard/action labels read like state markers** — anonymous (unnamed) actions and guards now show a plain kind label (`action`, `guard`) with the qualifier as a dimmed marker (`· inline`), and combinator groups show `guard · and` / `· or` / `· not` — mirroring how `parallel`/`initial`/`final` read on state nodes. Parentheses are no longer wrapped around inline-function labels.
+- **Actor nodes use a person icon** — the actor icon is now the `account` (person) codicon in place of the play-circle.
+
 ## [1.14.0] - 2026-06-15
 
 ### Fixed
