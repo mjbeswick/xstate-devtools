@@ -21,6 +21,7 @@ export interface MachineNode {
     historyType?: 'shallow' | 'deep'; // Set for `type: 'history'` states
     isTypeMarker?: boolean; // Synthetic `type: …` child — shown in the tree, hidden in the graph
     guardCombinator?: 'and' | 'or' | 'not'; // Set for `and`/`or`/`not` guard helper groups
+    isInline?: boolean; // Anonymous action/guard (no resolvable name) — `inline` shown as a dimmed marker
     description?: string; // XState `description` property, shown on hover
 }
 
@@ -574,7 +575,8 @@ export class XStateMachineParser {
                 const actionName = this.extractFunctionName(element);
                 actions.push({
                     type,
-                    label: actionName || `inline ${type}`,
+                    label: actionName || type,
+                    isInline: actionName ? undefined : true,
                     range: this.nodeToRange(element, document),
                     uri: document.uri
                 });
@@ -582,10 +584,10 @@ export class XStateMachineParser {
         } else {
             // Single action
             const actionName = this.extractFunctionName(node);
-            const label = actionName || `inline ${type}`;
             actions.push({
                 type,
-                label,
+                label: actionName || type,
+                isInline: actionName ? undefined : true,
                 range: this.nodeToRange(node, document),
                 uri: document.uri
             });
@@ -640,16 +642,18 @@ export class XStateMachineParser {
             const children = node.arguments.flatMap(arg => this.buildGuardChildren(arg, document));
             return {
                 type: 'guard',
-                label: node.expression.text,
+                label: 'guard',
                 range: this.nodeToRange(node, document),
                 uri: document.uri,
                 guardCombinator: node.expression.text as 'and' | 'or' | 'not',
                 children: children.length > 0 ? children : undefined
             };
         }
+        const guardName = this.extractFunctionName(node);
         return {
             type: 'guard',
-            label: this.extractFunctionName(node) || 'inline guard',
+            label: guardName || 'guard',
+            isInline: guardName ? undefined : true,
             range: this.nodeToRange(node, document),
             uri: document.uri
         };

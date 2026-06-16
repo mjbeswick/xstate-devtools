@@ -890,6 +890,12 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
         if (node.isParallel) { markers.push('parallel'); }
         if (node.isInitial) { markers.push('initial'); }
         if (node.isFinal) { markers.push('final'); }
+        // Anonymous action/guard: `inline` as a dimmed qualifier, mirroring the
+        // way parallel/initial/final read on state nodes.
+        if (node.isInline) { markers.push('inline'); }
+        // Guard combinator group: the and/or/not word as a dimmed qualifier (the
+        // badge icon carries it too, like parallel's icon + marker).
+        if (node.guardCombinator) { markers.push(node.guardCombinator); }
         return markers.length > 0 ? markers.join(' · ') : undefined;
     }
 
