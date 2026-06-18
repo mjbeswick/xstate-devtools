@@ -882,11 +882,16 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     // When the user clicks a node in the diagram, select the matching item in
     // the tree outline (instead of jumping to source). Revealing the item fires
-    // onDidChangeSelection below, which in turn highlights it in the diagram.
+    // onDidChangeSelection below; the guard stops that from echoing a name-based
+    // highlight back to the diagram — which would jump to the wrong duplicate
+    // when state names repeat, since the diagram already selected the exact node.
+    let isDiagramReveal = false;
     graphViewProvider.setRevealInTreeHandler(node => {
         const item = treeProvider.getTreeItemForNode(node);
         if (item && treeView.visible) {
-            treeView.reveal(item, { select: true, focus: false, expand: true });
+            isDiagramReveal = true;
+            void Promise.resolve(treeView.reveal(item, { select: true, focus: false, expand: true }))
+                .then(() => { isDiagramReveal = false; }, () => { isDiagramReveal = false; });
         }
     });
 
@@ -899,6 +904,8 @@ export async function activate(context: vscode.ExtensionContext) {
         if (!item?.node) { return; }
         // Update the Transitions view to track the selected state.
         navigatorProvider.setFocus(item.node);
+        // Don't bounce a diagram-originated selection back to the diagram by name.
+        if (isDiagramReveal) { return; }
         if (item.node.type === 'state') {
             graphViewProvider.highlightState(item.node.label);
         } else if (item.node.type === 'machine') {
