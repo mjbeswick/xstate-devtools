@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.15.2] - 2026-06-18
+
+### Fixed
+- **Clicking a guarded `always`/conditional branch in the diagram now navigates** — each branch of an array transition (`always`, `onDone`, multi-branch `on`) resolved its edge target from the branch's display label (`when <guard> → <target>`) instead of the actual target, so guarded branches became dead/ghost edges. They now resolve and are clickable.
+- **Diagram selection no longer jumps to the wrong duplicate** — when two states share a name, clicking one in the diagram echoed a name-based highlight back through the tree that re-selected the *last* same-named state. The diagram now keeps the exact node it was clicked on.
+
 ## [1.15.1] - 2026-06-16
 
 ### Fixed
