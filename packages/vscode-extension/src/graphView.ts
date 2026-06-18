@@ -516,10 +516,13 @@ export class XStateGraphViewProvider {
                         const branches = (t.children ?? []).filter(c => c.type === 'transition');
                         if (branches.length > 0) {
                             for (const b of branches) {
-                                if (!b.label || b.label === '?') { continue; }  // action-only branch, no target
+                                // The branch's target is its `target` child, not its
+                                // display label (which now reads `when guard → target`).
+                                const bTarget = b.children?.find(c => c.type === 'target');
+                                if (!bTarget) { continue; }  // action-only branch, no target → no edge
                                 const g = b.children?.find(c => c.type === 'guard');
                                 const acts = (b.children ?? []).filter(c => c.type === 'action').map(a => a.label);
-                                emitEdge(b.label, t.label ?? '', g?.label, acts);
+                                emitEdge(bTarget.label, t.label ?? '', g?.label, acts);
                             }
                             continue;
                         }
