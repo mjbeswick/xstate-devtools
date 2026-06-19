@@ -115,7 +115,9 @@ Defined in `packages/chrome-extension/src/shared/types.ts`. Same protocol on bot
 ## Time travel
 
 - Click any row in the event log → state tree freezes to the post-event snapshot at that point in time
-- "Back to live" in the time-travel banner resumes following live state
+- The time-travel banner shows the selected event's type and timestamp; "Back to live" resumes following live state
+- Keyboard: `←` / `→` step to the previous/next event (stepping past the newest returns to live); `Esc` returns to live. Keys are ignored while typing in an input
+- Events newer than the selected point are dimmed in the log so the timeline split is visible
 - Bounded ring buffer (500 events) — `timeTravelSeq` clamps to the oldest retained event when older entries evict
 
 ## Limitations

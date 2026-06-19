@@ -93,6 +93,8 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
         {filtered.map((evt) => {
           const actorLabel = actors.get(evt.sessionId)?.machine?.id ?? evt.sessionId.slice(0, 12)
           const isCurrent = evt.globalSeq === timeTravelSeq
+          // Dim events that occur after the current time-travel point.
+          const isFuture = timeTravelSeq !== null && evt.globalSeq > timeTravelSeq
           return (
             <div
               key={evt.globalSeq}
@@ -106,6 +108,7 @@ export function EventLog({ collapsed = false, onExpand }: Props = {}) {
                 gap: 8,
                 padding: '3px 8px',
                 cursor: 'pointer',
+                opacity: isFuture ? 0.4 : 1,
                 background: isCurrent ? '#e6f4ff' : 'transparent',
                 borderLeft: isCurrent ? '3px solid #1890ff' : '3px solid transparent',
               }}

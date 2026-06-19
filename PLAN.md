@@ -80,25 +80,21 @@ static-analysis tool — **not** involved here):
 **Outcome:** time-travel is obvious and reversible; all inspector panels follow the
 selected event; user always knows whether they're viewing live or history.
 
-- [ ] **Audit data flow.** Confirm the diagram view and `SidePanel` context/snapshot view
-      both read through `getDisplaySnapshot(state, sessionId)` (store.ts:30), not
-      `actor.snapshot` directly. Fix any panel that ignores `timeTravelSeq`. List the
-      components touched in the commit body.
-- [ ] **"Viewing history" banner.** When `timeTravelSeq !== null`, show a persistent banner
-      (top of `Layout` or above `EventLog`) reading e.g. `⏱ Viewing event seq:N (HH:MM:SS) —`
-      with a **"Return to live"** button that calls `timeTravel(null)`. Style it like the
-      existing `ServerStatusBar` in App.tsx (subtle background, 11px, flex row).
-- [ ] **Keyboard stepping.** With time-travel active, `←` / `→` move to the previous/next
-      event's `globalSeq` (clamp to the available `events` range; respect the current
-      actor filter if one is selected). `Esc` returns to live. Add via a `useEffect`
-      key listener in the panel root; ignore when focus is in an `<input>`/`<textarea>`.
-- [ ] **Live-tail behavior while travelling.** New events must NOT yank the user back to
-      live. EventLog already guards auto-scroll on `timeTravelSeq === null` (EventLog.tsx:28)
-      — verify nothing else force-resets `timeTravelSeq`. The existing clamp in store.ts:98
-      (when the oldest event is evicted) is correct; keep it.
-- [ ] **Visual "future" dimming (optional).** In `EventLog`, render rows with
-      `globalSeq > timeTravelSeq` at reduced opacity so the timeline split is visible.
-- [ ] Update README "Time travel" section. Commit: `feat(panel): time-travel banner, keyboard stepping`.
+- [x] **Audit data flow.** `MachineTree` (tree highlight, via `getActiveNodeIds`) and
+      `SidePanel` (context/status) both read through `getDisplaySnapshot(state, sessionId)`.
+      No panel ignores `timeTravelSeq`. No change needed.
+- [x] **"Viewing history" banner.** Already existed in `Layout.tsx`; enhanced to show the
+      selected event's type + timestamp and a keyboard hint, alongside "Back to live".
+- [x] **Keyboard stepping.** `useEffect` keydown listener in `Layout`. `←`/`→` step
+      prev/next along the global event timeline (selecting that event's actor too);
+      stepping past the newest returns to live; `Esc` returns to live. Ignored while
+      focus is in input/textarea/contenteditable.
+- [x] **Live-tail behavior while travelling.** Verified: nothing force-resets
+      `timeTravelSeq`; EventLog auto-scroll already guards on `timeTravelSeq === null`;
+      store.ts clamp on eviction kept.
+- [x] **Visual "future" dimming.** EventLog rows with `globalSeq > timeTravelSeq` render at
+      0.4 opacity.
+- [x] Update README "Time travel" section. Commit: `feat(panel): time-travel banner, keyboard stepping`.
 
 **Acceptance:** click an old event → diagram + context + snapshot all show that point;
 banner appears; `←/→` step; "Return to live" + `Esc` restore live tailing; incoming
