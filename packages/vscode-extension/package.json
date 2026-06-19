@@ -112,6 +112,18 @@
         "category": "XState Debugger"
       },
       {
+        "command": "xstateDebugger.exportSession",
+        "title": "Export Session…",
+        "category": "XState Debugger",
+        "icon": "$(save)"
+      },
+      {
+        "command": "xstateDebugger.importSession",
+        "title": "Import Session…",
+        "category": "XState Debugger",
+        "icon": "$(folder-opened)"
+      },
+      {
         "command": "xstateMachineOutline.refresh",
         "title": "Refresh XState Outline",
         "icon": "$(refresh)"
@@ -456,6 +468,16 @@
     },
     "menus": {
       "view/title": [
+        {
+          "command": "xstateDebugger.importSession",
+          "when": "view == xstateDebugger",
+          "group": "navigation@1"
+        },
+        {
+          "command": "xstateDebugger.exportSession",
+          "when": "view == xstateDebugger",
+          "group": "navigation@2"
+        },
         {
           "command": "xstateMachineOutline.refresh",
           "when": "view == xstateMachineOutline",

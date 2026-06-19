@@ -764,6 +764,8 @@ export async function activate(context: vscode.ExtensionContext) {
     const debuggerConnectCommand = vscode.commands.registerCommand('xstateDebugger.connect', () => debuggerController.connect());
     const debuggerDisconnectCommand = vscode.commands.registerCommand('xstateDebugger.disconnect', () => debuggerController.disconnect());
     const debuggerToggleCommand = vscode.commands.registerCommand('xstateDebugger.toggle', () => debuggerController.toggle());
+    const debuggerExportSessionCommand = vscode.commands.registerCommand('xstateDebugger.exportSession', () => debuggerController.exportSession());
+    const debuggerImportSessionCommand = vscode.commands.registerCommand('xstateDebugger.importSession', () => debuggerController.importSession());
 
     // "Transitions" view — the selected state's incoming (←) / outgoing (→)
     // transitions.
@@ -1164,6 +1166,8 @@ export async function activate(context: vscode.ExtensionContext) {
         cursorChangeListener,
         debuggerController,
         debuggerViewRegistration,
+        debuggerExportSessionCommand,
+        debuggerImportSessionCommand,
         debuggerConnectCommand,
         debuggerDisconnectCommand,
         debuggerToggleCommand,

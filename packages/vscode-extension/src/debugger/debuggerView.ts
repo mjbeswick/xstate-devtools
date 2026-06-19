@@ -32,6 +32,12 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
                 case 'selectActor': this.controller.selectActor(msg.sessionId ?? null); return;
                 case 'connect': this.controller.connect(); return;
                 case 'disconnect': this.controller.disconnect(); return;
+                case 'timeTravel': this.controller.timeTravel(typeof msg.seq === 'number' ? msg.seq : null); return;
+                case 'dispatch': this.controller.dispatch({ type: String(msg.eventType) }); return;
+                case 'dispatchCustom': this.controller.dispatchCustom(String(msg.type ?? ''), String(msg.payload ?? '')); return;
+                case 'capture': this.controller.capturePersisted(); return;
+                case 'restore': void this.controller.restore(); return;
+                case 'exitReplay': this.controller.exitReplay(); return;
                 case 'ready': if (this.lastModel) { this.post(this.lastModel); } return;
             }
         });
@@ -93,6 +99,22 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
   table.events td.ev { width: 99%; overflow: hidden; text-overflow: ellipsis; }
   .muted { color: var(--vscode-descriptionForeground); }
   .empty { color: var(--vscode-descriptionForeground); padding: 16px 10px; text-align: center; font-size: 12px; }
+  .banner { display: flex; align-items: center; gap: 8px; padding: 4px 10px; font-size: 12px; }
+  .banner.tt { background: var(--vscode-inputValidation-warningBackground, rgba(255,200,0,.15)); color: var(--vscode-foreground); }
+  .banner.replay { background: var(--vscode-inputValidation-infoBackground, rgba(100,100,255,.15)); }
+  .banner .grow { flex: 1; }
+  .tx { display: flex; align-items: center; gap: 6px; padding: 2px 4px; }
+  .tx button { padding: 1px 8px; }
+  .tx .ev { font-family: var(--vscode-editor-font-family); }
+  .tx .gd { color: var(--vscode-descriptionForeground); font-size: 11px; }
+  .custom { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+  .custom input, .custom textarea { font-family: var(--vscode-editor-font-family); font-size: 12px; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); border-radius: 2px; padding: 3px 6px; }
+  .custom textarea { resize: vertical; min-height: 38px; }
+  .row { display: flex; gap: 6px; align-items: center; }
+  table.events tr.evrow { cursor: pointer; }
+  table.events tr.evrow:hover td { background: var(--vscode-list-hoverBackground); }
+  table.events tr.tt td { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
+  table.events tr.future td { opacity: .5; }
 </style>
 </head>
 <body>
@@ -138,6 +160,16 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
     }
 
     let html = '';
+
+    // Replay / time-travel banners
+    if (m.replayMode) {
+      html += '<div class="banner replay"><span class="grow">● Replay' + (m.replayName ? (' · ' + esc(m.replayName)) : '') +
+        '</span><button class="secondary" id="exit-replay">Exit replay</button></div>';
+    } else if (m.timeTravelSeq !== null) {
+      html += '<div class="banner tt"><span class="grow">⏱ Time travel · seq ' + m.timeTravelSeq +
+        '</span><button class="secondary" id="back-live">Back to live</button></div>';
+    }
+
     // Actors
     html += '<div class="section"><h3>Actors</h3>';
     for (const a of m.actors) {
@@ -159,6 +191,40 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
       html += '</div>';
       html += '<div class="section"><h3>Context</h3><pre class="ctx">' +
         esc(safeJson(s.context)) + '</pre></div>';
+
+      // Dispatch — transition buttons + custom event
+      html += '<div class="section"><h3>Send event</h3>';
+      if (!m.canInteract) {
+        html += '<div class="muted">' + (m.timeTravelSeq !== null || m.replayMode
+          ? 'Return to live to send events.' : 'Connect to send events.') + '</div>';
+      } else {
+        if (s.transitions.length) {
+          for (const t of s.transitions) {
+            html += '<div class="tx"><button class="dispatch" data-ev="' + esc(t.eventType) + '">Send</button>' +
+              '<span class="ev">' + esc(t.eventType) + '</span>' +
+              (t.guard ? '<span class="gd">[' + esc(t.guard) + ']</span>' : '') + '</div>';
+          }
+        } else {
+          html += '<div class="muted">No outgoing events from the current state.</div>';
+        }
+        html += '<div class="custom">' +
+          '<input id="cev-type" type="text" placeholder="CUSTOM_EVENT" />' +
+          '<textarea id="cev-payload" placeholder=\'{ "key": "value" }\'></textarea>' +
+          '<div class="row"><button id="cev-send">Send custom</button></div></div>';
+      }
+      html += '</div>';
+
+      // Persisted snapshot capture / restore
+      html += '<div class="section"><h3>Persisted snapshot</h3>';
+      if (!m.canInteract) {
+        html += '<div class="muted">Available when live.</div>';
+      } else {
+        html += '<div class="row"><button id="capture">Capture</button>' +
+          (s.persisted.captured ? '<button id="restore" class="secondary">⏮ Restore</button>' : '') + '</div>';
+        if (s.persisted.error) { html += '<div class="muted" style="margin-top:4px">' + esc(s.persisted.error) + '</div>'; }
+        else if (s.persisted.captured) { html += '<div class="muted" style="margin-top:4px">Snapshot captured.</div>'; }
+      }
+      html += '</div>';
     }
 
     // Event log
@@ -169,7 +235,10 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
       html += '<table class="events">';
       for (let i = m.events.length - 1; i >= 0; i--) {
         const ev = m.events[i];
-        html += '<tr><td class="t">' + esc(fmtTime(ev.time)) + '</td>' +
+        const isCur = m.timeTravelSeq !== null && ev.seq === m.timeTravelSeq;
+        const isFuture = m.timeTravelSeq !== null && ev.seq > m.timeTravelSeq;
+        html += '<tr class="evrow' + (isCur ? ' tt' : '') + (isFuture ? ' future' : '') + '" data-seq="' + ev.seq + '">' +
+          '<td class="t">' + esc(fmtTime(ev.time)) + '</td>' +
           '<td class="ev">' + esc(ev.type) + '</td>' +
           '<td class="t">#' + ev.seq + '</td></tr>';
       }
@@ -178,9 +247,25 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
     html += '</div>';
 
     body.innerHTML = html;
+
     for (const el of body.querySelectorAll('.actor')) {
       el.addEventListener('click', () => vscode.postMessage({ command: 'selectActor', sessionId: el.dataset.id }));
     }
+    for (const el of body.querySelectorAll('.dispatch')) {
+      el.addEventListener('click', () => vscode.postMessage({ command: 'dispatch', eventType: el.dataset.ev }));
+    }
+    for (const el of body.querySelectorAll('tr.evrow')) {
+      el.addEventListener('click', () => vscode.postMessage({ command: 'timeTravel', seq: Number(el.dataset.seq) }));
+    }
+    $('exit-replay') && $('exit-replay').addEventListener('click', () => vscode.postMessage({ command: 'exitReplay' }));
+    $('back-live') && $('back-live').addEventListener('click', () => vscode.postMessage({ command: 'timeTravel', seq: null }));
+    $('capture') && $('capture').addEventListener('click', () => vscode.postMessage({ command: 'capture' }));
+    $('restore') && $('restore').addEventListener('click', () => vscode.postMessage({ command: 'restore' }));
+    $('cev-send') && $('cev-send').addEventListener('click', () => vscode.postMessage({
+      command: 'dispatchCustom',
+      type: ($('cev-type') || {}).value || '',
+      payload: ($('cev-payload') || {}).value || '',
+    }));
   }
 
   function safeJson(v) {

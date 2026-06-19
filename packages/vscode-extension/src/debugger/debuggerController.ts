@@ -6,9 +6,9 @@
 // status-bar indicator, and the bridge that overlays each running machine's
 // active state onto its open statechart diagram.
 import * as vscode from 'vscode';
-import { createInspectorStore, getActivePaths, getDisplaySnapshot, type InspectorStore } from '@xstate-devtools/panel-core';
+import { createInspectorStore, exportSession, getActivePaths, getDisplaySnapshot, importSession, type InspectorStore } from '@xstate-devtools/panel-core';
 import type { StoreApi } from 'zustand/vanilla';
-import type { ExtensionToPageMessage, PageToExtensionMessage } from '@xstate-devtools/protocol';
+import type { ExtensionToPageMessage, PageToExtensionMessage, SerializedEvent, SerializedStateNode } from '@xstate-devtools/protocol';
 import { DebuggerWsClient, type ConnectionStatus } from './wsClient';
 import { XStateGraphViewProvider, type LiveStateValue } from '../graphView';
 
@@ -32,12 +32,21 @@ export interface EventVM {
     time: number;
 }
 
+/** An event the selected actor could be sent from its current state. */
+export interface TransitionVM {
+    eventType: string;
+    guard?: string;
+    targets: string[];
+}
+
 /** The full snapshot of debugger state pushed to the webview view. */
 export interface DebuggerViewModel {
     status: ConnectionStatus;
     url: string;
+    replayMode: boolean;
     replayName: string | null;
     timeTravelSeq: number | null;
+    canInteract: boolean;
     actors: ActorVM[];
     selected: {
         sessionId: string;
@@ -45,6 +54,8 @@ export interface DebuggerViewModel {
         status: string;
         activeLeaves: string[];
         context: unknown;
+        transitions: TransitionVM[];
+        persisted: { captured: boolean; error?: string };
     } | null;
     events: EventVM[];
 }
@@ -88,6 +99,98 @@ export class DebuggerController implements vscode.Disposable {
     /** Select an actor (drives the inspector + which diagram is emphasised). */
     selectActor(sessionId: string | null): void {
         this.store.getState().selectActor(sessionId);
+    }
+
+    /** Freeze the display at a captured event seq (null = back to live). */
+    timeTravel(seq: number | null): void {
+        this.store.getState().timeTravel(seq);
+    }
+
+    /** Send an event to the selected running actor. */
+    dispatch(event: SerializedEvent): void {
+        const sessionId = this.store.getState().selectedActorId;
+        if (!sessionId) { return; }
+        this.send({ type: 'XSTATE_DISPATCH', sessionId, event });
+    }
+
+    /** Send a custom event with a JSON payload; reports a parse error to the UI. */
+    dispatchCustom(type: string, payloadJson: string): void {
+        let payload: Record<string, unknown> = {};
+        if (payloadJson.trim()) {
+            try {
+                const parsed = JSON.parse(payloadJson);
+                if (parsed && typeof parsed === 'object') { payload = parsed as Record<string, unknown>; }
+            } catch {
+                void vscode.window.showErrorMessage('XState debugger: event payload is not valid JSON.');
+                return;
+            }
+        }
+        if (!type.trim()) { return; }
+        this.dispatch({ type: type.trim(), ...payload });
+    }
+
+    /** Ask the running app for the selected actor's persisted snapshot. */
+    capturePersisted(): void {
+        const sessionId = this.store.getState().selectedActorId;
+        if (!sessionId) { return; }
+        this.send({ type: 'XSTATE_REQUEST_PERSISTED', sessionId });
+    }
+
+    /** Recreate the selected actor from its captured persisted snapshot. */
+    async restore(): Promise<void> {
+        const state = this.store.getState();
+        const sessionId = state.selectedActorId;
+        if (!sessionId) { return; }
+        const entry = state.persistedSnapshots.get(sessionId);
+        if (!entry || entry.persisted === undefined) {
+            void vscode.window.showWarningMessage('XState debugger: capture a persisted snapshot before restoring.');
+            return;
+        }
+        const ok = await vscode.window.showWarningMessage(
+            'Restore this actor to the captured snapshot? Side effects already run are not undone. ' +
+            '(Requires the actor to be wired with useRestorableInspectedMachine.)',
+            { modal: true },
+            'Restore',
+        );
+        if (ok !== 'Restore') { return; }
+        this.send({ type: 'XSTATE_RESTORE', sessionId, persisted: entry.persisted });
+    }
+
+    /** Write the current captured session to a JSON file. */
+    async exportSession(): Promise<void> {
+        const doc = exportSession(this.store.getState(), Date.now());
+        const uri = await vscode.window.showSaveDialog({
+            filters: { 'XState session': ['json'] },
+            saveLabel: 'Export XState session',
+        });
+        if (!uri) { return; }
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(doc, null, 2), 'utf8'));
+        void vscode.window.showInformationMessage(`Exported XState session to ${uri.fsPath}`);
+    }
+
+    /** Load a session JSON file into the store as a read-only replay. */
+    async importSession(): Promise<void> {
+        const picks = await vscode.window.showOpenDialog({
+            canSelectMany: false,
+            filters: { 'XState session': ['json'] },
+            openLabel: 'Import XState session',
+        });
+        const uri = picks?.[0];
+        if (!uri) { return; }
+        try {
+            const bytes = await vscode.workspace.fs.readFile(uri);
+            const data = importSession(JSON.parse(Buffer.from(bytes).toString('utf8')));
+            const name = uri.path.split('/').pop() ?? 'session';
+            this.store.getState().loadSession(data, name);
+        } catch (e) {
+            void vscode.window.showErrorMessage(`Could not import session: ${(e as Error).message}`);
+        }
+    }
+
+    /** Leave replay mode and return to an empty live session. */
+    exitReplay(): void {
+        this.store.getState().exitReplay();
+        this.graphView.clearLiveConfig();
     }
 
     /** Current connection URL (from config, falling back to the default). */
@@ -184,6 +287,8 @@ export class DebuggerController implements vscode.Disposable {
             };
         });
 
+        const liveSelectable = this.status === 'open' && state.timeTravelSeq === null && !state.replayMode;
+
         let selected: DebuggerViewModel['selected'] = null;
         const selId = state.selectedActorId;
         if (selId) {
@@ -191,18 +296,39 @@ export class DebuggerController implements vscode.Disposable {
             const snapshot = getDisplaySnapshot(state, selId) ?? actor?.snapshot ?? null;
             if (actor && snapshot) {
                 const activeLeaves: string[] = [];
+                const transitions: TransitionVM[] = [];
                 if (actor.machine) {
+                    const seenNodes = new Set<SerializedStateNode>();
+                    const seenEvents = new Set<string>();
                     for (const path of getActivePaths(snapshot.value as LiveStateValue, actor.machine.root)) {
                         const leaf = path[path.length - 1];
                         if (leaf) { activeLeaves.push(leaf.key); }
+                        // Outgoing events from every node on the active path (a child
+                        // and its ancestors can both handle an event).
+                        for (const node of path) {
+                            if (seenNodes.has(node)) { continue; }
+                            seenNodes.add(node);
+                            for (const t of node.on) {
+                                const key = `${t.eventType}::${t.guard ?? ''}`;
+                                if (seenEvents.has(key)) { continue; }
+                                seenEvents.add(key);
+                                transitions.push({ eventType: t.eventType, guard: t.guard, targets: t.targets });
+                            }
+                        }
                     }
                 }
+                const persistedEntry = state.persistedSnapshots.get(selId);
                 selected = {
                     sessionId: selId,
                     machineId: actor.machine?.id ?? null,
                     status: snapshot.status,
                     activeLeaves,
                     context: snapshot.context,
+                    transitions,
+                    persisted: {
+                        captured: persistedEntry?.persisted !== undefined,
+                        error: persistedEntry?.error,
+                    },
                 };
             }
         }
@@ -214,8 +340,10 @@ export class DebuggerController implements vscode.Disposable {
         return {
             status: this.status,
             url: this.url(),
+            replayMode: state.replayMode,
             replayName: state.replayName,
             timeTravelSeq: state.timeTravelSeq,
+            canInteract: liveSelectable,
             actors,
             selected,
             events,
@@ -226,10 +354,12 @@ export class DebuggerController implements vscode.Disposable {
     // graph provider only touches panels whose machine id matches, so actors
     // without an open diagram are silently skipped.
     private syncDiagram(): void {
-        const { actors } = this.store.getState();
-        for (const actor of actors.values()) {
+        const state = this.store.getState();
+        for (const [sessionId, actor] of state.actors) {
             const machineId = actor.machine?.id;
-            const value = actor.snapshot?.value;
+            // Respect time-travel: show the snapshot at the frozen seq, not live.
+            const snapshot = getDisplaySnapshot(state, sessionId) ?? actor.snapshot;
+            const value = snapshot?.value;
             if (!machineId || value === undefined || value === null) { continue; }
             this.graphView.setLiveConfig(machineId, value as LiveStateValue);
         }
