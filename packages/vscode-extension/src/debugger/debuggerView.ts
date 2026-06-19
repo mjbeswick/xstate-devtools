@@ -40,6 +40,7 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
                 case 'capture': this.controller.capturePersisted(); return;
                 case 'restore': void this.controller.restore(); return;
                 case 'exitReplay': this.controller.exitReplay(); return;
+                case 'jserror': this.controller.logLine(`webview JS error: ${msg.error}`); return;
                 case 'ready': if (this.lastModel) { this.post(this.lastModel); } return;
             }
         });
@@ -130,7 +131,17 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
   </div>
   <div id="body"></div>
 <script>
-  const vscode = acquireVsCodeApi();
+  var vscode;
+  try { vscode = acquireVsCodeApi(); } catch (e) {
+    document.getElementById('status').textContent = 'script error: ' + e;
+  }
+  // Surface any runtime error both in the panel and back to the output channel,
+  // so a broken script can be diagnosed without the webview devtools.
+  window.onerror = function (message, src, line, col) {
+    try { document.getElementById('status').textContent = 'JS error: ' + message + ' @' + line + ':' + col; } catch (_) {}
+    try { vscode && vscode.postMessage({ command: 'jserror', error: String(message) + ' @' + line + ':' + col }); } catch (_) {}
+    return false;
+  };
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
