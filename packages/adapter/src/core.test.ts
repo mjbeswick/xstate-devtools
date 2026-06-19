@@ -59,3 +59,40 @@ describe('persisted snapshot request', () => {
     expect(sent.find((m) => m.type === 'XSTATE_PERSISTED_SNAPSHOT')).toBeUndefined()
   })
 })
+
+describe('restore', () => {
+  it('invokes a registered restore handler with the persisted snapshot', () => {
+    const { transport, push } = mockTransport()
+    const { registerRestore } = createInspector(transport, 'web')
+
+    let received: unknown
+    registerRestore('s1', (persisted) => { received = persisted })
+    push({ type: 'XSTATE_RESTORE', sessionId: 'web:s1', persisted: { value: 'done' } })
+
+    expect(received).toEqual({ value: 'done' })
+  })
+
+  it('ignores restore for another transport source', () => {
+    const { transport, push } = mockTransport()
+    const { registerRestore } = createInspector(transport, 'web')
+
+    let called = false
+    registerRestore('s1', () => { called = true })
+    push({ type: 'XSTATE_RESTORE', sessionId: 'srv:s1', persisted: {} })
+
+    expect(called).toBe(false)
+  })
+
+  it('unregister stops the handler from firing', () => {
+    const { transport, push } = mockTransport()
+    const { registerRestore } = createInspector(transport, 'web')
+
+    let count = 0
+    const unregister = registerRestore('s1', () => { count++ })
+    push({ type: 'XSTATE_RESTORE', sessionId: 'web:s1', persisted: {} })
+    unregister()
+    push({ type: 'XSTATE_RESTORE', sessionId: 'web:s1', persisted: {} })
+
+    expect(count).toBe(1)
+  })
+})

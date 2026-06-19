@@ -74,6 +74,19 @@ export function SidePanel() {
     dispatch_({ type: 'XSTATE_REQUEST_PERSISTED', sessionId: selectedActorId })
   }, [selectedActorId, replayMode, dispatch_])
 
+  const restorePersisted = useCallback((value: unknown) => {
+    if (!selectedActorId || replayMode) return
+    const ok = window.confirm(
+      'Live rewind (experimental)\n\n' +
+      'This recreates the actor from the captured persisted snapshot. ' +
+      'It only works for actors wired with useRestorableInspectedMachine, and ' +
+      'already-performed side effects (network calls, spawned children, messages ' +
+      'sent to parents) are NOT undone.\n\nRestore to this state?'
+    )
+    if (!ok) return
+    dispatch_({ type: 'XSTATE_RESTORE', sessionId: selectedActorId, persisted: value })
+  }, [selectedActorId, replayMode, dispatch_])
+
   const [payloadJson, setPayloadJson] = useState('{}')
   const [payloadError, setPayloadError] = useState<string | null>(null)
   const [customEventType, setCustomEventType] = useState('')
@@ -222,7 +235,27 @@ export function SidePanel() {
             {persisted.error}
           </div>
         )}
-        {persisted?.persisted !== undefined && <JsonView value={persisted.persisted} />}
+        {persisted?.persisted !== undefined && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <button
+                onClick={() => restorePersisted(persisted.persisted)}
+                disabled={replayMode}
+                title="Recreate the actor from this snapshot (experimental)"
+                style={{
+                  padding: '2px 10px', fontSize: 11,
+                  cursor: replayMode ? 'default' : 'pointer',
+                  background: replayMode ? '#bfbfbf' : '#fff', color: replayMode ? '#fff' : '#a8071a',
+                  border: `1px solid ${replayMode ? '#bfbfbf' : '#ffa39e'}`, borderRadius: 4,
+                }}
+              >
+                ⏮ Restore to this state
+              </button>
+              <span style={{ fontSize: 10, color: '#aaa' }}>experimental · live rewind</span>
+            </div>
+            <JsonView value={persisted.persisted} />
+          </>
+        )}
       </AccordionSection>
 
       <AccordionSection

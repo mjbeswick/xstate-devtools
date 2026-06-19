@@ -114,6 +114,7 @@ Defined in `packages/chrome-extension/src/shared/types.ts`. Same protocol on bot
 - `XSTATE_PERSISTED_SNAPSHOT` — adapter → panel, an actor's XState persisted snapshot (or capture error)
 - `XSTATE_DISPATCH` — panel → adapter, send an event to a specific actor
 - `XSTATE_REQUEST_PERSISTED` — panel → adapter, request an actor's persisted snapshot
+- `XSTATE_RESTORE` — panel → adapter, recreate an actor from a persisted snapshot (live rewind)
 
 ## Time travel
 
@@ -135,6 +136,32 @@ Defined in `packages/chrome-extension/src/shared/types.ts`. Same protocol on bot
   of a machine's state, open the **Persisted snapshot** section in the side panel and click
   **Capture** — this pulls XState's `getPersistedSnapshot()` from the live actor. Captured
   persisted snapshots are included in session exports (format v2)
+
+## Live rewind (experimental)
+
+Restore a running machine to a previously captured state:
+
+1. In the side panel's **Persisted snapshot** section, click **Capture** to snapshot the
+   actor's state (uses XState's `getPersistedSnapshot()`).
+2. Later, click **Restore to this state** to recreate the actor from that snapshot.
+
+Restore only works for actors wired with the opt-in hook — it owns the actor instance so it
+can recreate it (plain `useMachine` creates its actor once and ignores later snapshot changes):
+
+```tsx
+import { useRestorableInspectedMachine } from '@xstate-devtools/adapter/react'
+
+const [state, send] = useRestorableInspectedMachine(myMachine)
+```
+
+Honest caveats — this restores *machine state*, not the outside world:
+
+- The actor is **recreated**, not rewound in place; its `sessionId` changes and subscriptions
+  re-fire from the restored state.
+- Already-performed **side effects are not undone** — network calls, spawned children, and
+  messages sent to parents stay as they were.
+- Actors using plain `useInspectedMachine` (or no hook) have no restore handler; the Restore
+  button sends the command but nothing happens on the app side.
 
 ## Limitations
 

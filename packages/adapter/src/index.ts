@@ -13,7 +13,7 @@ declare global {
 export function createAdapter() {
   if (typeof window === 'undefined') {
     // Non-browser env (SSR/SSG/server) — return a no-op so importing this module is safe.
-    return { inspect: () => {}, dispose: () => {} }
+    return { inspect: () => {}, dispose: () => {}, registerRestore: () => () => {} }
   }
 
   const transport: Transport = {

@@ -196,24 +196,29 @@ lifecycle — the app created it via `useInspectedMachine`/`useInspectedActorRef
 (`adapter/src/react.tsx`). Recreating an actor inside the adapter leaves the app's React
 hook pointing at the dead original. **Resolve the ownership story before writing code.**
 
-- [ ] **Spike: ownership & feasibility.** Determine whether restore is viable as
-      (a) adapter-side recreate (diverges from the app's hook — likely only useful for
-      standalone/server actors), or (b) a hook-level opt-in where `useInspectedMachine`
-      exposes a restore handle the adapter can call to swap the actor and re-render. Write
-      findings into this file before implementing. Recommend (b) for React apps.
-- [ ] **Protocol.** Add `ExtensionToPageMessage` variant
-      `{ type: 'XSTATE_RESTORE', sessionId, persisted: unknown }`. Handle it in `core.ts`
-      `transport.subscribe` alongside `XSTATE_DISPATCH`.
-- [ ] **Adapter restore path.** Implement per the spike decision. At minimum: stop the
-      existing actor, `createActor(ref.logic, { snapshot: persisted }).start()`, re-register
-      it so the panel sees a fresh registration, and update `actorRefs`.
-- [ ] **Panel UI.** A "Restore to this state" button in `SidePanel` (and/or event-log row
-      context action), enabled only when a persisted snapshot is available for that actor
-      (from Phase 2b). Show a confirmation dialog spelling out the side-effect caveat.
-- [ ] **Guardrails.** Disable restore in replay mode; disable when no persisted snapshot
-      exists; handle the "actor already stopped" case gracefully.
-- [ ] Update README "Live rewind (experimental)" with the caveats. Commit:
-      `feat: experimental live rewind from persisted snapshot`.
+- [x] **Spike: ownership & feasibility.** RESOLVED → option (b). The adapter only ever
+      receives an `actorRef` via the inspect callback; it never owns the actor's lifecycle
+      (the app's `useMachine`/`createActor` does). An adapter-side recreate would orphan the
+      app's reference (zombie actor), so restore MUST be driven by the owner. `@xstate/react`'s
+      `useMachine` creates the actor once and ignores later `snapshot` option changes, so the
+      restorable hook must own a `createActor` instance it can recreate on demand. Chosen
+      design: additive `useRestorableInspectedMachine` that owns its actor, registers a
+      restore handler with the adapter keyed by `sessionId`, and recreates from the persisted
+      snapshot when `XSTATE_RESTORE` arrives. Plain `useInspectedMachine` is unchanged; actors
+      not using the restorable hook simply have no restore handler (documented).
+- [x] **Protocol.** Added `XSTATE_RESTORE { sessionId, persisted }`. Handled in `core.ts`
+      `transport.subscribe` via the same `stripIfMine` routing as `XSTATE_DISPATCH`.
+- [x] **Adapter restore path (owner-driven).** `createInspector` now keeps a
+      `restoreHandlers` registry + `registerRestore(sessionId, handler)`. On `XSTATE_RESTORE`
+      it invokes the owner's handler. `useRestorableInspectedMachine` (additive) owns its
+      `createActor` instance and recreates it from the persisted snapshot on restore.
+- [x] **Panel UI.** "⏮ Restore to this state" button in the SidePanel Persisted snapshot
+      section, shown only when a persisted snapshot is available, with a `window.confirm`
+      dialog spelling out the side-effect caveats.
+- [x] **Guardrails.** Restore disabled in replay mode and only enabled when a persisted
+      snapshot exists; actors without the restorable hook are a documented no-op.
+- [x] Tests: adapter restore-registry routing (register/cross-source/unregister). Update
+      README "Live rewind (experimental)". Commit: `feat: experimental live rewind`.
 
 **Acceptance:** with a supported (likely standalone/server) actor, restoring re-seeds it to
 the chosen state and the panel reflects the new live actor; caveats are shown; nothing

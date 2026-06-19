@@ -144,6 +144,11 @@ export type ExtensionToPageMessage =
       type: 'XSTATE_REQUEST_PERSISTED'
       sessionId: string
     }
+  | {
+      type: 'XSTATE_RESTORE'
+      sessionId: string
+      persisted: unknown           // XState persisted snapshot to recreate the actor from
+    }
 
 // Marker added to all postMessages so content script can filter
 export type MarkedPageMessage = PageToExtensionMessage & { __xstateDevtools: true }

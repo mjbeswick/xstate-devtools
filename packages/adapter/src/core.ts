@@ -80,6 +80,10 @@ function nextSeq(): number {
 
 export function createInspector(transport: Transport, source: Source) {
   const actorRefs = new Map<string, AnyActorRef>()
+  // Owner-registered restore handlers, keyed by local (un-prefixed) sessionId.
+  // Populated by useRestorableInspectedMachine; an actor without a handler
+  // simply can't be restored (live rewind is opt-in).
+  const restoreHandlers = new Map<string, (persisted: unknown) => void>()
   const prefix = source + ':'
   const tag = (sessionId: string) => prefix + sessionId
   const tagOptional = (id: string | undefined) => (id ? prefix + id : undefined)
@@ -118,6 +122,15 @@ export function createInspector(transport: Transport, source: Source) {
         error,
         timestamp: Date.now(),
       })
+    } else if (message.type === 'XSTATE_RESTORE') {
+      const local = stripIfMine(message.sessionId)
+      if (local === null) return // not for this transport source
+      const handler = restoreHandlers.get(local)
+      if (handler) {
+        try { handler(message.persisted) } catch (e) {
+          console.warn('[xstate-devtools] restore error:', e)
+        }
+      }
     }
   })
 
@@ -162,10 +175,22 @@ export function createInspector(transport: Transport, source: Source) {
     }
   }
 
+  /**
+   * Register an owner-side restore handler for an actor. Called by
+   * useRestorableInspectedMachine. Returns an unregister function.
+   */
+  function registerRestore(sessionId: string, handler: (persisted: unknown) => void) {
+    restoreHandlers.set(sessionId, handler)
+    return () => {
+      if (restoreHandlers.get(sessionId) === handler) restoreHandlers.delete(sessionId)
+    }
+  }
+
   function dispose() {
     unsubscribe()
     actorRefs.clear()
+    restoreHandlers.clear()
   }
 
-  return { inspect, dispose }
+  return { inspect, dispose, registerRestore }
 }
