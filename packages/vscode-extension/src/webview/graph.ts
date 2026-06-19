@@ -37,8 +37,12 @@ interface ElkNode {
     edges?: ElkEdge[];
 }
 
+// A single rendered row of a transition label. `event` is the owning event
+// (e.g. `EVENT [guard]`) so a click on any wrapped actions row resolves back
+// to its transition; `text` is what's actually drawn.
+interface RenderLine { text: string; event: string }
 // Per-routed-edge metadata, populated by buildElkGraph and read while drawing.
-const edgeMeta = new Map<string, { srcId: string; tgtId: string; lines: string[] }>();
+const edgeMeta = new Map<string, { srcId: string; tgtId: string; lines: RenderLine[] }>();
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const vscode = acquireVsCodeApi();
@@ -113,6 +117,7 @@ const NODE_V_PAD    = 10;
 const REGION_H      = 28;
 const MIN_W         = 110;
 const MAX_W         = 320; // cap so one long action/event name can't blow up layout
+const MAX_LABEL_W   = 240; // wrap a transition's action list past this width
 
 function nw(label: string, entry: string[], exit: string[], internal: string[] = []): number {
     // Title is rendered at LABEL_PX (13) and centred; actions at ACTION_PX (11)
@@ -220,11 +225,46 @@ const ROUTING_OPTS: Record<string, string> = {
     'elk.layered.cycleBreaking.strategy': 'DEPTH_FIRST',
 };
 
+// Turn a transition label's raw rows — an event row, optionally followed by a
+// `/ a, b, c` actions row — into display rows: the `/` moves to the end of the
+// event row, and the action list wraps (token by token, keeping trailing
+// commas) once it would exceed `maxW`. Keeps the label compact and left-aligned
+// instead of one very wide actions row.
+function wrapLabelLines(rawLines: string[], maxW: number): RenderLine[] {
+    const out: RenderLine[] = [];
+    let curEvent = '';
+    for (const line of rawLines) {
+        if (!line.trimStart().startsWith('/')) {
+            curEvent = line;
+            out.push({ text: line, event: line });
+            continue;
+        }
+        // Actions row for the current event: move the slash up, then wrap.
+        const tokens = line.replace(/^\s*\/\s*/, '').split(',').map(t => t.trim()).filter(Boolean);
+        if (out.length && out[out.length - 1].event === curEvent && !out[out.length - 1].text.endsWith('/')) {
+            out[out.length - 1].text += ' /';
+        }
+        let cur = '';
+        for (let j = 0; j < tokens.length; j++) {
+            const tok = tokens[j] + (j < tokens.length - 1 ? ',' : '');
+            const trial = cur ? `${cur} ${tok}` : tok;
+            if (cur && Math.ceil(textW(trial, ACTION_PX)) > maxW) {
+                out.push({ text: cur, event: curEvent });
+                cur = tok;
+            } else {
+                cur = trial;
+            }
+        }
+        if (cur) { out.push({ text: cur, event: curEvent }); }
+    }
+    return out;
+}
+
 function buildElkGraph(): ElkNode {
     edgeMeta.clear();
     // Merge transitions sharing a visible source→target pair into one routed
     // edge (skip self-loops and initial-marker edges — drawn separately).
-    const merged = new Map<string, { id: string; s: string; t: string; lines: string[] }>();
+    const merged = new Map<string, { id: string; s: string; t: string; lines: string[]; seen: Set<string> }>();
     const startEdges: ElkEdge[] = [];
     for (const e of payload.edges) {
         const s = visibleEndpoint(e.data.source), t = visibleEndpoint(e.data.target);
@@ -237,17 +277,22 @@ function buildElkGraph(): ElkNode {
         }
         const key = `${s} ${t}`;
         const lines = e.data.label ? e.data.label.split('\n').filter(Boolean) : [];
+        // Dedup whole transition blocks (a label may span an event row + a
+        // `/ actions` row), not individual rows — so two events that happen to
+        // share an action list don't lose one of their rows.
+        const block = lines.join('\n');
         const ex = merged.get(key);
-        if (ex) { for (const l of lines) { if (!ex.lines.includes(l)) { ex.lines.push(l); } } }
-        else { merged.set(key, { id: e.data.id, s, t, lines: [...lines] }); }
+        if (ex) { if (block && !ex.seen.has(block)) { ex.seen.add(block); ex.lines.push(...lines); } }
+        else { merged.set(key, { id: e.data.id, s, t, lines: [...lines], seen: new Set(block ? [block] : []) }); }
     }
     const edges: ElkEdge[] = [...startEdges];
     for (const m of merged.values()) {
-        edgeMeta.set(m.id, { srcId: m.s, tgtId: m.t, lines: m.lines });
-        const labels: ElkEdgeLabel[] = m.lines.length ? [{
-            text: m.lines.join('\n'),
-            width: Math.max(...m.lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 12,
-            height: m.lines.length * ACTION_LINE_H + 4,
+        const rl = wrapLabelLines(m.lines, MAX_LABEL_W);
+        edgeMeta.set(m.id, { srcId: m.s, tgtId: m.t, lines: rl });
+        const labels: ElkEdgeLabel[] = rl.length ? [{
+            text: rl.map(l => l.text).join('\n'),
+            width: Math.max(...rl.map(l => Math.ceil(textW(l.text, ACTION_PX)))) + 12,
+            height: rl.length * ACTION_LINE_H + 4,
         }] : [];
         edges.push({ id: m.id, sources: [m.s], targets: [m.t], labels });
     }
@@ -835,7 +880,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
     };
 
     // ── Draw routed edge paths ───────────────────────────────────────────
-    interface Lbl { cx: number; cy: number; w: number; h: number; lines: string[]; srcId: string; tgtId: string; path: SVGElement }
+    interface Lbl { cx: number; cy: number; w: number; h: number; lines: RenderLine[]; srcId: string; tgtId: string; path: SVGElement }
     const lbls: Lbl[] = [];
     for (const r of routed) {
         if (r.pts.length < 2) { continue; }
@@ -848,7 +893,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
         gEdges.appendChild(path);
         const lines = meta?.lines ?? [];
         if (meta && lines.length) {
-            const w = Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 12;
+            const w = Math.max(...lines.map(l => Math.ceil(textW(l.text, ACTION_PX)))) + 12;
             const h = lines.length * ACTION_LINE_H + 4;
             // Use ELK's reserved label slot (top-left → centre); else midpoint.
             const cx = r.label ? r.label.x + w / 2 : midAlong(r.pts).x;
@@ -896,11 +941,11 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
             // Left-align so the event and its `/ actions` row start at the same
             // edge and read top-to-bottom like code (rect is inset 2px; +6 keeps
             // ~8px of padding on each side of the widest line).
-            const lineEl = txt(L.lines[i], bx + 6, by + padTop + (i + 0.5) * ACTION_LINE_H, {
+            const lineEl = txt(L.lines[i].text, bx + 6, by + padTop + (i + 0.5) * ACTION_LINE_H, {
                 'text-anchor': 'start', 'dominant-baseline': 'central',
                 'font-size': ACTION_PX, fill: C.fg,
             });
-            lineEl.setAttribute('data-event', L.lines[i]);
+            lineEl.setAttribute('data-event', L.lines[i].event);
             labelG.appendChild(lineEl);
         }
         const edgeEntry: EdgeEntry = { path: L.path, labelG };
@@ -932,17 +977,17 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
         // the event-label hover below can emphasize it like any other edge.
         const selfEntry: EdgeEntry = { path: selfPath, labelG: null };
         registerEdge(id, id, selfEntry);
-        const lines = label ? label.split('\n').filter(Boolean) : [];
+        const lines = label ? wrapLabelLines(label.split('\n').filter(Boolean), MAX_LABEL_W) : [];
         if (lines.length) {
-            const lw = Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 12;
+            const lw = Math.max(...lines.map(l => Math.ceil(textW(l.text, ACTION_PX)))) + 12;
             const cxp = (x1 + x2) / 2;
             const by = y0 - k * 0.75 - lines.length * ACTION_LINE_H / 2;
             const g = el('g', { 'data-src': id });
             (g as SVGElement).style.cursor = 'pointer';
             g.appendChild(el('rect', { x: cxp - lw / 2 - 2, y: by, width: lw + 4, height: lines.length * ACTION_LINE_H + 4, rx: 3, ry: 3, fill: C.bg, 'fill-opacity': 1, stroke: C.fg, 'stroke-width': 0.5, 'stroke-opacity': 0.12 }));
             for (let i = 0; i < lines.length; i++) {
-                const t = txt(lines[i], cxp - lw / 2 + 6, by + (i + 0.5) * ACTION_LINE_H + ACTION_LINE_H / 2, { 'text-anchor': 'start', 'dominant-baseline': 'central', 'font-size': ACTION_PX, fill: C.fg });
-                t.setAttribute('data-event', lines[i]);
+                const t = txt(lines[i].text, cxp - lw / 2 + 6, by + (i + 0.5) * ACTION_LINE_H + ACTION_LINE_H / 2, { 'text-anchor': 'start', 'dominant-baseline': 'central', 'font-size': ACTION_PX, fill: C.fg });
+                t.setAttribute('data-event', lines[i].event);
                 g.appendChild(t);
             }
             selfEntry.labelG = g;
@@ -1308,20 +1353,10 @@ function ctxItem(label: string, fn: () => void): HTMLElement {
 }
 function ctxSep(): HTMLElement { const s = document.createElement('div'); s.className = 'ctx-sep'; return s; }
 
-// A transition label is now two rows — the event (+guard) and a `/ actions`
-// row. Given the clicked text line, return the event it belongs to, so a click
-// on the actions row still resolves to its transition.
+// Every rendered label row (event row and each wrapped actions row) carries its
+// owning event in `data-event`, so a click on any row resolves to its transition.
 function owningEventName(lineEl: Element): string | undefined {
-    const raw = lineEl.getAttribute('data-event') ?? undefined;
-    if (!raw || !raw.trimStart().startsWith('/')) { return raw; }
-    const grp = lineEl.closest('[data-src]');
-    if (!grp) { return raw; }
-    const lines = [...grp.querySelectorAll('[data-event]')];
-    for (let i = lines.indexOf(lineEl) - 1; i >= 0; i--) {
-        const v = lines[i].getAttribute('data-event') ?? '';
-        if (!v.trimStart().startsWith('/')) { return v; }
-    }
-    return raw;
+    return lineEl.getAttribute('data-event') ?? undefined;
 }
 
 document.addEventListener('contextmenu', (ev) => {
