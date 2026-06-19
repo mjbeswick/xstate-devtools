@@ -3,7 +3,7 @@
 import type { AnyActorRef } from 'xstate'
 import type {
   ExtensionToPageMessage, PageToExtensionMessage, SerializedSnapshot,
-} from '../../extension/src/shared/types.js'
+} from '../../chrome-extension/src/shared/types.js'
 import { serializeMachine } from './serialize.js'
 import { sanitize } from './sanitize.js'
 
@@ -140,8 +140,10 @@ export function createInspector(transport: Transport, source: Source) {
       const sessionId: string = actorRef.sessionId
       actorRefs.set(sessionId, actorRef)
 
-      const machine = actorRef.logic?.root
-        ? serializeMachine(actorRef.logic as any, getSourceLocation())
+      // `logic` is internal and not on the public AnyActorRef type.
+      const logic = (actorRef as any).logic
+      const machine = logic?.root
+        ? serializeMachine(logic, getSourceLocation())
         : null
 
       transport.send({

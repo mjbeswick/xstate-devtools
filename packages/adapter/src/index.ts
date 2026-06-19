@@ -1,5 +1,5 @@
 // Browser entrypoint — uses window.postMessage via the extension's injected bridge.
-import type { ExtensionToPageMessage, PageToExtensionMessage } from '../../extension/src/shared/types.js'
+import type { ExtensionToPageMessage, PageToExtensionMessage } from '../../chrome-extension/src/shared/types.js'
 import { createInspector, type Transport } from './core.js'
 
 declare global {
