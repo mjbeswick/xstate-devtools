@@ -611,6 +611,12 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                 });
                 g.appendChild(regionRect);
                 nodeRectById.set(n.id, regionRect);
+                // Transparent body so clicking the region's empty interior selects
+                // the region itself. The header's own hit-rect (added below, on
+                // top) still owns collapse/expand.
+                const body = el('rect', { x: ax, y: ay, width: w, height: h, fill: 'transparent', 'pointer-events': 'all' });
+                (body as SVGElement).style.cursor = 'pointer';
+                g.appendChild(body);
                 g.appendChild(el('line', {
                     x1: ax+1, y1: ay+REGION_H, x2: ax+w-1, y2: ay+REGION_H,
                     stroke: C.fg, 'stroke-width': 0.75, 'stroke-opacity': 0.35,
@@ -634,7 +640,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                 (g as SVGElement).style.cursor = 'default';
                 const header = el('rect', {
                     x: ax, y: ay, width: w, height: REGION_H,
-                    fill: 'transparent', 'pointer-events': 'all',
+                    fill: 'transparent', 'pointer-events': 'all', 'data-role': 'toggle',
                 });
                 (header as SVGElement).style.cursor = 'pointer';
                 g.appendChild(header);
@@ -1218,7 +1224,11 @@ container.addEventListener('click', (ev) => {
     if (kind === 'start') { return; }
     // Keep keyboard nav in sync with what was clicked.
     selectNode(id);
-    if (kind === 'region' || collapsed.has(id)) {
+    // Collapse/expand only when the region's header toggle is hit, or when a
+    // collapsed compound is clicked to expand it. Clicking an expanded region's
+    // empty body selects the region (and syncs the outline) instead.
+    const wantsToggle = !!target.closest('[data-role="toggle"]') || (kind !== 'region' && collapsed.has(id));
+    if (wantsToggle) {
         if (collapsed.has(id)) { collapsed.delete(id); } else { collapsed.add(id); }
         rerenderCollapse();
         return;
