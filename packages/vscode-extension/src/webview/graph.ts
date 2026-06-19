@@ -40,7 +40,7 @@ interface ElkNode {
 // A single rendered row of a transition label. `event` is the owning event
 // (e.g. `EVENT [guard]`) so a click on any wrapped actions row resolves back
 // to its transition; `text` is what's actually drawn.
-interface RenderLine { text: string; event: string }
+interface RenderLine { text: string; event: string; action: boolean }
 // Per-routed-edge metadata, populated by buildElkGraph and read while drawing.
 const edgeMeta = new Map<string, { srcId: string; tgtId: string; lines: RenderLine[] }>();
 
@@ -118,6 +118,7 @@ const REGION_H      = 28;
 const MIN_W         = 110;
 const MAX_W         = 320; // cap so one long action/event name can't blow up layout
 const MAX_LABEL_W   = 240; // wrap a transition's action list past this width
+const ACTION_INDENT = 12;  // indent wrapped action rows under their event
 
 function nw(label: string, entry: string[], exit: string[], internal: string[] = []): number {
     // Title is rendered at LABEL_PX (13) and centred; actions at ACTION_PX (11)
@@ -236,7 +237,7 @@ function wrapLabelLines(rawLines: string[], maxW: number): RenderLine[] {
     for (const line of rawLines) {
         if (!line.trimStart().startsWith('/')) {
             curEvent = line;
-            out.push({ text: line, event: line });
+            out.push({ text: line, event: line, action: false });
             continue;
         }
         // Actions row for the current event: move the slash up, then wrap.
@@ -249,13 +250,13 @@ function wrapLabelLines(rawLines: string[], maxW: number): RenderLine[] {
             const tok = tokens[j] + (j < tokens.length - 1 ? ',' : '');
             const trial = cur ? `${cur} ${tok}` : tok;
             if (cur && Math.ceil(textW(trial, ACTION_PX)) > maxW) {
-                out.push({ text: cur, event: curEvent });
+                out.push({ text: cur, event: curEvent, action: true });
                 cur = tok;
             } else {
                 cur = trial;
             }
         }
-        if (cur) { out.push({ text: cur, event: curEvent }); }
+        if (cur) { out.push({ text: cur, event: curEvent, action: true }); }
     }
     return out;
 }
@@ -893,7 +894,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
         gEdges.appendChild(path);
         const lines = meta?.lines ?? [];
         if (meta && lines.length) {
-            const w = Math.max(...lines.map(l => Math.ceil(textW(l.text, ACTION_PX)))) + 12;
+            const w = Math.max(...lines.map(l => Math.ceil(textW(l.text, ACTION_PX)) + (l.action ? ACTION_INDENT : 0))) + 12;
             const h = lines.length * ACTION_LINE_H + 4;
             // Use ELK's reserved label slot (top-left → centre); else midpoint.
             const cx = r.label ? r.label.x + w / 2 : midAlong(r.pts).x;
@@ -938,14 +939,16 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
         for (let i = 0; i < L.lines.length; i++) {
             // Event/guard labels are primary semantic content — full foreground
             // contrast, not the dimmed description colour.
-            // Left-align so the event and its `/ actions` row start at the same
+            // Left-align so the event and its `/ actions` rows start at the same
             // edge and read top-to-bottom like code (rect is inset 2px; +6 keeps
-            // ~8px of padding on each side of the widest line).
-            const lineEl = txt(L.lines[i].text, bx + 6, by + padTop + (i + 0.5) * ACTION_LINE_H, {
+            // ~8px of padding on each side). Action rows are indented under their
+            // event and drawn in the muted colour, matching the in-box action rows.
+            const ln = L.lines[i];
+            const lineEl = txt(ln.text, bx + 6 + (ln.action ? ACTION_INDENT : 0), by + padTop + (i + 0.5) * ACTION_LINE_H, {
                 'text-anchor': 'start', 'dominant-baseline': 'central',
-                'font-size': ACTION_PX, fill: C.fg,
+                'font-size': ACTION_PX, fill: ln.action ? C.desc : C.fg,
             });
-            lineEl.setAttribute('data-event', L.lines[i].event);
+            lineEl.setAttribute('data-event', ln.event);
             labelG.appendChild(lineEl);
         }
         const edgeEntry: EdgeEntry = { path: L.path, labelG };
@@ -979,15 +982,16 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
         registerEdge(id, id, selfEntry);
         const lines = label ? wrapLabelLines(label.split('\n').filter(Boolean), MAX_LABEL_W) : [];
         if (lines.length) {
-            const lw = Math.max(...lines.map(l => Math.ceil(textW(l.text, ACTION_PX)))) + 12;
+            const lw = Math.max(...lines.map(l => Math.ceil(textW(l.text, ACTION_PX)) + (l.action ? ACTION_INDENT : 0))) + 12;
             const cxp = (x1 + x2) / 2;
             const by = y0 - k * 0.75 - lines.length * ACTION_LINE_H / 2;
             const g = el('g', { 'data-src': id });
             (g as SVGElement).style.cursor = 'pointer';
             g.appendChild(el('rect', { x: cxp - lw / 2 - 2, y: by, width: lw + 4, height: lines.length * ACTION_LINE_H + 4, rx: 3, ry: 3, fill: C.bg, 'fill-opacity': 1, stroke: C.fg, 'stroke-width': 0.5, 'stroke-opacity': 0.12 }));
             for (let i = 0; i < lines.length; i++) {
-                const t = txt(lines[i].text, cxp - lw / 2 + 6, by + (i + 0.5) * ACTION_LINE_H + ACTION_LINE_H / 2, { 'text-anchor': 'start', 'dominant-baseline': 'central', 'font-size': ACTION_PX, fill: C.fg });
-                t.setAttribute('data-event', lines[i].event);
+                const ln = lines[i];
+                const t = txt(ln.text, cxp - lw / 2 + 6 + (ln.action ? ACTION_INDENT : 0), by + (i + 0.5) * ACTION_LINE_H + ACTION_LINE_H / 2, { 'text-anchor': 'start', 'dominant-baseline': 'central', 'font-size': ACTION_PX, fill: ln.action ? C.desc : C.fg });
+                t.setAttribute('data-event', ln.event);
                 g.appendChild(t);
             }
             selfEntry.labelG = g;
