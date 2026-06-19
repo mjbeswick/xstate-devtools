@@ -58,6 +58,11 @@
         {
           "id": "xstateMachineErrors",
           "name": "Errors"
+        },
+        {
+          "type": "webview",
+          "id": "xstateDebugger",
+          "name": "Debugger"
         }
       ]
     },

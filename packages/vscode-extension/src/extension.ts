@@ -13,6 +13,7 @@ import { XStateReferenceProvider, XStateRenameProvider } from './providers';
 import { XStateHoverProvider } from './hoverProvider';
 import { XStateGraphViewProvider } from './graphView';
 import { DebuggerController } from './debugger/debuggerController';
+import { DebuggerViewProvider } from './debugger/debuggerView';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
 import { ErrorsTreeProvider, ErrorsGrouping, ErrorsFilter } from './errorsView';
 import { XStateCodeLensProvider } from './codeLensProvider';
@@ -755,6 +756,11 @@ export async function activate(context: vscode.ExtensionContext) {
     // WebSocket and overlays each running machine's active state onto its open
     // statechart diagram.
     const debuggerController = new DebuggerController(graphViewProvider);
+    const debuggerViewProvider = new DebuggerViewProvider(context.extensionUri, debuggerController);
+    const debuggerViewRegistration = vscode.window.registerWebviewViewProvider(
+        DebuggerViewProvider.viewType,
+        debuggerViewProvider,
+    );
     const debuggerConnectCommand = vscode.commands.registerCommand('xstateDebugger.connect', () => debuggerController.connect());
     const debuggerDisconnectCommand = vscode.commands.registerCommand('xstateDebugger.disconnect', () => debuggerController.disconnect());
     const debuggerToggleCommand = vscode.commands.registerCommand('xstateDebugger.toggle', () => debuggerController.toggle());
@@ -1157,6 +1163,7 @@ export async function activate(context: vscode.ExtensionContext) {
         documentChangeListener,
         cursorChangeListener,
         debuggerController,
+        debuggerViewRegistration,
         debuggerConnectCommand,
         debuggerDisconnectCommand,
         debuggerToggleCommand,

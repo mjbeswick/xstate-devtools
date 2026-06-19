@@ -6,7 +6,7 @@
 // status-bar indicator, and the bridge that overlays each running machine's
 // active state onto its open statechart diagram.
 import * as vscode from 'vscode';
-import { createInspectorStore, type InspectorStore } from '@xstate-devtools/panel-core';
+import { createInspectorStore, getActivePaths, getDisplaySnapshot, type InspectorStore } from '@xstate-devtools/panel-core';
 import type { StoreApi } from 'zustand/vanilla';
 import type { ExtensionToPageMessage, PageToExtensionMessage } from '@xstate-devtools/protocol';
 import { DebuggerWsClient, type ConnectionStatus } from './wsClient';
@@ -14,12 +14,55 @@ import { XStateGraphViewProvider, type LiveStateValue } from '../graphView';
 
 const DEFAULT_URL = 'ws://127.0.0.1:9301';
 
+/** A row in the debugger's actor list. */
+export interface ActorVM {
+    sessionId: string;
+    parentSessionId?: string;
+    label: string;
+    status: string;
+    depth: number;
+    selected: boolean;
+}
+
+/** Recent event-log row. */
+export interface EventVM {
+    sessionId: string;
+    type: string;
+    seq: number;
+    time: number;
+}
+
+/** The full snapshot of debugger state pushed to the webview view. */
+export interface DebuggerViewModel {
+    status: ConnectionStatus;
+    url: string;
+    replayName: string | null;
+    timeTravelSeq: number | null;
+    actors: ActorVM[];
+    selected: {
+        sessionId: string;
+        machineId: string | null;
+        status: string;
+        activeLeaves: string[];
+        context: unknown;
+    } | null;
+    events: EventVM[];
+}
+
+/** A surface (the sidebar webview) that renders the debugger view-model. */
+export interface DebuggerView {
+    postModel(model: DebuggerViewModel): void;
+}
+
+const MAX_EVENT_ROWS = 200;
+
 export class DebuggerController implements vscode.Disposable {
     private readonly store: StoreApi<InspectorStore> = createInspectorStore();
     private client: DebuggerWsClient | null = null;
     private readonly statusBar: vscode.StatusBarItem;
     private unsubscribeStore: (() => void) | null = null;
     private status: ConnectionStatus = 'idle';
+    private view: DebuggerView | null = null;
 
     constructor(private readonly graphView: XStateGraphViewProvider) {
         this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
@@ -27,9 +70,24 @@ export class DebuggerController implements vscode.Disposable {
         this.renderStatusBar();
         this.statusBar.show();
 
-        // Re-derive the live diagram overlay whenever the store changes.
-        this.unsubscribeStore = this.store.subscribe(() => this.syncDiagram());
+        // Re-derive the live diagram overlay and re-push the view-model whenever
+        // the store changes.
+        this.unsubscribeStore = this.store.subscribe(() => {
+            this.syncDiagram();
+            this.pushModel();
+        });
         void this.setConnectedContext(false);
+    }
+
+    /** Attach the sidebar webview view so it receives model updates. */
+    setView(view: DebuggerView | null): void {
+        this.view = view;
+        this.pushModel();
+    }
+
+    /** Select an actor (drives the inspector + which diagram is emphasised). */
+    selectActor(sessionId: string | null): void {
+        this.store.getState().selectActor(sessionId);
     }
 
     /** Current connection URL (from config, falling back to the default). */
@@ -76,7 +134,13 @@ export class DebuggerController implements vscode.Disposable {
     }
 
     private onMessage(msg: PageToExtensionMessage): void {
-        this.store.getState().handleMessage(msg);
+        const state = this.store.getState();
+        state.handleMessage(msg);
+        // Auto-select the first actor so the inspector isn't empty on connect.
+        const next = this.store.getState();
+        if (next.selectedActorId === null && next.actors.size > 0) {
+            next.selectActor(next.actors.keys().next().value ?? null);
+        }
     }
 
     private onStatus(status: ConnectionStatus): void {
@@ -84,6 +148,78 @@ export class DebuggerController implements vscode.Disposable {
         this.renderStatusBar();
         void this.setConnectedContext(status === 'open');
         if (status !== 'open') { this.graphView.clearLiveConfig(); }
+        this.pushModel();
+    }
+
+    /** Build and push the current view-model to the attached webview view. */
+    private pushModel(): void {
+        if (!this.view) { return; }
+        this.view.postModel(this.buildViewModel());
+    }
+
+    private buildViewModel(): DebuggerViewModel {
+        const state = this.store.getState();
+        const order = [...state.actors.keys()];
+        const depthOf = (sessionId: string): number => {
+            let depth = 0;
+            let cur = state.actors.get(sessionId)?.parentSessionId;
+            const seen = new Set<string>();
+            while (cur && state.actors.has(cur) && !seen.has(cur)) {
+                seen.add(cur);
+                depth++;
+                cur = state.actors.get(cur)?.parentSessionId;
+            }
+            return depth;
+        };
+
+        const actors: ActorVM[] = order.map((sessionId) => {
+            const a = state.actors.get(sessionId)!;
+            return {
+                sessionId,
+                parentSessionId: a.parentSessionId,
+                label: a.machine?.id ?? sessionId.slice(0, 8),
+                status: a.status,
+                depth: depthOf(sessionId),
+                selected: state.selectedActorId === sessionId,
+            };
+        });
+
+        let selected: DebuggerViewModel['selected'] = null;
+        const selId = state.selectedActorId;
+        if (selId) {
+            const actor = state.actors.get(selId);
+            const snapshot = getDisplaySnapshot(state, selId) ?? actor?.snapshot ?? null;
+            if (actor && snapshot) {
+                const activeLeaves: string[] = [];
+                if (actor.machine) {
+                    for (const path of getActivePaths(snapshot.value as LiveStateValue, actor.machine.root)) {
+                        const leaf = path[path.length - 1];
+                        if (leaf) { activeLeaves.push(leaf.key); }
+                    }
+                }
+                selected = {
+                    sessionId: selId,
+                    machineId: actor.machine?.id ?? null,
+                    status: snapshot.status,
+                    activeLeaves,
+                    context: snapshot.context,
+                };
+            }
+        }
+
+        const events: EventVM[] = state.events
+            .slice(-MAX_EVENT_ROWS)
+            .map((e) => ({ sessionId: e.sessionId, type: e.event.type, seq: e.globalSeq, time: e.timestamp }));
+
+        return {
+            status: this.status,
+            url: this.url(),
+            replayName: state.replayName,
+            timeTravelSeq: state.timeTravelSeq,
+            actors,
+            selected,
+            events,
+        };
     }
 
     // Overlay every running machine's active state onto its open diagram. The
