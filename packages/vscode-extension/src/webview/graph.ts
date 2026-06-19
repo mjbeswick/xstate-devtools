@@ -361,6 +361,21 @@ function emphasizeNode(id: string) {
         }
     }
 }
+// Emphasize a single edge (its line + label) and dim the rest — the focus
+// effect for hovering a transition's event label, mirroring emphasizeNode.
+function emphasizeEdge(entry: EdgeEntry) {
+    for (const e of allEdges) {
+        if (e === entry) {
+            e.path.setAttribute('opacity', '1');
+            e.path.setAttribute('stroke-opacity', '0.95');
+            e.path.setAttribute('stroke-width', '2');
+            if (e.labelG) { e.labelG.setAttribute('opacity', '1'); }
+        } else {
+            e.path.setAttribute('opacity', '0.12');
+            if (e.labelG) { e.labelG.setAttribute('opacity', '0.15'); }
+        }
+    }
+}
 // Reset all edges, then re-assert the selected node's emphasis — so hovering
 // away from a state restores the selection's focus effect instead of clearing it.
 function refreshEdgeEmphasis() {
@@ -885,16 +900,11 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
             lineEl.setAttribute('data-event', L.lines[i]);
             labelG.appendChild(lineEl);
         }
-        labelG.addEventListener('mouseenter', () => {
-            L.path.setAttribute('stroke-opacity', '0.95');
-            L.path.setAttribute('stroke-width', '2');
-        });
-        labelG.addEventListener('mouseleave', () => {
-            L.path.setAttribute('stroke-opacity', '0.7');
-            L.path.setAttribute('stroke-width', '1.5');
-        });
+        const edgeEntry: EdgeEntry = { path: L.path, labelG };
+        labelG.addEventListener('mouseenter', () => emphasizeEdge(edgeEntry));
+        labelG.addEventListener('mouseleave', () => refreshEdgeEmphasis());
         gLabels.appendChild(labelG);
-        registerEdge(L.srcId, L.tgtId, { path: L.path, labelG });
+        registerEdge(L.srcId, L.tgtId, edgeEntry);
     }
 
     // (Initial-state arrows are now routed by ELK alongside the other edges.)
@@ -909,11 +919,16 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
         const x1 = r.x + r.w * 0.40, x2 = r.x + r.w * 0.66;  // exit / entry on top edge
         const y0 = r.y;
         const k = 30;                                         // arch height
-        gEdges.appendChild(el('path', {
+        const selfPath = el('path', {
             d: `M ${x1} ${y0} C ${x1} ${y0 - k} ${x2} ${y0 - k} ${x2} ${y0}`,
             fill: 'none', stroke: C.fg, 'stroke-width': 1.4, 'stroke-opacity': 0.7,
             'marker-end': 'url(#arr)',
-        }));
+        });
+        gEdges.appendChild(selfPath);
+        // Register the self-loop so the focus effect (node hover / selection) and
+        // the event-label hover below can emphasize it like any other edge.
+        const selfEntry: EdgeEntry = { path: selfPath, labelG: null };
+        registerEdge(id, id, selfEntry);
         const lines = label ? label.split('\n').filter(Boolean) : [];
         if (lines.length) {
             const lw = Math.max(...lines.map(l => Math.ceil(textW(l, ACTION_PX)))) + 12;
@@ -927,6 +942,9 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                 t.setAttribute('data-event', lines[i]);
                 g.appendChild(t);
             }
+            selfEntry.labelG = g;
+            g.addEventListener('mouseenter', () => emphasizeEdge(selfEntry));
+            g.addEventListener('mouseleave', () => refreshEdgeEmphasis());
             gLabels.appendChild(g);
         }
     }
