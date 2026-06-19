@@ -111,7 +111,9 @@ Defined in `packages/chrome-extension/src/shared/types.ts`. Same protocol on bot
 - `XSTATE_SNAPSHOT` — snapshot tick (no event)
 - `XSTATE_EVENT` — event dispatched + resulting snapshot
 - `XSTATE_ACTOR_STOPPED` — actor terminated
+- `XSTATE_PERSISTED_SNAPSHOT` — adapter → panel, an actor's XState persisted snapshot (or capture error)
 - `XSTATE_DISPATCH` — panel → adapter, send an event to a specific actor
+- `XSTATE_REQUEST_PERSISTED` — panel → adapter, request an actor's persisted snapshot
 
 ## Time travel
 
@@ -129,8 +131,10 @@ Defined in `packages/chrome-extension/src/shared/types.ts`. Same protocol on bot
   the state tree, and the event log all work, but live messages are ignored and event
   dispatch is disabled until you **Exit replay**
 - Exports contain only the retained event window (see the 500-event cap below)
-- These are lossy *display* snapshots, not XState persisted snapshots — a session is for
-  inspection and sharing, not for restoring a live machine
+- The event log and Context view use lossy *display* snapshots. For a **restorable** copy
+  of a machine's state, open the **Persisted snapshot** section in the side panel and click
+  **Capture** — this pulls XState's `getPersistedSnapshot()` from the live actor. Captured
+  persisted snapshots are included in session exports (format v2)
 
 ## Limitations
 

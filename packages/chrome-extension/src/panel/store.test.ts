@@ -23,6 +23,7 @@ beforeEach(() => {
   useStore.setState({
     actors: new Map(),
     registeredSnapshots: new Map(),
+    persistedSnapshots: new Map(),
     events: [],
     selectedActorId: null,
     selectedStateNodeId: null,
@@ -87,6 +88,28 @@ describe('handleMessage', () => {
       })
     }
     expect(useStore.getState().events.length).toBe(500)
+  })
+
+  it('records a persisted snapshot response', () => {
+    useStore.getState().handleMessage({
+      type: 'XSTATE_PERSISTED_SNAPSHOT',
+      sessionId: 'a1',
+      persisted: { value: 'running' },
+      timestamp: 1234,
+    })
+    const entry = useStore.getState().persistedSnapshots.get('a1')
+    expect(entry?.persisted).toEqual({ value: 'running' })
+    expect(entry?.error).toBeUndefined()
+  })
+
+  it('records a persisted snapshot error', () => {
+    useStore.getState().handleMessage({
+      type: 'XSTATE_PERSISTED_SNAPSHOT',
+      sessionId: 'a1',
+      error: 'not persistable',
+      timestamp: 1234,
+    })
+    expect(useStore.getState().persistedSnapshots.get('a1')?.error).toBe('not persistable')
   })
 
   it('marks actor as stopped on XSTATE_ACTOR_STOPPED', () => {

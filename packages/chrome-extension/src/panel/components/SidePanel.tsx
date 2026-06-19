@@ -60,11 +60,19 @@ export function SidePanel() {
   const selectedStateNodeId = useStore((s) => s.selectedStateNodeId)
   const actors = useStore((s) => s.actors)
   const replayMode = useStore((s) => s.replayMode)
+  const persisted = useStore((s) =>
+    selectedActorId ? s.persistedSnapshots.get(selectedActorId) : undefined
+  )
   const snapshot = useStore((s) =>
     selectedActorId ? getDisplaySnapshot(s, selectedActorId) : null
   )
 
   const dispatch_ = useDispatch()
+
+  const capturePersisted = useCallback(() => {
+    if (!selectedActorId || replayMode) return
+    dispatch_({ type: 'XSTATE_REQUEST_PERSISTED', sessionId: selectedActorId })
+  }, [selectedActorId, replayMode, dispatch_])
 
   const [payloadJson, setPayloadJson] = useState('{}')
   const [payloadError, setPayloadError] = useState<string | null>(null)
@@ -183,6 +191,38 @@ export function SidePanel() {
         ) : (
           <div style={{ color: '#aaa', fontSize: 11 }}>No snapshot available.</div>
         )}
+      </AccordionSection>
+
+      <AccordionSection title="Persisted snapshot" defaultOpen={false}>
+        <div style={{ fontSize: 10, color: '#888', marginBottom: 6 }}>
+          XState persisted snapshot — restorable, unlike the display Context above.
+        </div>
+        <button
+          onClick={capturePersisted}
+          disabled={replayMode}
+          style={{
+            padding: '2px 10px', fontSize: 11, marginBottom: 6,
+            cursor: replayMode ? 'default' : 'pointer',
+            background: replayMode ? '#bfbfbf' : '#1890ff', color: '#fff',
+            border: 'none', borderRadius: 4,
+          }}
+        >
+          {persisted ? 'Re-capture' : 'Capture'}
+        </button>
+        {replayMode && (
+          <div style={{ fontSize: 10, color: '#888' }}>
+            Replay sessions show snapshots captured at export time; live capture is disabled.
+          </div>
+        )}
+        {persisted?.error && (
+          <div style={{
+            fontSize: 11, color: '#a8071a', background: '#fff1f0',
+            border: '1px solid #ffccc7', borderRadius: 4, padding: '4px 8px',
+          }}>
+            {persisted.error}
+          </div>
+        )}
+        {persisted?.persisted !== undefined && <JsonView value={persisted.persisted} />}
       </AccordionSection>
 
       <AccordionSection

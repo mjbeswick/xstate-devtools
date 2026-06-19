@@ -7,10 +7,19 @@ import type {
 
 const MAX_EVENTS = 500
 
+/** A captured XState persisted snapshot (or the reason it couldn't be captured). */
+export interface PersistedEntry {
+  persisted?: unknown
+  error?: string
+  timestamp: number
+}
+
 export interface InspectorStore {
   actors: Map<string, ActorRecord>
   /** Snapshot at registration time, never mutated — used as time-travel floor */
   registeredSnapshots: Map<string, SerializedSnapshot>
+  /** On-demand XState persisted snapshots, keyed by sessionId. */
+  persistedSnapshots: Map<string, PersistedEntry>
   events: EventRecord[]
   selectedActorId: string | null
   selectedStateNodeId: string | null
@@ -57,6 +66,7 @@ export function getDisplaySnapshot(
 export const useStore = create<InspectorStore>((set, get) => ({
   actors: new Map(),
   registeredSnapshots: new Map(),
+  persistedSnapshots: new Map(),
   events: [],
   selectedActorId: null,
   selectedStateNodeId: null,
@@ -124,6 +134,15 @@ export const useStore = create<InspectorStore>((set, get) => ({
           registeredSnapshots.delete(msg.sessionId)
           break
         }
+        case 'XSTATE_PERSISTED_SNAPSHOT': {
+          const persistedSnapshots = new Map(state.persistedSnapshots)
+          persistedSnapshots.set(msg.sessionId, {
+            persisted: msg.persisted,
+            error: msg.error,
+            timestamp: msg.timestamp,
+          })
+          return { actors, registeredSnapshots, events, persistedSnapshots }
+        }
       }
 
       return { actors, registeredSnapshots, events }
@@ -149,10 +168,15 @@ export const useStore = create<InspectorStore>((set, get) => ({
   loadSession(data, name) {
     const actors = new Map(data.actors.map((a) => [a.sessionId, a]))
     const registeredSnapshots = new Map(data.registeredSnapshots)
+    const persistedEntries = 'persistedSnapshots' in data ? data.persistedSnapshots : []
+    const persistedSnapshots = new Map(
+      persistedEntries.map(([id, persisted]) => [id, { persisted, timestamp: 0 }]),
+    )
     const firstActor = data.actors[0]?.sessionId ?? null
     set({
       actors,
       registeredSnapshots,
+      persistedSnapshots,
       events: data.events,
       replayMode: true,
       replayName: name,
@@ -168,6 +192,7 @@ export const useStore = create<InspectorStore>((set, get) => ({
     set({
       actors: new Map(),
       registeredSnapshots: new Map(),
+      persistedSnapshots: new Map(),
       events: [],
       replayMode: false,
       replayName: null,

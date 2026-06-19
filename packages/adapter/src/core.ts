@@ -45,6 +45,26 @@ function safeSerializeSnapshot(actorRef: AnyActorRef): SerializedSnapshot {
   }
 }
 
+/**
+ * Capture XState's persisted snapshot for an actor. Unlike the display snapshot,
+ * this is meant to be restorable. We JSON round-trip it to guarantee it survives
+ * the transport (and stays serializable); a throw here means the snapshot isn't
+ * cleanly persistable, which we report as an error rather than silently dropping.
+ */
+function safePersistedSnapshot(actorRef: AnyActorRef): { persisted?: unknown; error?: string } {
+  const getPersisted = (actorRef as any).getPersistedSnapshot
+  if (typeof getPersisted !== 'function') {
+    return { error: 'Actor does not support getPersistedSnapshot.' }
+  }
+  try {
+    const raw = getPersisted.call(actorRef)
+    if (raw === undefined) return { error: 'No persisted snapshot available.' }
+    return { persisted: JSON.parse(JSON.stringify(raw)) }
+  } catch (e) {
+    return { error: `Snapshot is not JSON-serializable: ${(e as Error).message}` }
+  }
+}
+
 // Cached on globalThis so HMR re-evaluating this module doesn't reset the
 // monotonic seq counter mid-session. The panel re-numbers messages on ingest
 // to merge multiple sources, but keeping a stable per-process seq still helps
@@ -85,6 +105,19 @@ export function createInspector(transport: Transport, source: Source) {
           console.warn('[xstate-devtools] dispatch error:', e)
         }
       }
+    } else if (message.type === 'XSTATE_REQUEST_PERSISTED') {
+      const local = stripIfMine(message.sessionId)
+      if (local === null) return // not for this transport source
+      const ref = actorRefs.get(local)
+      if (!ref) return
+      const { persisted, error } = safePersistedSnapshot(ref)
+      transport.send({
+        type: 'XSTATE_PERSISTED_SNAPSHOT',
+        sessionId: tag(local),
+        persisted,
+        error,
+        timestamp: Date.now(),
+      })
     }
   })
 

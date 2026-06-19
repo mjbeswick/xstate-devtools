@@ -154,38 +154,29 @@ state can later be reconstructed. This is the prerequisite for Phase 3 and for "
 state you can re-seed", and is the riskiest unknown — **prototype this first if validating
 feasibility before committing to the roadmap.**
 
-- [ ] **Capture in the adapter.** In `core.ts`, add a helper
-      `safePersistedSnapshot(actorRef): unknown` using
-      `actorRef.getPersistedSnapshot?.()` wrapped in try/catch (some actor types may not
-      support it — return `undefined`). XState v5 exposes `getPersistedSnapshot()` on
-      actors; confirm the import/typing against the installed `xstate` version.
-- [ ] **Decide capture cadence.** Per-event persisted snapshots could be large. Recommended:
-      capture on `@xstate.actor` (registration) and ON DEMAND via a new request message,
-      rather than on every event. Implement an on-demand request:
-      - Add `ExtensionToPageMessage` variant `{ type: 'XSTATE_REQUEST_PERSISTED', sessionId }`.
-      - Add `PageToExtensionMessage` variant
-        `{ type: 'XSTATE_PERSISTED_SNAPSHOT', sessionId, persisted: unknown, globalSeq, timestamp }`.
-      - In `core.ts` `transport.subscribe`, handle the request: look up the ref in
-        `actorRefs` (use the same `stripIfMine` prefix logic as `XSTATE_DISPATCH`), call
-        `safePersistedSnapshot`, and `transport.send` the response.
-- [ ] **Panel side.** Add a store field `persistedSnapshots: Map<sessionId, unknown>` and a
-      `dispatch`-backed `requestPersisted(sessionId)` helper in `App.tsx` (broadcast over
-      both transports, same as `dispatch`). Handle the response in `handleMessage`.
-- [ ] **Serialization safety.** Persisted snapshots can contain values the default JSON
-      path mangles. Reuse/extend `packages/adapter/src/sanitize.ts` only if needed — but do
-      NOT over-sanitize: a persisted snapshot must stay restorable, so prefer structured
-      clone / `JSON` round-trip validation and flag (don't silently drop) non-serializable
-      fields.
-- [ ] **Extend the export format to V2** (additive): `SessionExportV2` adds
-      `persistedSnapshots: Array<[string, unknown]>`. `importSession` must accept both V1
-      and V2. Bump `SESSION_FORMAT_VERSION = 2`.
-- [ ] Commit: `feat(adapter): capture persisted snapshots on demand`.
+- [x] **Capture in the adapter.** `core.ts` `safePersistedSnapshot(actorRef)` calls
+      `getPersistedSnapshot()` (guarded for actors that lack it) and JSON round-trips the
+      result so it stays serializable + restorable; returns `{ persisted }` or `{ error }`.
+- [x] **On-demand request.** Added `XSTATE_REQUEST_PERSISTED` (panel→adapter) and
+      `XSTATE_PERSISTED_SNAPSHOT` (adapter→panel, carries `persisted?`/`error?`). `core.ts`
+      `transport.subscribe` handles the request via the same `stripIfMine` prefix routing as
+      `XSTATE_DISPATCH`. (Capture is on-demand, not per-event — avoids large payloads.)
+- [x] **Panel side.** Store field `persistedSnapshots: Map<sessionId, PersistedEntry>`;
+      response handled in `handleMessage`. The request is sent straight through the existing
+      `DispatchContext` from `SidePanel` (no separate App helper needed).
+- [x] **Serialization safety.** JSON round-trip in the adapter guarantees transport-safe,
+      restorable snapshots; a throw is reported as an error rather than silently dropping.
+- [x] **Export format V2** (additive): `SessionExportV2.persistedSnapshots`. `importSession`
+      accepts v1 (normalized to v2 with empty array) and v2. `SESSION_FORMAT_VERSION = 2`.
+- [x] **UI.** `SidePanel` "Persisted snapshot" section with Capture/Re-capture, JSON view,
+      and error display; disabled in replay.
+- [x] Tests: adapter `core.test.ts` (request/response, missing-API, cross-source routing),
+      session-io v1/v2 + persisted-export tests, store persisted-message tests.
+      Commit: `feat(adapter): capture persisted snapshots on demand`.
 
-**Acceptance:** select an actor, request its persisted snapshot, see it arrive in the
-store; export includes it; importing a V1 file still works.
-
-**Open question to resolve during this phase:** which actor types lack
-`getPersistedSnapshot` in this XState version, and how to surface "not restorable" in the UI.
+**Resolved open question:** actors without `getPersistedSnapshot` (or whose snapshot isn't
+JSON-serializable) surface a clear error string in the Persisted snapshot section; the
+Capture button stays available for retry.
 
 ---
 

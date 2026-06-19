@@ -62,14 +62,14 @@ export interface EventRecord {
 
 // ── Session export / import ────────────────────────────────────────────────────
 
-export const SESSION_FORMAT_VERSION = 1
+export const SESSION_FORMAT_VERSION = 2
 
 /**
  * Serializable snapshot of a captured debug session — the event log plus the
  * actors and their (display) snapshots. Re-importable into the panel as a
- * read-only replay. Note: these are lossy *display* snapshots, not XState
- * persisted snapshots, so a session is for inspection/sharing, not for
- * restoring a live machine.
+ * read-only replay. Note: the `*snapshot*` fields here are lossy *display*
+ * snapshots, not XState persisted snapshots; `persistedSnapshots` (v2+) holds
+ * any captured XState persisted snapshots, which ARE restorable.
  */
 export interface SessionExportV1 {
   formatVersion: 1
@@ -80,7 +80,18 @@ export interface SessionExportV1 {
   events: EventRecord[]
 }
 
-export type SessionExport = SessionExportV1
+export interface SessionExportV2 {
+  formatVersion: 2
+  exportedAt: number
+  source: 'live-capture'
+  actors: ActorRecord[]
+  registeredSnapshots: Array<[string, SerializedSnapshot]>
+  events: EventRecord[]
+  /** XState persisted snapshots captured on demand, keyed by sessionId. */
+  persistedSnapshots: Array<[string, unknown]>
+}
+
+export type SessionExport = SessionExportV1 | SessionExportV2
 
 // ── Message protocol ──────────────────────────────────────────────────────────
 
@@ -114,6 +125,13 @@ export type PageToExtensionMessage =
       type: 'XSTATE_ACTOR_STOPPED'
       sessionId: string
     }
+  | {
+      type: 'XSTATE_PERSISTED_SNAPSHOT'
+      sessionId: string
+      persisted?: unknown          // XState persisted snapshot (JSON-safe), if captured
+      error?: string               // set when the actor can't be persisted
+      timestamp: number
+    }
 
 // panel → service worker → content script → injected world → adapter
 export type ExtensionToPageMessage =
@@ -121,6 +139,10 @@ export type ExtensionToPageMessage =
       type: 'XSTATE_DISPATCH'
       sessionId: string
       event: SerializedEvent
+    }
+  | {
+      type: 'XSTATE_REQUEST_PERSISTED'
+      sessionId: string
     }
 
 // Marker added to all postMessages so content script can filter
