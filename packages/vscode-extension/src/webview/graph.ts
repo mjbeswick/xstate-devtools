@@ -1059,6 +1059,28 @@ const centerOf = (id: string) => {
     return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
 };
 
+// A node currently drawn as an expanded container (region) — same test drawNode
+// uses, so it matches what's on screen.
+const isRegionId = (id: string) => childStateIds(id).length > 0 && !collapsed.has(id);
+// Convert a pointer event to diagram (pre-transform) coordinates.
+const clientToDiagram = (ev: { clientX: number; clientY: number }): XY => {
+    const rect = container.getBoundingClientRect();
+    return { x: (ev.clientX - rect.left - tx) / scale, y: (ev.clientY - rect.top - ty) / scale };
+};
+// The innermost (smallest-area) region whose bounds contain `pt` — so clicking
+// the empty body of a parent selects it, even when a label box or edge sits on
+// top of that spot and swallows the direct hit.
+const innermostRegionAt = (pt: XY): string | null => {
+    let best: string | null = null, bestArea = Infinity;
+    for (const [id, r] of geom) {
+        if (!isRegionId(id)) { continue; }
+        if (pt.x < r.x || pt.x > r.x + r.w || pt.y < r.y || pt.y > r.y + r.h) { continue; }
+        const area = r.w * r.h;
+        if (area < bestArea) { bestArea = area; best = id; }
+    }
+    return best;
+};
+
 // Default visual style of a node's primary shape — mirrors how drawNode creates
 // it, so selection styling can be applied and cleanly reverted without a ring.
 function nodeStyle(id: string): { fill: string; stroke: string; sw: number; so: number } {
@@ -1218,7 +1240,13 @@ container.addEventListener('click', (ev) => {
         return;
     }
     const nodeG = target.closest('[data-id]');
-    if (!nodeG) { return; }
+    if (!nodeG) {
+        // Clicked empty space — or a label/edge sitting over a region's body.
+        // Select the innermost region under the cursor so parents are reachable.
+        const id = innermostRegionAt(clientToDiagram(ev));
+        if (id) { selectNode(id); vscode.postMessage({ command: 'stateClicked', id }); }
+        return;
+    }
     const kind = nodeG.getAttribute('data-kind');
     const id = nodeG.getAttribute('data-id')!;
     if (kind === 'start') { return; }
