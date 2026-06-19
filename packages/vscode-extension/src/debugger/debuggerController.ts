@@ -14,13 +14,16 @@ import { XStateGraphViewProvider, type LiveStateValue } from '../graphView';
 
 const DEFAULT_URL = 'ws://127.0.0.1:9301';
 
-/** A row in the debugger's actor list. */
+/** A row in the debugger's actor (machine instance) tree. */
 export interface ActorVM {
     sessionId: string;
     parentSessionId?: string;
     label: string;
+    /** Active leaf state(s), shown inline as the instance's current state. */
+    state: string;
     status: string;
     depth: number;
+    hasChildren: boolean;
     selected: boolean;
 }
 
@@ -271,30 +274,42 @@ export class DebuggerController implements vscode.Disposable {
 
     private buildViewModel(): DebuggerViewModel {
         const state = this.store.getState();
-        const order = [...state.actors.keys()];
-        const depthOf = (sessionId: string): number => {
-            let depth = 0;
-            let cur = state.actors.get(sessionId)?.parentSessionId;
-            const seen = new Set<string>();
-            while (cur && state.actors.has(cur) && !seen.has(cur)) {
-                seen.add(cur);
-                depth++;
-                cur = state.actors.get(cur)?.parentSessionId;
-            }
-            return depth;
-        };
 
-        const actors: ActorVM[] = order.map((sessionId) => {
+        // Order actors depth-first — each parent immediately followed by its
+        // descendants — so the list renders as a real machine-instance tree.
+        // An actor whose parent is unknown (e.g. stopped) is treated as a root.
+        const childrenOf = new Map<string | undefined, string[]>();
+        for (const [sessionId, a] of state.actors) {
+            const parent = a.parentSessionId && state.actors.has(a.parentSessionId) ? a.parentSessionId : undefined;
+            const arr = childrenOf.get(parent) ?? [];
+            arr.push(sessionId);
+            childrenOf.set(parent, arr);
+        }
+        const summarize = (sessionId: string): string => {
+            const a = state.actors.get(sessionId);
+            if (!a?.machine) { return ''; }
+            const snap = getDisplaySnapshot(state, sessionId) ?? a.snapshot;
+            return getActivePaths(snap?.value as LiveStateValue, a.machine.root)
+                .map((p) => p[p.length - 1]?.key)
+                .filter((k): k is string => !!k)
+                .join(', ');
+        };
+        const actors: ActorVM[] = [];
+        const walk = (sessionId: string, depth: number): void => {
             const a = state.actors.get(sessionId)!;
-            return {
+            actors.push({
                 sessionId,
                 parentSessionId: a.parentSessionId,
                 label: a.machine?.id ?? sessionId.slice(0, 8),
+                state: summarize(sessionId),
                 status: a.status,
-                depth: depthOf(sessionId),
+                depth,
+                hasChildren: (childrenOf.get(sessionId)?.length ?? 0) > 0,
                 selected: state.selectedActorId === sessionId,
-            };
-        });
+            });
+            for (const child of childrenOf.get(sessionId) ?? []) { walk(child, depth + 1); }
+        };
+        for (const root of childrenOf.get(undefined) ?? []) { walk(root, 0); }
 
         const liveSelectable = this.status === 'open' && state.timeTravelSeq === null && !state.replayMode;
 

@@ -60,13 +60,17 @@ function render(m: any): void {
             '</span><button class="secondary" id="back-live">Back to live</button></div>';
     }
 
-    // Actors
-    html += '<div class="section"><h3>Actors</h3>';
+    // Machine-instance tree — actors ordered depth-first, parents then children.
+    html += '<div class="section"><h3>Machine instances</h3>';
     for (const a of m.actors) {
+        const branch = a.depth > 0 ? '<span class="branch">└</span>' : '';
         html += '<div class="actor ' + (a.selected ? 'sel ' : '') + (a.status === 'stopped' ? 'stopped' : '') +
-            '" data-id="' + esc(a.sessionId) + '" style="padding-left:' + (4 + a.depth * 14) + 'px">' +
+            '" data-id="' + esc(a.sessionId) + '" style="padding-left:' + (6 + a.depth * 14) + 'px">' +
+            branch +
             '<span class="dot ' + (a.status === 'active' ? 'open' : 'idle') + '"></span>' +
-            '<span>' + esc(a.label) + '</span></div>';
+            '<span class="alabel">' + esc(a.label) + '</span>' +
+            (a.state ? '<span class="astate">' + esc(a.state) + '</span>' : '') +
+            '</div>';
     }
     html += '</div>';
 

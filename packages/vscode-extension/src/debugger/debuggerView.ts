@@ -96,6 +96,9 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
   .actor:hover { background: var(--vscode-list-hoverBackground); }
   .actor.sel { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
   .actor.stopped { opacity: .55; }
+  .actor .branch { color: var(--vscode-tree-indentGuidesStroke, var(--vscode-descriptionForeground)); margin-right: -2px; flex: none; }
+  .actor .alabel { font-weight: 600; }
+  .actor .astate { color: var(--vscode-descriptionForeground); font-family: var(--vscode-editor-font-family); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
   .chip { display: inline-block; padding: 0 6px; margin: 1px 3px 1px 0; border-radius: 9px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); font-size: 11px; }
   pre.ctx { margin: 0; max-height: 240px; overflow: auto; font-family: var(--vscode-editor-font-family); font-size: 12px; white-space: pre; background: var(--vscode-textCodeBlock-background); padding: 6px; border-radius: 3px; }
   table.events { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -131,7 +134,7 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
 <body>
   <div class="bar">
     <span id="dot" class="dot idle"></span>
-    <span id="status" class="status">Not connected (build D)</span>
+    <span id="status" class="status">Not connected (build E)</span>
     <button id="toggle">Connect</button>
   </div>
   <div id="body"></div>
