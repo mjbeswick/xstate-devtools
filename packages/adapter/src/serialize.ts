@@ -1,6 +1,6 @@
 // packages/adapter/src/serialize.ts
 import type { AnyStateMachine } from 'xstate'
-import type { SerializedMachine, SerializedStateNode, SerializedTransition, SerializedInvoke } from '../../chrome-extension/src/shared/types.js'
+import type { SerializedMachine, SerializedStateNode, SerializedTransition, SerializedInvoke } from '@xstate-devtools/protocol'
 
 function serializeGuard(guard: unknown): string | undefined {
   if (!guard) return undefined

@@ -9,6 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@xstate-devtools/protocol": "*",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "zustand": "^5.0.0",

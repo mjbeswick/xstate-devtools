@@ -3,7 +3,7 @@
 import type { AnyActorRef } from 'xstate'
 import type {
   ExtensionToPageMessage, PageToExtensionMessage, SerializedSnapshot,
-} from '../../chrome-extension/src/shared/types.js'
+} from '@xstate-devtools/protocol'
 import { serializeMachine } from './serialize.js'
 import { sanitize } from './sanitize.js'
 

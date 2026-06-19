@@ -1,6 +1,6 @@
 // Server entrypoint — exposes a WebSocket bridge so the DevTools panel
 // can connect to actors running in Node.
-import type { ExtensionToPageMessage, PageToExtensionMessage } from '../../chrome-extension/src/shared/types.js'
+import type { ExtensionToPageMessage, PageToExtensionMessage } from '@xstate-devtools/protocol'
 import { createInspector, type Transport } from './core.js'
 
 export interface ServerAdapterOptions {
