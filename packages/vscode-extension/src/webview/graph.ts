@@ -791,6 +791,38 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
         return out;
     };
 
+    // Keep a straight run of at least MIN_APPROACH px into each endpoint, so an
+    // orthogonal route doesn't kink right at the arrowhead when ELK's port sits
+    // a few px off the incoming channel. Only the clean single-jog case is
+    // adjusted (short final segment + a perpendicular jog with room behind it);
+    // anything else is left exactly as ELK routed it.
+    const MIN_APPROACH = 14;
+    const near = (m: number, n: number) => Math.abs(m - n) < 1.5;
+    const straightenApproach = (p: XY[]): XY[] => {
+        const lengthen = (ei: number, ai: number, ci: number, bi: number) => {
+            const end = p[ei], a = p[ai], c = p[ci], before = p[bi];
+            if (!before) { return; }
+            const segX = end.x - a.x, segY = end.y - a.y;
+            const len = Math.abs(segX) + Math.abs(segY);
+            if (len === 0 || len >= MIN_APPROACH) { return; }
+            if (near(segX, 0) && near(c.y, a.y) && near(before.x, c.x)) {
+                const dir = a.y > end.y ? 1 : -1;
+                const ny = end.y + dir * MIN_APPROACH;
+                if ((before.y - ny) * dir <= 0) { return; }  // no room behind the jog
+                a.y = ny; c.y = ny;                           // push the turn back; run stays straight
+            } else if (near(segY, 0) && near(c.x, a.x) && near(before.y, c.y)) {
+                const dir = a.x > end.x ? 1 : -1;
+                const nx = end.x + dir * MIN_APPROACH;
+                if ((before.x - nx) * dir <= 0) { return; }
+                a.x = nx; c.x = nx;
+            }
+        };
+        const n = p.length;
+        lengthen(n - 1, n - 2, n - 3, n - 4);  // target (arrowhead) end
+        lengthen(0, 1, 2, 3);                  // source end
+        return p;
+    };
+
     // Point on a rectangle's border along the ray from its centre toward `to`.
     const borderPoint = (rect: Rect, to: XY): XY => {
         const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
@@ -858,7 +890,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
             }
             const lb = e.labels?.[0];
             const label = (lb && lb.x != null && lb.y != null) ? { x: o.x + lb.x, y: o.y + lb.y } : undefined;
-            routed.push({ id: e.id, pts: simplify(pts), label });
+            routed.push({ id: e.id, pts: straightenApproach(simplify(pts)), label });
         }
         for (const c of n.children ?? []) { collectEdges(c); }
     };
