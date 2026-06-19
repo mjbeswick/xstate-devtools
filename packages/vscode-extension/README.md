@@ -26,7 +26,7 @@
 ### ✏️ Editing & authoring
 - **Context-aware autocomplete** — suggests valid machine, state, transition, invoke, and setup properties, plus valid target / action / guard / actor references
 - **Tree editing** — add, rename, and delete states, transitions, and references, and set a state's or machine's `description`, straight from the outline
-- **Diagram editing** — the same edit actions are available right from the diagram: right-click a state or the machine to edit/add/delete, set its `description`, or add children, transitions, and references; right-click a transition edge to edit it, add an action/guard, or delete it
+- **Diagram editing** — the same edit actions are available right from the diagram: right-click a state or the machine to edit/add/delete, set its `description`, or add children, transitions, and references; right-click a transition's event to jump to its source, edit it, add an action/guard, or delete it
 - **Invalid property highlighting** — unknown config properties show up in the tree with a red error icon
 
 ### 🚦 Errors pane
@@ -78,7 +78,7 @@ The example above shows a parallel `checkout` machine: the dashed outer box with
 
 **Diagram toolbar:** zoom out `−`, the live zoom-percent button (click to reset to **100%**), zoom in `+`, fit `⊡`, toggle direction `↧`/`↦`, expand all `⊞`, collapse all `⊟`, toggle internal-transition rows `/ƒ`, export `SVG` / `PNG` / `MMD` (Mermaid), and **▷ Sim** to enter the interactive simulator.
 
-**Right-click** anywhere in the diagram for a context menu — **Go to Source** and **Expand/Collapse** for the state under the cursor, the full set of **editing actions** (edit/add child/add transition/add reference/set description/delete on a state, the applicable subset on the machine, and edit/add action-guard/delete on a transition edge), plus fit, actual size, expand/collapse all, toggle internal transitions, and export.
+**Right-click** anywhere in the diagram for a context menu — **Go to Source** and **Expand/Collapse** for the state under the cursor, the full set of **editing actions** (edit/add child/add transition/add reference/set description/delete on a state, the applicable subset on the machine, and go to source/edit/add action-guard/delete on a transition's event), plus fit, actual size, expand/collapse all, toggle internal transitions, and export.
 
 **Diagram keyboard shortcuts:** **arrow keys** move the selection between states, **Enter** expands/collapses the selected compound (or jumps a leaf state to its source), **Shift+arrows** pan, `]`/`[` (or `+`/`-`) zoom, `0` or `.` fits to screen, and `1` resets to actual size.
 

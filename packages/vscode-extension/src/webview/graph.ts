@@ -1121,7 +1121,7 @@ container.addEventListener('click', (ev) => {
         else {
             vscode.postMessage({
                 command: 'eventClicked',
-                eventName: lineEl.getAttribute('data-event'),
+                eventName: owningEventName(lineEl),
                 src: grp?.getAttribute('data-src'),
             });
         }
@@ -1305,20 +1305,38 @@ function ctxItem(label: string, fn: () => void): HTMLElement {
 }
 function ctxSep(): HTMLElement { const s = document.createElement('div'); s.className = 'ctx-sep'; return s; }
 
+// A transition label is now two rows — the event (+guard) and a `/ actions`
+// row. Given the clicked text line, return the event it belongs to, so a click
+// on the actions row still resolves to its transition.
+function owningEventName(lineEl: Element): string | undefined {
+    const raw = lineEl.getAttribute('data-event') ?? undefined;
+    if (!raw || !raw.trimStart().startsWith('/')) { return raw; }
+    const grp = lineEl.closest('[data-src]');
+    if (!grp) { return raw; }
+    const lines = [...grp.querySelectorAll('[data-event]')];
+    for (let i = lines.indexOf(lineEl) - 1; i >= 0; i--) {
+        const v = lines[i].getAttribute('data-event') ?? '';
+        if (!v.trimStart().startsWith('/')) { return v; }
+    }
+    return raw;
+}
+
 document.addEventListener('contextmenu', (ev) => {
     ev.preventDefault();  // kill the default copy/cut/paste menu everywhere
     hideCtx();
     const items: HTMLElement[] = [];
-    // Transition edges: right-click an event label → edit that transition.
+    // Transition edges: right-click an event label → go to source or edit it.
     const eventEl = (ev.target as Element).closest?.('[data-event]');
     const edgeGrp = eventEl?.closest('[data-src]');
-    const eventName = eventEl?.getAttribute('data-event') ?? undefined;
+    const eventName = eventEl ? owningEventName(eventEl) : undefined;
     const edgeSrc = edgeGrp?.getAttribute('data-src') ?? undefined;
     const nodeG = (ev.target as Element).closest?.('[data-id]');
     const id = nodeG?.getAttribute('data-id') ?? undefined;
     const kind = nodeG?.getAttribute('data-kind');
 
     if (eventName && edgeSrc) {
+        items.push(ctxItem('Go to Source', () => vscode.postMessage({ command: 'goToSourceEvent', src: edgeSrc, eventName })));
+        items.push(ctxSep());
         items.push(ctxItem('Edit', () => vscode.postMessage({ command: 'editTransition', src: edgeSrc, eventName })));
         items.push(ctxItem('Add Action / Guard', () => vscode.postMessage({ command: 'addTransitionReference', src: edgeSrc, eventName })));
         items.push(ctxItem('Delete', () => vscode.postMessage({ command: 'deleteTransition', src: edgeSrc, eventName })));

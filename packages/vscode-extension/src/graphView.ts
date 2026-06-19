@@ -105,6 +105,9 @@ export class XStateGraphViewProvider {
                 case 'addReference':  void this.runNodeEdit(message.id, entry, n => XStateTreeEditor.addReference(n)); return;
                 case 'setDescription':void this.runNodeEdit(message.id, entry, n => XStateTreeEditor.setDescription(n)); return;
                 case 'deleteNode':    void this.runNodeEdit(message.id, entry, n => XStateTreeEditor.deleteNode(n)); return;
+                case 'goToSourceEvent': void this.runTransitionEdit(message.src, message.eventName, entry, async n => {
+                    if (n.uri && n.range) { await vscode.window.showTextDocument(n.uri, { selection: n.range, preview: false }); }
+                }); return;
                 case 'editTransition':       void this.runTransitionEdit(message.src, message.eventName, entry, n => XStateTreeEditor.editNode(n)); return;
                 case 'addTransitionReference':void this.runTransitionEdit(message.src, message.eventName, entry, n => XStateTreeEditor.addReference(n)); return;
                 case 'deleteTransition':     void this.runTransitionEdit(message.src, message.eventName, entry, n => XStateTreeEditor.deleteNode(n)); return;
@@ -523,9 +526,14 @@ export class XStateGraphViewProvider {
                         const key = `${sourceId} ${targetId}`;
                         let entry = edgeMap.get(key);
                         if (!entry) { entry = { source: sourceId, target: targetId, labels: [] }; edgeMap.set(key, entry); }
+                        // Harel label, but with the actions on their own line so a
+                        // long event name + several actions don't run into one
+                        // wide, hard-to-read row. The leading `/` also marks the
+                        // row as the transition's actions (and lets the webview map
+                        // a click on it back to its owning event).
                         let label = eventLabel ?? '';
                         if (guardLabel) { label += ` [${guardLabel}]`; }
-                        if (actionLabels.length) { label += ` / ${actionLabels.join(', ')}`; }
+                        if (actionLabels.length) { label += `\n/ ${actionLabels.join(', ')}`; }
                         label = label.trim();
                         if (label && !entry.labels.includes(label)) { entry.labels.push(label); }
                         // Simulator transition — only when the target is a real
