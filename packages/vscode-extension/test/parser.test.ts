@@ -39,6 +39,8 @@ function serialize(n: MachineNode): Record<string, unknown> {
     if (n.isFinal) { o.final = true; }
     if (n.isParallel) { o.parallel = true; }
     if (n.historyType) { o.history = n.historyType; }
+    if (n.isInline) { o.inline = true; }
+    if (n.guardCombinator) { o.guardCombinator = n.guardCombinator; }
     if (n.isTypeMarker) { o.typeMarker = true; }
     if (n.isStateConfig) { o.stateConfig = true; }
     if (n.description) { o.description = n.description; }
@@ -187,9 +189,11 @@ export const m = createMachine({
 });`;
     const roots = () => XStateMachineParser.parseMachines(makeDoc(SRC, '/fb.ts'));
 
-    it('anonymous array action gets a placeholder, not the bare type word', () => {
+    it('anonymous array action is flagged inline (rendered as a dimmed marker)', () => {
         const idle = findState(roots(), 'idle');
-        expect(childLabels(idle, 'entry')).toEqual(['(inline entry)']);
+        const entry = idle?.children?.find(c => c.type === 'entry');
+        expect(entry?.label).toBe('entry');
+        expect(entry?.isInline).toBe(true);
     });
 
     it('named-guard branches lead with the guard; anonymous guard falls back to target', () => {
@@ -203,7 +207,9 @@ export const m = createMachine({
         const idle = findState(roots(), 'idle');
         const go = idle?.children?.find(c => c.type === 'transition' && c.label === 'GO');
         const anonBranch = go?.children?.find(c => c.type === 'transition' && c.label === 'idle');
-        expect(childLabels(anonBranch, 'guard')).toEqual(['(inline guard)']);
+        const guard = anonBranch?.children?.find(c => c.type === 'guard');
+        expect(guard).toBeDefined();
+        expect(guard?.isInline).toBe(true);
     });
 });
 
@@ -235,9 +241,9 @@ export const m = setup({
     it('renders a combinator as a guard group with one child per inner guard (object-form types resolved)', () => {
         const s = findState(roots(), 's');
         const t = s?.children?.find(c => c.type === 'transition' && c.label === 'print.receipt');
-        const and = t?.children?.find(c => c.type === 'guard' && c.label === 'and');
+        const and = t?.children?.find(c => c.type === 'guard' && c.guardCombinator === 'and');
         const nots = (and?.children ?? []).filter(c => c.type === 'guard');
-        expect(nots.map(n => n.label)).toEqual(['not', 'not']);
+        expect(nots.map(n => n.guardCombinator)).toEqual(['not', 'not']);
         expect(nots.flatMap(n => childLabels(n, 'guard'))).toEqual(['isHealthServiceFail', 'isHealthComponentFail']);
     });
 
@@ -247,7 +253,7 @@ export const m = setup({
         const branch = always?.children?.find(c => c.type === 'transition');
         expect(branch?.label).toBe('when not(isHealthFail) → done');
         expect(childLabels(branch, 'target')).toEqual(['done']);
-        const not = branch?.children?.find(c => c.type === 'guard' && c.label === 'not');
+        const not = branch?.children?.find(c => c.type === 'guard' && c.guardCombinator === 'not');
         expect(childLabels(not, 'guard')).toEqual(['isHealthFail']);
     });
 });

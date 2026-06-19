@@ -2295,7 +2295,8 @@ exports[`parser snapshots > parses complexMachine.ts 1`] = `
           {
             "children": [
               {
-                "label": "(inline guard)",
+                "inline": true,
+                "label": "guard",
                 "type": "guard",
               },
               {
@@ -2405,7 +2406,8 @@ exports[`parser snapshots > parses complexMachine.ts 1`] = `
               {
                 "children": [
                   {
-                    "label": "(inline guard)",
+                    "inline": true,
+                    "label": "guard",
                     "type": "guard",
                   },
                   {
@@ -2602,7 +2604,8 @@ exports[`parser snapshots > parses complexMachine.ts 1`] = `
           {
             "children": [
               {
-                "label": "(inline guard)",
+                "inline": true,
+                "label": "guard",
                 "type": "guard",
               },
               {
