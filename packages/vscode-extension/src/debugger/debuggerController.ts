@@ -6,7 +6,7 @@
 // status-bar indicator, and the bridge that overlays each running machine's
 // active state onto its open statechart diagram.
 import * as vscode from 'vscode';
-import { createInspectorStore, exportSession, getActivePaths, getDisplaySnapshot, importSession, type InspectorStore } from '@xstate-devtools/panel-core';
+import { createInspectorStore, exportSession, getActiveNodeIds, getActivePaths, getDisplaySnapshot, importSession, type InspectorStore } from '@xstate-devtools/panel-core';
 import type { StoreApi } from 'zustand/vanilla';
 import type { ExtensionToPageMessage, PageToExtensionMessage, SerializedEvent, SerializedStateNode } from '@xstate-devtools/protocol';
 import { DebuggerWsClient, type ConnectionStatus } from './wsClient';
@@ -54,6 +54,10 @@ export interface DebuggerViewModel {
         status: string;
         activeLeaves: string[];
         context: unknown;
+        /** The running machine's state-node tree (null for non-machine actors). */
+        machine: SerializedStateNode | null;
+        /** Ids of the currently-active state nodes, for tree highlighting. */
+        activeIds: string[];
         transitions: TransitionVM[];
         persisted: { captured: boolean; error?: string };
     } | null;
@@ -74,8 +78,10 @@ export class DebuggerController implements vscode.Disposable {
     private unsubscribeStore: (() => void) | null = null;
     private status: ConnectionStatus = 'idle';
     private view: DebuggerView | null = null;
+    private readonly log: vscode.OutputChannel;
 
     constructor(private readonly graphView: XStateGraphViewProvider) {
+        this.log = vscode.window.createOutputChannel('XState Debugger');
         this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
         this.statusBar.command = 'xstateDebugger.toggle';
         this.renderStatusBar();
@@ -202,6 +208,7 @@ export class DebuggerController implements vscode.Disposable {
     }
 
     connect(): void {
+        this.log.appendLine(`[${stamp()}] connect → ${this.url()}`);
         if (!this.client) {
             this.client = new DebuggerWsClient(this.url(), {
                 onMessage: (msg) => this.onMessage(msg),
@@ -237,6 +244,7 @@ export class DebuggerController implements vscode.Disposable {
     }
 
     private onMessage(msg: PageToExtensionMessage): void {
+        this.log.appendLine(`[${stamp()}] ← ${msg.type}${'sessionId' in msg ? ` (${msg.sessionId})` : ''}`);
         const state = this.store.getState();
         state.handleMessage(msg);
         // Auto-select the first actor so the inspector isn't empty on connect.
@@ -247,6 +255,7 @@ export class DebuggerController implements vscode.Disposable {
     }
 
     private onStatus(status: ConnectionStatus): void {
+        this.log.appendLine(`[${stamp()}] status → ${status}`);
         this.status = status;
         this.renderStatusBar();
         void this.setConnectedContext(status === 'open');
@@ -318,12 +327,17 @@ export class DebuggerController implements vscode.Disposable {
                     }
                 }
                 const persistedEntry = state.persistedSnapshots.get(selId);
+                const activeIds = actor.machine
+                    ? [...getActiveNodeIds(snapshot.value as LiveStateValue, actor.machine.root)]
+                    : [];
                 selected = {
                     sessionId: selId,
                     machineId: actor.machine?.id ?? null,
                     status: snapshot.status,
                     activeLeaves,
                     context: snapshot.context,
+                    machine: actor.machine?.root ?? null,
+                    activeIds,
                     transitions,
                     persisted: {
                         captured: persistedEntry?.persisted !== undefined,
@@ -382,9 +396,21 @@ export class DebuggerController implements vscode.Disposable {
         await vscode.commands.executeCommand('setContext', 'xstateDebugger.connected', connected);
     }
 
+    /** Reveal the diagnostics output channel. */
+    showLog(): void {
+        this.log.show(true);
+    }
+
     dispose(): void {
         this.unsubscribeStore?.();
         this.client?.dispose();
         this.statusBar.dispose();
+        this.log.dispose();
     }
+}
+
+function stamp(): string {
+    const d = new Date();
+    const p = (n: number, l = 2) => String(n).padStart(l, '0');
+    return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
 }

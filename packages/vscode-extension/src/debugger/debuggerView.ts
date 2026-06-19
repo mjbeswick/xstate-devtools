@@ -115,6 +115,12 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
   table.events tr.evrow:hover td { background: var(--vscode-list-hoverBackground); }
   table.events tr.tt td { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
   table.events tr.future td { opacity: .5; }
+  .tree { font-size: 12px; }
+  .tnode { display: flex; align-items: center; gap: 6px; padding: 1px 4px; border-radius: 3px; white-space: nowrap; }
+  .tnode.active { background: var(--vscode-list-activeSelectionBackground, rgba(0,160,0,.18)); font-weight: 600; }
+  .tnode .tag { font-size: 9px; text-transform: uppercase; letter-spacing: .03em; padding: 0 4px; border-radius: 3px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); opacity: .8; }
+  .tnode .dotg { width: 7px; height: 7px; border-radius: 50%; flex: none; background: transparent; }
+  .tnode.active .dotg { background: var(--vscode-charts-green); }
 </style>
 </head>
 <body>
@@ -189,6 +195,14 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
         ? s.activeLeaves.map((l) => '<span class="chip">' + esc(l) + '</span>').join('')
         : '<span class="muted">—</span>') + '</div>';
       html += '</div>';
+
+      // Machine state tree (runtime), with the active configuration highlighted.
+      if (s.machine) {
+        const activeSet = new Set(s.activeIds || []);
+        html += '<div class="section"><h3>Machine</h3><div class="tree">' +
+          renderTree(s.machine, activeSet, 0) + '</div></div>';
+      }
+
       html += '<div class="section"><h3>Context</h3><pre class="ctx">' +
         esc(safeJson(s.context)) + '</pre></div>';
 
@@ -266,6 +280,19 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
       type: ($('cev-type') || {}).value || '',
       payload: ($('cev-payload') || {}).value || '',
     }));
+  }
+
+  function renderTree(node, activeSet, depth) {
+    const active = activeSet.has(node.id);
+    const tag = (node.type || 'state').slice(0, 4);
+    let html = '<div class="tnode ' + (active ? 'active' : '') + '" style="padding-left:' + (4 + depth * 14) + 'px">' +
+      '<span class="dotg"></span><span class="tag">' + esc(tag) + '</span>' +
+      '<span>' + esc(node.key || node.id) + '</span></div>';
+    const states = node.states || {};
+    for (const key of Object.keys(states)) {
+      html += renderTree(states[key], activeSet, depth + 1);
+    }
+    return html;
   }
 
   function safeJson(v) {
