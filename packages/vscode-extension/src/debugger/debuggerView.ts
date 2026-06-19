@@ -61,18 +61,15 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
         void this.view?.webview.postMessage({ command: 'model', model });
     }
 
-    private getHtml(webview: vscode.Webview): string {
-        const nonce = makeNonce();
-        const csp = [
-            `default-src 'none'`,
-            `style-src ${webview.cspSource} 'unsafe-inline'`,
-            `script-src 'nonce-${nonce}'`,
-        ].join('; ');
+    private getHtml(_webview: vscode.Webview): string {
+        // No CSP meta tag / nonce here, matching the extension's other working
+        // WebviewView (filterView). A strict `script-src 'nonce-…'` CSP starved
+        // VS Code's injected acquireVsCodeApi bootstrap, so the inline script
+        // aborted on its first line and never wired up the Connect button.
         return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
   :root { color-scheme: light dark; }
@@ -132,7 +129,7 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
     <button id="toggle">Connect</button>
   </div>
   <div id="body"></div>
-<script nonce="${nonce}">
+<script>
   const vscode = acquireVsCodeApi();
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -312,11 +309,4 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
 </body>
 </html>`;
     }
-}
-
-function makeNonce(): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let out = '';
-    for (let i = 0; i < 32; i++) { out += chars[Math.floor(Math.random() * chars.length)]; }
-    return out;
 }
