@@ -289,6 +289,10 @@
         "title": "Delete"
       },
       {
+        "command": "xstateMachineOutline.setDescription",
+        "title": "Set Description"
+      },
+      {
         "command": "xstateMachineOutline.openGraphView",
         "title": "View State Diagram",
         "icon": "$(git-merge)"
@@ -596,6 +600,11 @@
           "command": "xstateMachineOutline.deleteNode",
           "when": "view == xstateMachineOutline && (viewItem == state || viewItem == transition || viewItem == target || viewItem == action || viewItem == guard || viewItem == invoke || viewItem == contextProperty || viewItem == actor || viewItem == delay || viewItem == invalid)",
           "group": "edit@5"
+        },
+        {
+          "command": "xstateMachineOutline.setDescription",
+          "when": "view == xstateMachineOutline && (viewItem == machine || viewItem == state)",
+          "group": "edit@6"
         },
         {
           "command": "xstateErrors.copy",

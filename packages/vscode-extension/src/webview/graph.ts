@@ -14,6 +14,7 @@ interface NodeData {
     history?: 'shallow' | 'deep'; ghost?: boolean;
     entryActions?: string[]; exitActions?: string[]; internalTransitions?: string[];
     invokes?: string[]; description?: string;
+    nodeType?: string;
 }
 interface GraphPayload {
     nodes: { data: NodeData }[];
@@ -1290,10 +1291,21 @@ document.addEventListener('contextmenu', (ev) => {
     ev.preventDefault();  // kill the default copy/cut/paste menu everywhere
     hideCtx();
     const items: HTMLElement[] = [];
+    // Transition edges: right-click an event label → edit that transition.
+    const eventEl = (ev.target as Element).closest?.('[data-event]');
+    const edgeGrp = eventEl?.closest('[data-src]');
+    const eventName = eventEl?.getAttribute('data-event') ?? undefined;
+    const edgeSrc = edgeGrp?.getAttribute('data-src') ?? undefined;
     const nodeG = (ev.target as Element).closest?.('[data-id]');
     const id = nodeG?.getAttribute('data-id') ?? undefined;
     const kind = nodeG?.getAttribute('data-kind');
-    if (id && kind !== 'start' && !nodeById.get(id)?.ghost) {
+
+    if (eventName && edgeSrc) {
+        items.push(ctxItem('Edit', () => vscode.postMessage({ command: 'editTransition', src: edgeSrc, eventName })));
+        items.push(ctxItem('Add Action / Guard', () => vscode.postMessage({ command: 'addTransitionReference', src: edgeSrc, eventName })));
+        items.push(ctxItem('Delete', () => vscode.postMessage({ command: 'deleteTransition', src: edgeSrc, eventName })));
+        items.push(ctxSep());
+    } else if (id && kind !== 'start' && !nodeById.get(id)?.ghost) {
         items.push(ctxItem('Go to Source', () => vscode.postMessage({ command: 'goToSource', id })));
         if (childStateIds(id).length) {
             const collapsedNow = collapsed.has(id);
@@ -1301,6 +1313,23 @@ document.addEventListener('contextmenu', (ev) => {
                 if (collapsedNow) { collapsed.delete(id); } else { collapsed.add(id); }
                 rerenderCollapse();
             }));
+        }
+        items.push(ctxSep());
+        // Source-editing actions — mirror the tree's right-click menu. The
+        // machine root (nodeType 'machine') can't be renamed/deleted, and only
+        // states take transitions.
+        const nodeType = nodeById.get(id)?.nodeType;
+        if (nodeType === 'state') {
+            items.push(ctxItem('Edit', () => vscode.postMessage({ command: 'editNode', id })));
+        }
+        items.push(ctxItem('Add Child State', () => vscode.postMessage({ command: 'addChildState', id })));
+        if (nodeType === 'state') {
+            items.push(ctxItem('Add Transition', () => vscode.postMessage({ command: 'addTransition', id })));
+        }
+        items.push(ctxItem('Add Action / Guard / Invoke', () => vscode.postMessage({ command: 'addReference', id })));
+        items.push(ctxItem('Set Description', () => vscode.postMessage({ command: 'setDescription', id })));
+        if (nodeType === 'state') {
+            items.push(ctxItem('Delete', () => vscode.postMessage({ command: 'deleteNode', id })));
         }
         items.push(ctxSep());
     }

@@ -1,42 +1,42 @@
 import * as vscode from 'vscode';
 import * as ts from 'typescript';
-import type { XStateMachineTreeItem } from './treeProvider';
+import type { MachineNode } from './parser';
 
 type SetupSection = 'actions' | 'guards' | 'actors' | 'delays';
 
 export class XStateTreeEditor {
-    static async editNode(treeItem: XStateMachineTreeItem): Promise<void> {
-        switch (treeItem.node.type) {
+    static async editNode(node: MachineNode): Promise<void> {
+        switch (node.type) {
             case 'state':
             case 'transition':
             case 'contextProperty':
             case 'invalid':
-                await this.renameNode(treeItem);
+                await this.renameNode(node);
                 return;
             case 'target':
             case 'action':
             case 'guard':
             case 'invoke':
-                await this.changeValue(treeItem);
+                await this.changeValue(node);
                 return;
             case 'actor':
             case 'delay':
-                await this.renameNode(treeItem);
+                await this.renameNode(node);
                 return;
             default:
-                vscode.window.showInformationMessage(`Editing is not supported for ${treeItem.node.type} nodes yet.`);
+                vscode.window.showInformationMessage(`Editing is not supported for ${node.type} nodes yet.`);
         }
     }
 
-    static async renameNode(treeItem: XStateMachineTreeItem): Promise<void> {
-        const editor = await this.openEditor(treeItem);
+    static async renameNode(node: MachineNode): Promise<void> {
+        const editor = await this.openEditor(node);
         const document = editor.document;
         const parsed = this.parseDocument(document);
-        const rangeOffsets = this.toOffsets(document, treeItem.range!);
+        const rangeOffsets = this.toOffsets(document, node.range!);
 
-        switch (treeItem.node.type) {
+        switch (node.type) {
             case 'state': {
-                const stateProperty = this.findStateProperty(parsed, rangeOffsets.start, rangeOffsets.end, treeItem.node.label);
+                const stateProperty = this.findStateProperty(parsed, rangeOffsets.start, rangeOffsets.end, node.label);
                 if (!stateProperty) {
                     vscode.window.showInformationMessage('Could not resolve the selected state in source.');
                     return;
@@ -53,7 +53,7 @@ export class XStateTreeEditor {
                 return;
             }
             case 'transition': {
-                const transitionProperty = this.findTransitionProperty(parsed, rangeOffsets.start, rangeOffsets.end, treeItem.node.label);
+                const transitionProperty = this.findTransitionProperty(parsed, rangeOffsets.start, rangeOffsets.end, node.label);
                 if (!transitionProperty) {
                     vscode.window.showInformationMessage('Only named transitions can be renamed from the outline.');
                     return;
@@ -92,13 +92,13 @@ export class XStateTreeEditor {
             case 'delay': {
                 const setupProperty = this.findSetupImplementationProperty(parsed, rangeOffsets.start, rangeOffsets.end);
                 if (!setupProperty) {
-                    vscode.window.showInformationMessage(`Renaming ${treeItem.node.type} references is handled via “Change value”.`);
+                    vscode.window.showInformationMessage(`Renaming ${node.type} references is handled via “Change value”.`);
                     return;
                 }
                 const currentName = this.getPropertyName(setupProperty.name);
                 if (!currentName) { return; }
                 const nextName = await vscode.window.showInputBox({
-                    prompt: `Rename setup ${treeItem.node.type}`,
+                    prompt: `Rename setup ${node.type}`,
                     value: currentName,
                     validateInput: (value) => this.validateIdentifier(value)
                 });
@@ -124,17 +124,17 @@ export class XStateTreeEditor {
                 return;
             }
             default:
-                vscode.window.showInformationMessage(`Renaming is not supported for ${treeItem.node.type} nodes.`);
+                vscode.window.showInformationMessage(`Renaming is not supported for ${node.type} nodes.`);
         }
     }
 
-    static async changeValue(treeItem: XStateMachineTreeItem): Promise<void> {
-        const editor = await this.openEditor(treeItem);
+    static async changeValue(node: MachineNode): Promise<void> {
+        const editor = await this.openEditor(node);
         const document = editor.document;
         const parsed = this.parseDocument(document);
-        const offsets = this.toOffsets(document, treeItem.range!);
+        const offsets = this.toOffsets(document, node.range!);
 
-        if (treeItem.node.type === 'target') {
+        if (node.type === 'target') {
             const literal = this.findStringLikeNode(parsed, offsets.start, offsets.end);
             if (!literal) {
                 vscode.window.showInformationMessage('Could not resolve the selected target in source.');
@@ -143,13 +143,13 @@ export class XStateTreeEditor {
 
             const machineConfig = this.findContainingMachineConfig(literal);
             const validTargets = machineConfig ? this.collectStateTargets(machineConfig) : [];
-            const next = await this.pickOrInput('Select target state', validTargets, treeItem.node.label);
-            if (!next || next === treeItem.node.label) { return; }
+            const next = await this.pickOrInput('Select target state', validTargets, node.label);
+            if (!next || next === node.label) { return; }
             await this.applyRangeEdit(document, this.nodeRange(document, literal), this.quote(next));
             return;
         }
 
-        if (treeItem.node.type === 'action') {
+        if (node.type === 'action') {
             const setupProperty = this.findSetupImplementationProperty(parsed, offsets.start, offsets.end);
             if (setupProperty) {
                 vscode.window.showInformationMessage('Setup action definitions can be renamed or deleted from the outline.');
@@ -160,13 +160,13 @@ export class XStateTreeEditor {
                 vscode.window.showInformationMessage('Could not resolve the selected action reference in source.');
                 return;
             }
-            const next = await this.pickOrInput('Select action', this.collectSetupKeys(parsed, 'actions'), treeItem.node.label);
-            if (!next || next === treeItem.node.label) { return; }
+            const next = await this.pickOrInput('Select action', this.collectSetupKeys(parsed, 'actions'), node.label);
+            if (!next || next === node.label) { return; }
             await this.applyRangeEdit(document, this.nodeRange(document, valueNode), this.stringifyValueLike(valueNode, next));
             return;
         }
 
-        if (treeItem.node.type === 'guard') {
+        if (node.type === 'guard') {
             const setupProperty = this.findSetupImplementationProperty(parsed, offsets.start, offsets.end);
             if (setupProperty) {
                 vscode.window.showInformationMessage('Setup guard definitions can be renamed or deleted from the outline.');
@@ -177,13 +177,13 @@ export class XStateTreeEditor {
                 vscode.window.showInformationMessage('Could not resolve the selected guard reference in source.');
                 return;
             }
-            const next = await this.pickOrInput('Select guard', this.collectSetupKeys(parsed, 'guards'), treeItem.node.label);
-            if (!next || next === treeItem.node.label) { return; }
+            const next = await this.pickOrInput('Select guard', this.collectSetupKeys(parsed, 'guards'), node.label);
+            if (!next || next === node.label) { return; }
             await this.applyRangeEdit(document, this.nodeRange(document, valueNode), this.stringifyValueLike(valueNode, next));
             return;
         }
 
-        if (treeItem.node.type === 'invoke') {
+        if (node.type === 'invoke') {
             const invokeObject = this.findInvokeObject(parsed, offsets.start, offsets.end);
             if (!invokeObject) {
                 vscode.window.showInformationMessage('Could not resolve the selected invoke block in source.');
@@ -194,13 +194,13 @@ export class XStateTreeEditor {
                 vscode.window.showInformationMessage('Could not resolve invoke.src in source.');
                 return;
             }
-            const next = await this.pickOrInput('Select actor source', this.collectSetupKeys(parsed, 'actors'), treeItem.node.label);
-            if (!next || next === treeItem.node.label) { return; }
+            const next = await this.pickOrInput('Select actor source', this.collectSetupKeys(parsed, 'actors'), node.label);
+            if (!next || next === node.label) { return; }
             await this.applyRangeEdit(document, this.nodeRange(document, srcProperty.initializer), this.stringifyValueLike(srcProperty.initializer, next));
             return;
         }
 
-        if (treeItem.node.type === 'contextProperty') {
+        if (node.type === 'contextProperty') {
             const property = this.findPropertyByExactRange(parsed, offsets.start, offsets.end);
             if (!property) {
                 vscode.window.showInformationMessage('Could not resolve the selected context property in source.');
@@ -215,23 +215,23 @@ export class XStateTreeEditor {
             return;
         }
 
-        vscode.window.showInformationMessage(`Changing the value of ${treeItem.node.type} nodes is not supported yet.`);
+        vscode.window.showInformationMessage(`Changing the value of ${node.type} nodes is not supported yet.`);
     }
 
-    static async deleteNode(treeItem: XStateMachineTreeItem): Promise<void> {
+    static async deleteNode(node: MachineNode): Promise<void> {
         const confirmed = await vscode.window.showWarningMessage(
-            `Delete ${treeItem.node.label}?`,
+            `Delete ${node.label}?`,
             { modal: true },
             'Delete'
         );
         if (confirmed !== 'Delete') { return; }
 
-        const editor = await this.openEditor(treeItem);
+        const editor = await this.openEditor(node);
         const document = editor.document;
         const parsed = this.parseDocument(document);
-        const offsets = this.toOffsets(document, treeItem.range!);
+        const offsets = this.toOffsets(document, node.range!);
 
-        const property = this.findDeletableProperty(parsed, offsets.start, offsets.end, treeItem.node.type);
+        const property = this.findDeletableProperty(parsed, offsets.start, offsets.end, node.type);
         if (property) {
             await this.applyRangeEdit(document, this.deletionRange(document, property), '');
             return;
@@ -243,22 +243,22 @@ export class XStateTreeEditor {
             return;
         }
 
-        vscode.window.showInformationMessage(`Could not delete the selected ${treeItem.node.type} node safely.`);
+        vscode.window.showInformationMessage(`Could not delete the selected ${node.type} node safely.`);
     }
 
-    static async addChildState(treeItem: XStateMachineTreeItem): Promise<void> {
-        const editor = await this.openEditor(treeItem);
+    static async addChildState(node: MachineNode): Promise<void> {
+        const editor = await this.openEditor(node);
         const document = editor.document;
         const parsed = this.parseDocument(document);
 
         const stateName = await vscode.window.showInputBox({
-            prompt: treeItem.node.type === 'machine' ? 'New top-level state name' : 'New child state name',
+            prompt: node.type === 'machine' ? 'New top-level state name' : 'New child state name',
             validateInput: (value) => this.validateIdentifier(value)
         });
         if (!stateName) { return; }
 
-        if (treeItem.node.type === 'machine') {
-            const offsets = this.toOffsets(document, treeItem.range!);
+        if (node.type === 'machine') {
+            const offsets = this.toOffsets(document, node.range!);
             const machineConfig = this.findMachineConfigByRange(parsed, offsets.start, offsets.end);
             if (!machineConfig) {
                 vscode.window.showInformationMessage('Could not resolve the selected machine in source.');
@@ -268,9 +268,9 @@ export class XStateTreeEditor {
             return;
         }
 
-        if (treeItem.node.type === 'state') {
-            const offsets = this.toOffsets(document, treeItem.range!);
-            const stateProperty = this.findStateProperty(parsed, offsets.start, offsets.end, treeItem.node.label);
+        if (node.type === 'state') {
+            const offsets = this.toOffsets(document, node.range!);
+            const stateProperty = this.findStateProperty(parsed, offsets.start, offsets.end, node.label);
             if (!stateProperty || !ts.isObjectLiteralExpression(stateProperty.initializer)) {
                 vscode.window.showInformationMessage('Could not resolve the selected state in source.');
                 return;
@@ -282,17 +282,17 @@ export class XStateTreeEditor {
         vscode.window.showInformationMessage('Add child state is only supported for machine and state nodes.');
     }
 
-    static async addTransition(treeItem: XStateMachineTreeItem): Promise<void> {
-        if (treeItem.node.type !== 'state') {
+    static async addTransition(node: MachineNode): Promise<void> {
+        if (node.type !== 'state') {
             vscode.window.showInformationMessage('Add transition is only supported on state nodes.');
             return;
         }
 
-        const editor = await this.openEditor(treeItem);
+        const editor = await this.openEditor(node);
         const document = editor.document;
         const parsed = this.parseDocument(document);
-        const offsets = this.toOffsets(document, treeItem.range!);
-        const stateProperty = this.findStateProperty(parsed, offsets.start, offsets.end, treeItem.node.label);
+        const offsets = this.toOffsets(document, node.range!);
+        const stateProperty = this.findStateProperty(parsed, offsets.start, offsets.end, node.label);
         if (!stateProperty || !ts.isObjectLiteralExpression(stateProperty.initializer)) {
             vscode.window.showInformationMessage('Could not resolve the selected state in source.');
             return;
@@ -322,21 +322,21 @@ export class XStateTreeEditor {
         );
     }
 
-    static async addReference(treeItem: XStateMachineTreeItem): Promise<void> {
-        const editor = await this.openEditor(treeItem);
+    static async addReference(node: MachineNode): Promise<void> {
+        const editor = await this.openEditor(node);
         const document = editor.document;
         const parsed = this.parseDocument(document);
-        const offsets = this.toOffsets(document, treeItem.range!);
+        const offsets = this.toOffsets(document, node.range!);
 
-        if (treeItem.node.type === 'state' || treeItem.node.type === 'machine') {
+        if (node.type === 'state' || node.type === 'machine') {
             const kind = await vscode.window.showQuickPick(['Entry action', 'Exit action', 'Invoke'], {
                 placeHolder: 'Select what to add'
             });
             if (!kind) { return; }
 
-            const configObject = treeItem.node.type === 'machine'
+            const configObject = node.type === 'machine'
                 ? this.findMachineConfigByRange(parsed, offsets.start, offsets.end)
-                : this.findStateProperty(parsed, offsets.start, offsets.end, treeItem.node.label)?.initializer;
+                : this.findStateProperty(parsed, offsets.start, offsets.end, node.label)?.initializer;
             if (!configObject || !ts.isObjectLiteralExpression(configObject)) {
                 vscode.window.showInformationMessage('Could not resolve the selected node in source.');
                 return;
@@ -356,7 +356,7 @@ export class XStateTreeEditor {
             return;
         }
 
-        if (treeItem.node.type === 'transition') {
+        if (node.type === 'transition') {
             const transitionNode = this.findTransitionObject(parsed, offsets.start, offsets.end);
             if (!transitionNode) {
                 vscode.window.showInformationMessage('Add action/guard is only supported on named transition handlers.');
@@ -377,8 +377,8 @@ export class XStateTreeEditor {
             return;
         }
 
-        if (treeItem.node.type === 'setup' || ['action', 'guard', 'actor', 'delay'].includes(treeItem.node.type)) {
-            const setupConfig = treeItem.node.type === 'setup'
+        if (node.type === 'setup' || ['action', 'guard', 'actor', 'delay'].includes(node.type)) {
+            const setupConfig = node.type === 'setup'
                 ? this.findSetupConfigByRange(parsed, offsets.start, offsets.end)
                 : this.findContainingSetupConfig(parsed, offsets.start, offsets.end);
             if (!setupConfig) {
@@ -386,7 +386,7 @@ export class XStateTreeEditor {
                 return;
             }
 
-            const initialSection = this.inferSetupSection(treeItem.node.type);
+            const initialSection = this.inferSetupSection(node.type);
             const section = initialSection ?? await vscode.window.showQuickPick(['actions', 'guards', 'actors', 'delays'], {
                 placeHolder: 'Select setup section'
             }) as SetupSection | undefined;
@@ -403,6 +403,50 @@ export class XStateTreeEditor {
         }
 
         vscode.window.showInformationMessage('Add action/guard/invoke is not supported for this node.');
+    }
+
+    static async setDescription(node: MachineNode): Promise<void> {
+        if (node.type !== 'machine' && node.type !== 'state') {
+            vscode.window.showInformationMessage('Descriptions can only be set on machine and state nodes.');
+            return;
+        }
+
+        const editor = await this.openEditor(node);
+        const document = editor.document;
+        const parsed = this.parseDocument(document);
+        const offsets = this.toOffsets(document, node.range!);
+
+        const configObject = node.type === 'machine'
+            ? this.findMachineConfigByRange(parsed, offsets.start, offsets.end)
+            : this.findStateProperty(parsed, offsets.start, offsets.end, node.label)?.initializer;
+        if (!configObject || !ts.isObjectLiteralExpression(configObject)) {
+            vscode.window.showInformationMessage('Could not resolve the selected node in source.');
+            return;
+        }
+
+        const existing = this.findProperty(configObject, 'description');
+        const current = existing && ts.isStringLiteralLike(existing.initializer)
+            ? existing.initializer.text
+            : node.description ?? '';
+
+        const next = await vscode.window.showInputBox({
+            prompt: 'Description (leave empty to remove)',
+            value: current
+        });
+        if (next === undefined || next === current) { return; }
+
+        if (next.trim() === '') {
+            if (existing) {
+                await this.applyRangeEdit(document, this.deletionRange(document, existing), '');
+            }
+            return;
+        }
+
+        if (existing) {
+            await this.applyRangeEdit(document, this.nodeRange(document, existing.initializer), this.quote(next));
+            return;
+        }
+        await this.insertProperty(document, configObject, `description: ${this.quote(next)}`);
     }
 
     private static async addSetupImplementation(
@@ -927,11 +971,11 @@ export class XStateTreeEditor {
         return vscode.window.showInputBox({ prompt: placeHolder, value: initialValue });
     }
 
-    private static async openEditor(treeItem: XStateMachineTreeItem): Promise<vscode.TextEditor> {
-        if (!treeItem.uri) {
+    private static async openEditor(node: MachineNode): Promise<vscode.TextEditor> {
+        if (!node.uri) {
             throw new Error('Tree item has no URI.');
         }
-        const document = await vscode.workspace.openTextDocument(treeItem.uri);
+        const document = await vscode.workspace.openTextDocument(node.uri);
         return vscode.window.showTextDocument(document, { preserveFocus: false, preview: false });
     }
 

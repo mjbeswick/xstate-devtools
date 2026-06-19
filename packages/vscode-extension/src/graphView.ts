@@ -3,6 +3,7 @@ import { MachineNode } from './parser';
 import { XStateMachineTreeProvider } from './treeProvider';
 import { toMermaid } from './export/mermaid';
 import { SimModel, SimState, SimTransition, indexModel, shortestPaths } from './machineModel';
+import { XStateTreeEditor } from './treeEditor';
 
 interface PanelEntry {
     panel: vscode.WebviewPanel;
@@ -98,6 +99,15 @@ export class XStateGraphViewProvider {
                 case 'exportPng':   this.saveExport(message.data, 'png', title); return;
                 case 'exportMermaid': void this.exportMermaid(entry.machine, title); return;
                 case 'goToSource': void this.goToSource(message.id, entry); return;
+                case 'editNode':      void this.runNodeEdit(message.id, entry, n => XStateTreeEditor.editNode(n)); return;
+                case 'addChildState': void this.runNodeEdit(message.id, entry, n => XStateTreeEditor.addChildState(n)); return;
+                case 'addTransition': void this.runNodeEdit(message.id, entry, n => XStateTreeEditor.addTransition(n)); return;
+                case 'addReference':  void this.runNodeEdit(message.id, entry, n => XStateTreeEditor.addReference(n)); return;
+                case 'setDescription':void this.runNodeEdit(message.id, entry, n => XStateTreeEditor.setDescription(n)); return;
+                case 'deleteNode':    void this.runNodeEdit(message.id, entry, n => XStateTreeEditor.deleteNode(n)); return;
+                case 'editTransition':       void this.runTransitionEdit(message.src, message.eventName, entry, n => XStateTreeEditor.editNode(n)); return;
+                case 'addTransitionReference':void this.runTransitionEdit(message.src, message.eventName, entry, n => XStateTreeEditor.addReference(n)); return;
+                case 'deleteTransition':     void this.runTransitionEdit(message.src, message.eventName, entry, n => XStateTreeEditor.deleteNode(n)); return;
             }
         });
 
@@ -184,19 +194,37 @@ export class XStateGraphViewProvider {
         );
     }
 
-    // Event label clicked → select the matching transition node in the tree.
-    // `eventName` is the rendered Harel label (EVENT [guard] / actions); the
-    // transition node's own label is just the event, so match on that prefix.
-    private selectEventInTree(srcId: string | undefined, eventName: string, entry: PanelEntry) {
-        if (!srcId || !eventName) { return; }
+    // Resolve a diagram edge (source state id + rendered event label) back to
+    // its transition MachineNode. `eventName` is the rendered Harel label
+    // (EVENT [guard] / actions); the transition node's own label is just the
+    // event, so match on that prefix.
+    private resolveTransitionNode(srcId: string | undefined, eventName: string | undefined, entry: PanelEntry): MachineNode | undefined {
+        if (!srcId || !eventName) { return undefined; }
         const state = entry.nodeById.get(srcId);
-        if (!state) { return; }
+        if (!state) { return undefined; }
         const event = eventName.split(/\s*[[/]/)[0].trim();
         const transitions = (state.children ?? []).filter(c => c.type === 'transition');
-        const match = transitions.find(t => t.label === eventName)
+        return transitions.find(t => t.label === eventName)
             ?? transitions.find(t => t.label === event)
             ?? transitions.find(t => (t.label ?? '').trim() === event);
+    }
+
+    // Event label clicked → select the matching transition node in the tree.
+    private selectEventInTree(srcId: string | undefined, eventName: string, entry: PanelEntry) {
+        const match = this.resolveTransitionNode(srcId, eventName, entry);
         if (match) { this.revealInTree?.(match); }
+    }
+
+    // Run an edit action against the MachineNode behind a diagram node id.
+    private async runNodeEdit(id: string, entry: PanelEntry, edit: (node: MachineNode) => Promise<void>) {
+        const node = entry.nodeById.get(id);
+        if (node) { await edit(node); }
+    }
+
+    // Run an edit action against the transition behind a diagram edge.
+    private async runTransitionEdit(srcId: string | undefined, eventName: string | undefined, entry: PanelEntry, edit: (node: MachineNode) => Promise<void>) {
+        const node = this.resolveTransitionNode(srcId, eventName, entry);
+        if (node) { await edit(node); }
     }
 
     // Diagram node clicked → select the matching item in the tree outline.
@@ -371,6 +399,7 @@ export class XStateGraphViewProvider {
                     internalTransitions,
                     invokes,
                     description: n.description,
+                    nodeType: n.type,
                 },
             });
 
@@ -734,6 +763,7 @@ export interface GraphNode {
         history?: 'shallow' | 'deep'; ghost?: boolean;
         entryActions?: string[]; exitActions?: string[]; internalTransitions?: string[];
         invokes?: string[]; description?: string;
+        nodeType?: string;
     };
 }
 export interface GraphEdge {

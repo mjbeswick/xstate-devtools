@@ -198,7 +198,7 @@ export async function activate(context: vscode.ExtensionContext) {
         'xstateMachineOutline.editNode',
         async (treeItem) => {
             if (!treeItem?.node) { return; }
-            await XStateTreeEditor.editNode(treeItem);
+            await XStateTreeEditor.editNode(treeItem.node);
             treeProvider.refresh();
         }
     );
@@ -207,7 +207,7 @@ export async function activate(context: vscode.ExtensionContext) {
         'xstateMachineOutline.addChildState',
         async (treeItem) => {
             if (!treeItem?.node) { return; }
-            await XStateTreeEditor.addChildState(treeItem);
+            await XStateTreeEditor.addChildState(treeItem.node);
             treeProvider.refresh();
         }
     );
@@ -216,7 +216,7 @@ export async function activate(context: vscode.ExtensionContext) {
         'xstateMachineOutline.addTransition',
         async (treeItem) => {
             if (!treeItem?.node) { return; }
-            await XStateTreeEditor.addTransition(treeItem);
+            await XStateTreeEditor.addTransition(treeItem.node);
             treeProvider.refresh();
         }
     );
@@ -225,7 +225,7 @@ export async function activate(context: vscode.ExtensionContext) {
         'xstateMachineOutline.addReference',
         async (treeItem) => {
             if (!treeItem?.node) { return; }
-            await XStateTreeEditor.addReference(treeItem);
+            await XStateTreeEditor.addReference(treeItem.node);
             treeProvider.refresh();
         }
     );
@@ -234,7 +234,16 @@ export async function activate(context: vscode.ExtensionContext) {
         'xstateMachineOutline.deleteNode',
         async (treeItem) => {
             if (!treeItem?.node) { return; }
-            await XStateTreeEditor.deleteNode(treeItem);
+            await XStateTreeEditor.deleteNode(treeItem.node);
+            treeProvider.refresh();
+        }
+    );
+
+    const setDescriptionCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.setDescription',
+        async (treeItem) => {
+            if (!treeItem?.node) { return; }
+            await XStateTreeEditor.setDescription(treeItem.node);
             treeProvider.refresh();
         }
     );
@@ -1117,6 +1126,7 @@ export async function activate(context: vscode.ExtensionContext) {
         addTransitionCommand,
         addReferenceCommand,
         deleteNodeCommand,
+        setDescriptionCommand,
         openGraphViewCommand,
         openGraphViewAtCursorCommand,
         refreshGraphOnlyCommand,
