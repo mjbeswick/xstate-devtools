@@ -1,7 +1,7 @@
-// packages/chrome-extension/src/panel/session-io.test.ts
+// packages/panel-core/src/session-io.test.ts
 import { describe, it, expect } from 'vitest'
 import { exportSession, importSession } from './session-io.js'
-import type { ActorRecord, EventRecord, SerializedSnapshot } from '../shared/types.js'
+import type { ActorRecord, EventRecord, SerializedSnapshot } from '@xstate-devtools/protocol'
 
 const snap = (value: unknown): SerializedSnapshot => ({ value, context: {}, status: 'active' })
 

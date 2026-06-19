@@ -1,7 +1,7 @@
-// packages/chrome-extension/src/panel/active-nodes.test.ts
+// packages/panel-core/src/active-nodes.test.ts
 import { describe, it, expect } from 'vitest'
 import { getActiveNodeIds } from './active-nodes.js'
-import type { SerializedStateNode } from '../shared/types.js'
+import type { SerializedStateNode } from '@xstate-devtools/protocol'
 
 const atomicNode = (id: string): SerializedStateNode => ({
   id, key: id.split('.').pop()!, type: 'atomic',
