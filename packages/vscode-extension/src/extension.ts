@@ -12,6 +12,7 @@ import { WorkspaceScanner } from './workspaceScanner';
 import { XStateReferenceProvider, XStateRenameProvider } from './providers';
 import { XStateHoverProvider } from './hoverProvider';
 import { XStateGraphViewProvider } from './graphView';
+import { DebuggerController } from './debugger/debuggerController';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
 import { ErrorsTreeProvider, ErrorsGrouping, ErrorsFilter } from './errorsView';
 import { XStateCodeLensProvider } from './codeLensProvider';
@@ -749,6 +750,15 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const graphViewProvider = new XStateGraphViewProvider(context.extensionUri, treeProvider);
 
+    // ── Live debugger ──────────────────────────────────────────────────────────
+    // Attaches to a running app's server adapter (createServerAdapter) over a
+    // WebSocket and overlays each running machine's active state onto its open
+    // statechart diagram.
+    const debuggerController = new DebuggerController(graphViewProvider);
+    const debuggerConnectCommand = vscode.commands.registerCommand('xstateDebugger.connect', () => debuggerController.connect());
+    const debuggerDisconnectCommand = vscode.commands.registerCommand('xstateDebugger.disconnect', () => debuggerController.disconnect());
+    const debuggerToggleCommand = vscode.commands.registerCommand('xstateDebugger.toggle', () => debuggerController.toggle());
+
     // "Transitions" view — the selected state's incoming (←) / outgoing (→)
     // transitions.
     const navigatorProvider = new NavigatorTreeProvider(
@@ -1146,6 +1156,10 @@ export async function activate(context: vscode.ExtensionContext) {
         documentCloseListener,
         documentChangeListener,
         cursorChangeListener,
+        debuggerController,
+        debuggerConnectCommand,
+        debuggerDisconnectCommand,
+        debuggerToggleCommand,
         {
             dispose: () => {
                 pendingDiagnosticUpdates.forEach((timeout) => clearTimeout(timeout));

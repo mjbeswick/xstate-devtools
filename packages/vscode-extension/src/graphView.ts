@@ -19,6 +19,38 @@ interface PanelEntry {
     rendered?: boolean;
 }
 
+/** XState StateValue shape from a live snapshot. */
+export type LiveStateValue = string | { [key: string]: LiveStateValue };
+
+/** A state node's child states, excluding synthetic markers (e.g. `type:`). */
+function childStatesOf(node: MachineNode): MachineNode[] {
+    return (node.children ?? []).filter(c => c.type === 'state' && !c.isTypeMarker);
+}
+
+/**
+ * Walk a live StateValue against the static MachineNode tree, collecting every
+ * active node (the node itself plus the active descendant chain). Compound
+ * values are a single active child; parallel values activate several regions.
+ * Matching is by local label, mirroring XState's state keys.
+ */
+function collectActiveNodes(
+    value: LiveStateValue,
+    node: MachineNode,
+    acc: Set<MachineNode>,
+): void {
+    acc.add(node);
+    const children = childStatesOf(node);
+    if (typeof value === 'string') {
+        const child = children.find(c => c.label === value);
+        if (child) { acc.add(child); }
+        return;
+    }
+    for (const [key, sub] of Object.entries(value)) {
+        const child = children.find(c => c.label === key);
+        if (child) { collectActiveNodes(sub, child, acc); }
+    }
+}
+
 export class XStateGraphViewProvider {
     public static readonly viewType = 'xstateGraphView';
 
@@ -142,6 +174,43 @@ export class XStateGraphViewProvider {
             command: 'highlight',
             stateId: stateName.replace(/[^a-zA-Z0-9_]/g, '_'),
         });
+    }
+
+    /**
+     * Overlay a running machine's active state configuration onto any open
+     * diagram for that machine. `value` is the XState StateValue from the live
+     * snapshot (a string for an atomic leaf, or nested objects for compound /
+     * parallel configs). We resolve it against the static MachineNode tree by
+     * local label — robust against the diagram's opaque `n#` ids and the
+     * name-collision pitfall of a flat name map — then push the matching diagram
+     * node ids to the webview, which paints them (see `paintLive` in graph.ts).
+     */
+    public setLiveConfig(machineId: string, value: LiveStateValue): void {
+        for (const entry of this.panels.values()) {
+            if (entry.machine.label !== machineId) { continue; }
+            const active = new Set<MachineNode>();
+            collectActiveNodes(value, entry.machine, active);
+            const ids: string[] = [];
+            for (const [id, node] of entry.nodeById) {
+                if (active.has(node)) { ids.push(id); }
+            }
+            entry.panel.webview.postMessage({ command: 'liveStates', ids });
+        }
+    }
+
+    /** Remove any live overlay from all open diagrams (e.g. on disconnect). */
+    public clearLiveConfig(): void {
+        for (const entry of this.panels.values()) {
+            entry.panel.webview.postMessage({ command: 'liveClear' });
+        }
+    }
+
+    /** True if a diagram is open for the machine with the given root id/label. */
+    public hasPanelForMachineId(machineId: string): boolean {
+        for (const entry of this.panels.values()) {
+            if (entry.machine.label === machineId) { return true; }
+        }
+        return false;
     }
 
     public refresh() {

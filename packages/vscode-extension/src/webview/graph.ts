@@ -1048,6 +1048,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
     applyNodeStyle(selectedId);
     refreshEdgeEmphasis();  // re-assert the selected node's edge emphasis on the rebuilt edges
     if (simMode) { paintSim(); }  // re-assert the active-state overlay onto fresh rects
+    if (liveMode) { paintLive(); }  // re-assert the live-debugger overlay onto fresh rects
 }
 
 // ── Keyboard navigation ─────────────────────────────────────────────────────
@@ -1321,6 +1322,10 @@ window.addEventListener('message', (event: MessageEvent) => {
                 if (msg.select) { selectNode(idByName.get(msg.select) ?? selectedId, false); }
             })
             .catch(showError);
+    } else if (msg?.command === 'liveStates') {
+        setLiveConfig(Array.isArray(msg.ids) ? msg.ids : []);
+    } else if (msg?.command === 'liveClear') {
+        clearLive();
     }
 });
 
@@ -1516,6 +1521,10 @@ document.getElementById('btn-export-mermaid')?.addEventListener('click', () => v
 // can't be evaluated statically, so each guarded branch is its own button.
 let simMode = false;
 let simConfig = new Set<string>();
+// Live-debugger overlay: the active configuration of a *running* machine,
+// pushed from the extension host (see paintLive / the 'liveStates' message).
+let liveMode = false;
+let liveConfig = new Set<string>();
 interface TraceEntry { label: string; leaves: string; prev: Set<string>; leaf?: string }
 const simTrace: TraceEntry[] = [];
 
@@ -1571,6 +1580,57 @@ function paintSim(): void {
             if (e.labelG) { e.labelG.setAttribute('opacity', '0.12'); }
         }
     }
+}
+
+// Live-debugger overlay — same visual language as the simulator, but the active
+// configuration comes from a running machine (pushed by the extension host as a
+// list of diagram node ids), not from a static walk.
+function paintLive(): void {
+    for (const id of nodeRectById.keys()) {
+        const rect = nodeRectById.get(id);
+        if (!rect) { continue; }
+        const base = nodeStyle(id);
+        const active = liveConfig.has(id);
+        rect.setAttribute('fill', base.fill);
+        rect.setAttribute('stroke', active ? C.simActive : base.stroke);
+        rect.setAttribute('stroke-width', String(active ? 3 : base.sw));
+        rect.setAttribute('stroke-opacity', active ? '1' : String(base.so));
+        rect.setAttribute('opacity', active ? '1' : '0.4');
+    }
+    resetEdgeStyles();
+    const mine = new Set<EdgeEntry>();
+    for (const id of liveConfig) { for (const e of (nodeEdgeMap.get(id) ?? [])) { mine.add(e); } }
+    for (const e of allEdges) {
+        if (mine.has(e)) {
+            e.path.setAttribute('opacity', '1');
+            e.path.setAttribute('stroke-opacity', '0.95');
+            e.path.setAttribute('stroke-width', '2');
+        } else {
+            e.path.setAttribute('opacity', '0.1');
+            if (e.labelG) { e.labelG.setAttribute('opacity', '0.12'); }
+        }
+    }
+}
+
+// Fold any active node hidden inside a collapsed ancestor onto that visible
+// ancestor, so a collapsed compound still lights up when its child is active.
+function setLiveConfig(ids: string[]): void {
+    liveMode = true;
+    liveConfig = new Set(ids.map(visibleEndpoint));
+    paintLive();
+}
+
+function clearLive(): void {
+    if (!liveMode) { return; }
+    liveMode = false;
+    liveConfig.clear();
+    // paintLive dimmed inactive rects via `opacity`, which applyNodeStyle
+    // doesn't touch — clear it explicitly, mirroring exitSimMode.
+    for (const id of nodeRectById.keys()) {
+        nodeRectById.get(id)?.setAttribute('opacity', '1');
+        applyNodeStyle(id);
+    }
+    resetEdgeStyles();
 }
 
 function renderSimPanel(): void {

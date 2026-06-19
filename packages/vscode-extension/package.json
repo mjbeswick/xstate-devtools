@@ -90,6 +90,23 @@
     ],
     "commands": [
       {
+        "command": "xstateDebugger.connect",
+        "title": "Connect Live Debugger",
+        "category": "XState Debugger",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "xstateDebugger.disconnect",
+        "title": "Disconnect Live Debugger",
+        "category": "XState Debugger",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "xstateDebugger.toggle",
+        "title": "Toggle Live Debugger Connection",
+        "category": "XState Debugger"
+      },
+      {
         "command": "xstateMachineOutline.refresh",
         "title": "Refresh XState Outline",
         "icon": "$(refresh)"
@@ -330,6 +347,11 @@
     "configuration": {
       "title": "XState Outline",
       "properties": {
+        "xstateOutline.debuggerUrl": {
+          "type": "string",
+          "default": "ws://127.0.0.1:9301",
+          "description": "WebSocket URL of the running app's XState server adapter (createServerAdapter) that the live debugger connects to."
+        },
         "xstateOutline.defaultScope": {
           "type": "string",
           "enum": [
@@ -741,11 +763,15 @@
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "@vscode/codicons": "^0.0.45",
+    "@types/ws": "^8.18.1",
     "esbuild": "^0.17.6",
     "eslint": "^8.0.0",
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "elkjs": "^0.11.1"
+    "@xstate-devtools/panel-core": "*",
+    "@xstate-devtools/protocol": "*",
+    "elkjs": "^0.11.1",
+    "ws": "^8.20.0"
   }
 }
