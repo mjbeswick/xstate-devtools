@@ -219,10 +219,18 @@ hook pointing at the dead original. **Resolve the ownership story before writing
       snapshot exists; actors without the restorable hook are a documented no-op.
 - [x] Tests: adapter restore-registry routing (register/cross-source/unregister). Update
       README "Live rewind (experimental)". Commit: `feat: experimental live rewind`.
+- [x] **Example wiring + end-to-end smoke test.** `InspectorProvider` gained an optional
+      `adapter` prop (reuse an existing singleton; only self-created adapters are disposed).
+      `example-remix` now wraps the app in `<InspectorProvider adapter={adapter}>` and the
+      Player Machine card uses `useRestorableInspectedMachine`. Verified end to end with a
+      headless Chrome (Playwright) driving the real `window` transport: drive player →
+      capture persisted snapshot → STOP→idle → restore → machine rewound to the captured
+      `active.playing.normal` state with `position` preserved and the actor recreated
+      (2 registrations). README "Live rewind" updated with the provider wiring.
 
-**Acceptance:** with a supported (likely standalone/server) actor, restoring re-seeds it to
-the chosen state and the panel reflects the new live actor; caveats are shown; nothing
-crashes for unsupported actor types (button disabled with explanation).
+**Acceptance:** ✅ Met — restoring re-seeds the actor to the chosen state, the panel reflects
+the new live actor, caveats are shown, and unsupported actors surface an error (button stays
+available for retry).
 
 ---
 

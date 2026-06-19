@@ -16,21 +16,33 @@ type AdapterContext = ReturnType<typeof createAdapter> | null
 
 const InspectorContext = createContext<AdapterContext>(null)
 
-export function InspectorProvider({ children }: { children: ReactNode }) {
-  const adapterRef = useRef<ReturnType<typeof createAdapter> | null>(null)
-  if (!adapterRef.current && typeof window !== 'undefined') {
-    adapterRef.current = createAdapter()
+/**
+ * Provides the inspector adapter to {@link useInspectedMachine} and
+ * {@link useRestorableInspectedMachine}. By default it creates and owns a browser
+ * adapter. Pass `adapter` to reuse an existing instance (e.g. a module singleton
+ * shared with components that call `useMachine(machine, { inspect })` directly) —
+ * provided adapters are NOT disposed on unmount, since the caller owns them.
+ */
+export function InspectorProvider({
+  children, adapter,
+}: { children: ReactNode; adapter?: AdapterContext }) {
+  const ownRef = useRef<ReturnType<typeof createAdapter> | null>(null)
+  const useOwn = adapter == null
+  if (useOwn && !ownRef.current && typeof window !== 'undefined') {
+    ownRef.current = createAdapter()
   }
+  const resolved = adapter ?? ownRef.current
 
   useEffect(() => {
+    if (!useOwn) return
     return () => {
-      adapterRef.current?.dispose()
-      adapterRef.current = null
+      ownRef.current?.dispose()
+      ownRef.current = null
     }
-  }, [])
+  }, [useOwn])
 
   return (
-    <InspectorContext.Provider value={adapterRef.current}>
+    <InspectorContext.Provider value={resolved}>
       {children}
     </InspectorContext.Provider>
   )

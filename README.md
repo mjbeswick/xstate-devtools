@@ -146,13 +146,29 @@ Restore a running machine to a previously captured state:
 2. Later, click **Restore to this state** to recreate the actor from that snapshot.
 
 Restore only works for actors wired with the opt-in hook — it owns the actor instance so it
-can recreate it (plain `useMachine` creates its actor once and ignores later snapshot changes):
+can recreate it (plain `useMachine` creates its actor once and ignores later snapshot changes).
+The hook reads the adapter from `InspectorProvider`, so wrap your app once:
 
 ```tsx
+// root.tsx — reuse the same adapter your other components pass to `useMachine`
+import { InspectorProvider } from '@xstate-devtools/adapter/react'
+import { adapter } from './inspector.client.js' // export const adapter = createAdapter()
+
+<InspectorProvider adapter={adapter}>
+  <App />
+</InspectorProvider>
+```
+
+```tsx
+// any component — opt this machine into live rewind
 import { useRestorableInspectedMachine } from '@xstate-devtools/adapter/react'
 
 const [state, send] = useRestorableInspectedMachine(myMachine)
 ```
+
+`InspectorProvider` creates and owns an adapter by default; pass `adapter` to reuse an
+existing instance (provided adapters aren't disposed on unmount). The `example-remix` app
+demonstrates this end to end — the **Player Machine** card is wired with the restorable hook.
 
 Honest caveats — this restores *machine state*, not the outside world:
 

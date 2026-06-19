@@ -5,6 +5,10 @@ import {
   Scripts,
   ScrollRestoration,
 } from '@remix-run/react'
+import { InspectorProvider } from '@xstate-devtools/adapter/react'
+// `.client` module — `adapter` is undefined during SSR; InspectorProvider falls
+// back to creating its own (a no-op on the server) when none is passed.
+import { adapter } from './inspector.client.js'
 
 export default function App() {
   return (
@@ -16,7 +20,9 @@ export default function App() {
         <Links />
       </head>
       <body style={{ fontFamily: 'system-ui, sans-serif', padding: 24 }}>
-        <Outlet />
+        <InspectorProvider adapter={adapter}>
+          <Outlet />
+        </InspectorProvider>
         <ScrollRestoration />
         <Scripts />
       </body>

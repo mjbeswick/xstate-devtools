@@ -1,15 +1,21 @@
-import { useMachine } from '@xstate/react'
+import { useRestorableInspectedMachine } from '@xstate-devtools/adapter/react'
 import { playerMachine } from '../machines/player.machine.js'
-import { inspect } from '../inspector.client.js'
 
 export function MediaPlayer() {
-  const [state, send] = useMachine(playerMachine, { inspect })
+  // Opts this machine into live rewind: Capture a persisted snapshot in the
+  // DevTools panel, then "Restore to this state" to recreate the actor here.
+  const [state, send] = useRestorableInspectedMachine(playerMachine)
   const showBuffer = state.matches('buffering')
     || (state.context.bufferProgress > 0 && state.context.bufferProgress < 100)
 
   return (
     <div style={{ border: '1px solid #eee', padding: 16, borderRadius: 8 }}>
-      <h3>Player Machine — state: <code>{JSON.stringify(state.value)}</code></h3>
+      <h3>
+        Player Machine — state: <code>{JSON.stringify(state.value)}</code>
+        <span style={{ fontSize: 11, fontWeight: 400, color: '#722ed1', marginLeft: 8 }}>
+          ⏮ live-rewind enabled
+        </span>
+      </h3>
       <p style={{ fontSize: 12, color: '#666', margin: '4px 0 8px' }}>
         Position: {state.context.position}s / {state.context.duration}s | Vol: {state.context.volume}% | Rate: {state.context.rate}×
       </p>
