@@ -60,6 +60,28 @@ export interface EventRecord {
   globalSeq: number
 }
 
+// ── Session export / import ────────────────────────────────────────────────────
+
+export const SESSION_FORMAT_VERSION = 1
+
+/**
+ * Serializable snapshot of a captured debug session — the event log plus the
+ * actors and their (display) snapshots. Re-importable into the panel as a
+ * read-only replay. Note: these are lossy *display* snapshots, not XState
+ * persisted snapshots, so a session is for inspection/sharing, not for
+ * restoring a live machine.
+ */
+export interface SessionExportV1 {
+  formatVersion: 1
+  exportedAt: number
+  source: 'live-capture'
+  actors: ActorRecord[]
+  registeredSnapshots: Array<[string, SerializedSnapshot]>
+  events: EventRecord[]
+}
+
+export type SessionExport = SessionExportV1
+
 // ── Message protocol ──────────────────────────────────────────────────────────
 
 // page (injected world) → content script → service worker → panel

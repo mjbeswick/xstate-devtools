@@ -16,10 +16,11 @@ function findNode(root: SerializedStateNode, id: string): SerializedStateNode | 
 }
 
 function TransitionRow({
-  transition, onSend,
+  transition, onSend, disabled,
 }: {
   transition: SerializedTransition
   onSend: (eventType: string) => void
+  disabled?: boolean
 }) {
   return (
     <div style={{
@@ -40,9 +41,11 @@ function TransitionRow({
       {transition.eventType && (
         <button
           onClick={() => onSend(transition.eventType)}
+          disabled={disabled}
           style={{
-            padding: '2px 8px', fontSize: 11, cursor: 'pointer',
-            background: '#1890ff', color: '#fff', border: 'none', borderRadius: 4,
+            padding: '2px 8px', fontSize: 11, cursor: disabled ? 'default' : 'pointer',
+            background: disabled ? '#bfbfbf' : '#1890ff', color: '#fff',
+            border: 'none', borderRadius: 4,
           }}
         >
           Send
@@ -56,6 +59,7 @@ export function SidePanel() {
   const selectedActorId = useStore((s) => s.selectedActorId)
   const selectedStateNodeId = useStore((s) => s.selectedStateNodeId)
   const actors = useStore((s) => s.actors)
+  const replayMode = useStore((s) => s.replayMode)
   const snapshot = useStore((s) =>
     selectedActorId ? getDisplaySnapshot(s, selectedActorId) : null
   )
@@ -72,7 +76,7 @@ export function SidePanel() {
     : null
 
   const dispatch = useCallback((eventType: string) => {
-    if (!selectedActorId) return
+    if (!selectedActorId || replayMode) return
     let payload: Record<string, unknown> = {}
     try {
       payload = JSON.parse(payloadJson)
@@ -86,7 +90,7 @@ export function SidePanel() {
       sessionId: selectedActorId,
       event: { type: eventType, ...payload },
     })
-  }, [selectedActorId, payloadJson, dispatch_])
+  }, [selectedActorId, payloadJson, dispatch_, replayMode])
 
   if (!actor) {
     return (
@@ -104,7 +108,7 @@ export function SidePanel() {
         {node && node.on.length > 0 ? (
           <>
             {node.on.map((t, i) => (
-              <TransitionRow key={i} transition={t} onSend={dispatch} />
+              <TransitionRow key={i} transition={t} onSend={dispatch} disabled={replayMode} />
             ))}
             {node.always.length > 0 && (
               <>
@@ -123,6 +127,14 @@ export function SidePanel() {
       </AccordionSection>
 
       <AccordionSection title="Send event">
+        {replayMode && (
+          <div style={{
+            fontSize: 11, color: '#722ed1', background: '#f9f0ff',
+            border: '1px solid #efdbff', borderRadius: 4, padding: '4px 8px', marginBottom: 8,
+          }}>
+            Disabled during replay — no live actor to receive events.
+          </div>
+        )}
         <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>PAYLOAD (JSON)</div>
         <textarea
           value={payloadJson}
@@ -149,9 +161,11 @@ export function SidePanel() {
           />
           <button
             onClick={() => customEventType && dispatch(customEventType)}
+            disabled={replayMode}
             style={{
-              padding: '2px 10px', fontSize: 11, cursor: 'pointer',
-              background: '#52c41a', color: '#fff', border: 'none', borderRadius: 4,
+              padding: '2px 10px', fontSize: 11, cursor: replayMode ? 'default' : 'pointer',
+              background: replayMode ? '#bfbfbf' : '#52c41a', color: '#fff',
+              border: 'none', borderRadius: 4,
             }}
           >
             Send
@@ -177,7 +191,7 @@ export function SidePanel() {
       >
         <div style={{ fontSize: 11 }}>
           <div>State: <strong>{snapshot?.status ?? 'unknown'}</strong></div>
-          {snapshot?.error && (
+          {snapshot?.error != null && (
             <pre style={{
               fontSize: 10, marginTop: 4, background: '#fff1f0', color: '#a8071a',
               padding: 6, borderRadius: 4, overflow: 'auto',

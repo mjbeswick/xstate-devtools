@@ -2,7 +2,7 @@
 import { create } from 'zustand'
 import type {
   ActorRecord, EventRecord, SerializedStateNode,
-  PageToExtensionMessage, SerializedSnapshot,
+  PageToExtensionMessage, SerializedSnapshot, SessionExport,
 } from '../shared/types.js'
 
 const MAX_EVENTS = 500
@@ -17,6 +17,11 @@ export interface InspectorStore {
   timeTravelSeq: number | null   // null = live; number = frozen at that seq
   treeFilter: string
 
+  /** When true, the store holds an imported session and ignores live messages. */
+  replayMode: boolean
+  /** Label for the loaded session (e.g. file name), shown in the replay banner. */
+  replayName: string | null
+
   // Message handler — call this from the port listener
   handleMessage: (msg: PageToExtensionMessage) => void
 
@@ -24,6 +29,11 @@ export interface InspectorStore {
   selectStateNode: (id: string | null) => void
   timeTravel: (seq: number | null) => void
   setTreeFilter: (filter: string) => void
+
+  /** Replace store contents with an imported session and enter replay mode. */
+  loadSession: (data: SessionExport, name: string) => void
+  /** Leave replay mode and reset to an empty live state. */
+  exitReplay: () => void
 }
 
 /** Pure function — use as a Zustand selector: useStore(s => getDisplaySnapshot(s, id)) */
@@ -52,9 +62,14 @@ export const useStore = create<InspectorStore>((set, get) => ({
   selectedStateNodeId: null,
   timeTravelSeq: null,
   treeFilter: '',
+  replayMode: false,
+  replayName: null,
 
   handleMessage(msg) {
     set((state) => {
+      // In replay mode the store holds a frozen imported session — drop live data.
+      if (state.replayMode) return state
+
       const actors = new Map(state.actors)
       const registeredSnapshots = new Map(state.registeredSnapshots)
       const events = [...state.events]
@@ -129,5 +144,37 @@ export const useStore = create<InspectorStore>((set, get) => ({
 
   setTreeFilter(filter) {
     set({ treeFilter: filter })
+  },
+
+  loadSession(data, name) {
+    const actors = new Map(data.actors.map((a) => [a.sessionId, a]))
+    const registeredSnapshots = new Map(data.registeredSnapshots)
+    const firstActor = data.actors[0]?.sessionId ?? null
+    set({
+      actors,
+      registeredSnapshots,
+      events: data.events,
+      replayMode: true,
+      replayName: name,
+      // Land at the end of the recording (final captured state).
+      timeTravelSeq: null,
+      selectedActorId: firstActor,
+      selectedStateNodeId: null,
+      treeFilter: '',
+    })
+  },
+
+  exitReplay() {
+    set({
+      actors: new Map(),
+      registeredSnapshots: new Map(),
+      events: [],
+      replayMode: false,
+      replayName: null,
+      timeTravelSeq: null,
+      selectedActorId: null,
+      selectedStateNodeId: null,
+      treeFilter: '',
+    })
   },
 }))

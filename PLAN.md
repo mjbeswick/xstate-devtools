@@ -121,28 +121,21 @@ export interface SessionExportV1 {
 }
 ```
 
-- [ ] Add `SessionExportV1` + a `SESSION_FORMAT_VERSION = 1` const to `types.ts`.
-- [ ] **Serializer/deserializer** in a new `src/panel/session-io.ts`:
-      `exportSession(state): SessionExportV1` and
-      `importSession(json: unknown): SessionExportV1` (validate `formatVersion`, shape;
-      throw a clear error on mismatch).
-- [ ] **Store actions** in `store.ts`:
-      - `loadSession(data: SessionExportV1)` — replace `actors`/`registeredSnapshots`/
-        `events`, set a new flag `replayMode: boolean = true`, and set `timeTravelSeq` to
-        the last event's seq so the user lands at the end of the recording.
-      - `clearReplay()` — wipe loaded data, `replayMode = false`, return to live.
-      - Add `replayMode: boolean` to `InspectorStore` (default `false`).
-- [ ] **Replay isolation.** When `replayMode === true`, `handleMessage` must IGNORE
-      incoming live messages (otherwise a live app pollutes the replay). Guard the top of
-      `handleMessage`. The banner from Phase 1 should switch to a **"Replay: <file> —
-      Exit replay"** variant in replay mode.
-- [ ] **UI controls.** Add an "Export" + "Import" pair near the `ServerStatusBar` or in a
-      small toolbar. Export → `Blob` + `URL.createObjectURL` download named
-      `xstate-session-<timestamp>.json`. Import → hidden `<input type="file">` →
-      `importSession` → `loadSession`. On import error, show the message inline.
-- [ ] **Disable dispatch in replay.** The "Send event" UI in `SidePanel` must be disabled
-      (or hidden) when `replayMode` — there is no live actor to receive it.
-- [ ] Update README with "Save & replay sessions". Commit: `feat(panel): export/import debug sessions`.
+- [x] Add `SessionExportV1` + a `SESSION_FORMAT_VERSION = 1` const to `types.ts`.
+- [x] **Serializer/deserializer** in `src/panel/session-io.ts`: `exportSession(state, now)`
+      and `importSession(json)` (validates `formatVersion` + array shapes, throws clear errors).
+- [x] **Store actions** in `store.ts`: `loadSession(data, name)` (enters replay, lands at
+      final state with `timeTravelSeq = null`), `exitReplay()` (resets to empty live state),
+      and `replayMode` / `replayName` fields.
+- [x] **Replay isolation.** `handleMessage` early-returns when `replayMode`. Replay state is
+      surfaced in the new `SessionControls` bar ("● Replay <file> · N events · Exit replay").
+- [x] **UI controls.** `SessionControls` in `App.tsx`: Export → Blob download
+      `xstate-session-<ts>.json`; Import → hidden file input → `importSession` → `loadSession`,
+      with inline error display.
+- [x] **Disable dispatch in replay.** `SidePanel` Send buttons disabled + a "Disabled during
+      replay" note; the dispatch callback bails when `replayMode`.
+- [x] Tests: `session-io.test.ts` (round-trip + validation) and replay-mode store tests.
+      Update README. Commit: `feat(panel): export/import debug sessions`.
 
 **Acceptance:** run an app, capture events, Export → JSON file downloads; reload the panel
 (or a fresh one), Import the file → events/diagram/time-travel all work read-only; live

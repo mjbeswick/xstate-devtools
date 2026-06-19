@@ -10,7 +10,8 @@ Chrome DevTools extension for inspecting XState v5 machines at runtime — both 
 - **Machine tree** with active-state highlighting and source-link to your editor
 - **Active-state breadcrumb** under the title (selected node only)
 - **Side panel** with stacked accordion sections: Transitions, Send event, Context (interactive JSON viewer), Status, Actor info
-- **Event log** with filter, click-to-time-travel, and live "back to live"
+- **Event log** with filter, click-to-time-travel, keyboard stepping (`←`/`→`/`Esc`), and live "back to live"
+- **Session export / import** — save the event log to JSON and replay it later, read-only
 - **Server-side bridge** — a single `createServerAdapter()` call exposes Node actors to the panel via WebSocket
 - **Resizable, collapsible** three-column + drawer layout (Chrome DevTools style)
 
@@ -120,9 +121,21 @@ Defined in `packages/chrome-extension/src/shared/types.ts`. Same protocol on bot
 - Events newer than the selected point are dimmed in the log so the timeline split is visible
 - Bounded ring buffer (500 events) — `timeTravelSeq` clamps to the oldest retained event when older entries evict
 
+## Save & replay sessions
+
+- **Export** writes the captured session (actors, snapshots, and the full event log) to a
+  JSON file — useful for attaching a bug repro to an issue or sharing it with a teammate
+- **Import** loads a session file into the panel as a read-only **replay**: time travel,
+  the state tree, and the event log all work, but live messages are ignored and event
+  dispatch is disabled until you **Exit replay**
+- Exports contain only the retained event window (see the 500-event cap below)
+- These are lossy *display* snapshots, not XState persisted snapshots — a session is for
+  inspection and sharing, not for restoring a live machine
+
 ## Limitations
 
 - Bounded event history (500 events) — older events are evicted; time travel clamps to the oldest retained event
+- Session export captures only the retained event window — events evicted before export are not included
 - Server adapter requires `ws` to be installed by the consumer (not bundled)
 - Machine source-link uses `vscode://file/...` — works in VS Code; other editors need a custom URL handler
 

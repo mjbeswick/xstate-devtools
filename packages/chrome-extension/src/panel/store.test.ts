@@ -27,6 +27,8 @@ beforeEach(() => {
     selectedActorId: null,
     selectedStateNodeId: null,
     timeTravelSeq: null,
+    replayMode: false,
+    replayName: null,
   })
 })
 
@@ -165,5 +167,69 @@ describe('selection', () => {
     useStore.getState().selectStateNode('test.idle')
     useStore.getState().selectActor('a2')
     expect(useStore.getState().selectedStateNodeId).toBeNull()
+  })
+})
+
+describe('replay mode', () => {
+  function seed() {
+    const { handleMessage } = useStore.getState()
+    handleMessage({
+      type: 'XSTATE_ACTOR_REGISTERED',
+      sessionId: 'a1', machine: mockMachine, snapshot: snap('idle'),
+      globalSeq: 1, timestamp: 1000,
+    })
+    handleMessage({
+      type: 'XSTATE_EVENT', sessionId: 'a1', event: { type: 'START' },
+      snapshotAfter: snap('running'), timestamp: 2000, globalSeq: 2,
+    })
+  }
+
+  it('loadSession enters replay and populates the store', () => {
+    useStore.getState().loadSession({
+      formatVersion: 1, exportedAt: 0, source: 'live-capture',
+      actors: [{
+        sessionId: 'a1', machine: mockMachine, snapshot: snap('running'),
+        status: 'active', registeredAt: 0, registeredAtSeq: 1,
+      }],
+      registeredSnapshots: [['a1', snap('idle')]],
+      events: [{ sessionId: 'a1', event: { type: 'START' }, snapshotAfter: snap('running'), timestamp: 2000, globalSeq: 2 }],
+    }, 'demo.json')
+
+    const s = useStore.getState()
+    expect(s.replayMode).toBe(true)
+    expect(s.replayName).toBe('demo.json')
+    expect(s.actors.get('a1')?.snapshot.value).toBe('running')
+    expect(s.selectedActorId).toBe('a1')
+  })
+
+  it('ignores live messages while in replay', () => {
+    seed()
+    useStore.setState({ replayMode: true })
+    useStore.getState().handleMessage({
+      type: 'XSTATE_EVENT', sessionId: 'a1', event: { type: 'STOP' },
+      snapshotAfter: snap('idle'), timestamp: 3000, globalSeq: 3,
+    })
+    // Event dropped — still 1 event, snapshot unchanged
+    expect(useStore.getState().events).toHaveLength(1)
+    expect(useStore.getState().actors.get('a1')?.snapshot.value).toBe('running')
+  })
+
+  it('exitReplay clears the session and resumes live ingest', () => {
+    seed()
+    useStore.setState({ replayMode: true, replayName: 'x.json' })
+    useStore.getState().exitReplay()
+    const s = useStore.getState()
+    expect(s.replayMode).toBe(false)
+    expect(s.replayName).toBeNull()
+    expect(s.actors.size).toBe(0)
+    expect(s.events).toHaveLength(0)
+
+    // Live ingest works again
+    useStore.getState().handleMessage({
+      type: 'XSTATE_ACTOR_REGISTERED',
+      sessionId: 'b1', machine: mockMachine, snapshot: snap('idle'),
+      globalSeq: 10, timestamp: 1,
+    })
+    expect(useStore.getState().actors.get('b1')?.sessionId).toBe('b1')
   })
 })
