@@ -401,6 +401,11 @@ export class DebuggerController implements vscode.Disposable {
         this.log.show(true);
     }
 
+    /** Append a diagnostic line (used by the webview view to trace its lifecycle). */
+    logLine(message: string): void {
+        this.log.appendLine(`[${stamp()}] ${message}`);
+    }
+
     dispose(): void {
         this.unsubscribeStore?.();
         this.client?.dispose();

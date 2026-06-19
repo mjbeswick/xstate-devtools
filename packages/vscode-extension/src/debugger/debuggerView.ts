@@ -20,6 +20,7 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
     ) {}
 
     resolveWebviewView(webviewView: vscode.WebviewView): void {
+        this.controller.logLine('debugger view resolved');
         this.view = webviewView;
         webviewView.webview.options = {
             enableScripts: true,
@@ -28,6 +29,7 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
         webviewView.webview.html = this.getHtml(webviewView.webview);
 
         webviewView.webview.onDidReceiveMessage((msg) => {
+            this.controller.logLine(`webview → ${msg?.command ?? '(unknown)'}`);
             switch (msg?.command) {
                 case 'selectActor': this.controller.selectActor(msg.sessionId ?? null); return;
                 case 'connect': this.controller.connect(); return;

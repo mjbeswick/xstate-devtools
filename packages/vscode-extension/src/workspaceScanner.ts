@@ -1,6 +1,19 @@
 import * as vscode from 'vscode';
 import { XStateMachineParser, MachineNode } from './parser';
 
+// Directories that hold generated/compiled copies of source — scanning them
+// surfaces the same machine several times (e.g. an `auth` machine shows up once
+// from `app/` and again from each `build/` bundle). Exclude them everywhere we
+// scan or watch.
+const IGNORED_DIRS = ['node_modules', 'build', 'dist', 'out', '.next', '.nuxt', '.svelte-kit', '.vite', '.turbo', '.cache', 'coverage'];
+export const SCAN_EXCLUDE_GLOB = `**/{${IGNORED_DIRS.join(',')}}/**`;
+
+/** True if a file sits inside a generated/ignored directory. */
+export function isIgnoredPath(uri: vscode.Uri): boolean {
+    const segments = uri.path.split('/');
+    return segments.some((seg) => IGNORED_DIRS.includes(seg));
+}
+
 export interface FileMachines {
     uri: vscode.Uri;
     relativePath: string;
@@ -40,7 +53,7 @@ export class WorkspaceScanner {
             // Find all JS/TS files in workspace
             const files = await vscode.workspace.findFiles(
                 '**/*.{ts,tsx,js,jsx}',
-                '**/node_modules/**'
+                SCAN_EXCLUDE_GLOB
             );
 
             this.log(`Found ${files.length} JS/TS files to scan`);
@@ -104,6 +117,7 @@ export class WorkspaceScanner {
      * Update a single file in the cache
      */
     async updateFile(uri: vscode.Uri): Promise<void> {
+        if (isIgnoredPath(uri)) { return; }
         try {
             const document = await vscode.workspace.openTextDocument(uri);
             this.updateDocument(document);
