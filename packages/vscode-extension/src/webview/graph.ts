@@ -893,8 +893,11 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
         for (let i = 0; i < L.lines.length; i++) {
             // Event/guard labels are primary semantic content — full foreground
             // contrast, not the dimmed description colour.
-            const lineEl = txt(L.lines[i], bx + L.w / 2, by + padTop + (i + 0.5) * ACTION_LINE_H, {
-                'text-anchor': 'middle', 'dominant-baseline': 'central',
+            // Left-align so the event and its `/ actions` row start at the same
+            // edge and read top-to-bottom like code (rect is inset 2px; +6 keeps
+            // ~8px of padding on each side of the widest line).
+            const lineEl = txt(L.lines[i], bx + 6, by + padTop + (i + 0.5) * ACTION_LINE_H, {
+                'text-anchor': 'start', 'dominant-baseline': 'central',
                 'font-size': ACTION_PX, fill: C.fg,
             });
             lineEl.setAttribute('data-event', L.lines[i]);
@@ -938,7 +941,7 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
             (g as SVGElement).style.cursor = 'pointer';
             g.appendChild(el('rect', { x: cxp - lw / 2 - 2, y: by, width: lw + 4, height: lines.length * ACTION_LINE_H + 4, rx: 3, ry: 3, fill: C.bg, 'fill-opacity': 1, stroke: C.fg, 'stroke-width': 0.5, 'stroke-opacity': 0.12 }));
             for (let i = 0; i < lines.length; i++) {
-                const t = txt(lines[i], cxp, by + (i + 0.5) * ACTION_LINE_H + ACTION_LINE_H / 2, { 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': ACTION_PX, fill: C.fg });
+                const t = txt(lines[i], cxp - lw / 2 + 6, by + (i + 0.5) * ACTION_LINE_H + ACTION_LINE_H / 2, { 'text-anchor': 'start', 'dominant-baseline': 'central', 'font-size': ACTION_PX, fill: C.fg });
                 t.setAttribute('data-event', lines[i]);
                 g.appendChild(t);
             }
