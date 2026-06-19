@@ -56,6 +56,19 @@ A dedicated **Errors** view collects every problem the static analyzer finds acr
 - **Generate Setup Stubs** — right-click a machine → scaffold a `setup({ actions, guards, actors, delays })` block with a typed stub for every implementation the machine references, each flagged as already in `setup()` or missing from it (XState built-ins like `assign`/`not` are skipped)
 - **Focus mode** — open the diagram on a compound state to see just that subtree
 
+### 🐞 Live debugger
+- **Attach to a running app** — connect to a Node/SSR app that uses the `@xstate-devtools/adapter` server adapter (`createServerAdapter()`, default `ws://127.0.0.1:9301`) straight from the editor. Connect/disconnect from the **status-bar item** or the **XState Debugger** view; the connection auto-reconnects if the app restarts
+- **Live on the diagram** — the open statechart diagram lights up with the machine's **real** active state as it runs — unlike the static simulator, this is the actual resolved path, with real guard outcomes and context
+- **Actor inspector** — a live tree of running actors (parent → child), and for the selected actor: its status, active state(s), and a JSON view of its **real context**
+- **Event log** — every event the machine receives, with timestamp and sequence number
+- **Time travel** — click any event to freeze the diagram and inspector at that point in history; **Back to live** resumes. Pure client-side replay — it never touches the running app
+- **Send events** — fire any of the current state's outgoing transitions with one click, or send a custom event with a JSON payload
+- **Persisted snapshots** — capture an actor's persisted snapshot, and (for actors wired with `useRestorableInspectedMachine`) **restore** it to rewind the live actor
+- **Record & replay** — export the captured session to a JSON file and re-import it later as a read-only replay
+- **Works alongside the VS Code debugger** — the WebSocket attach is independent of the V8 inspector, so you can set breakpoints in an action/guard and inspect state/event flow at the same time (live updates pause while the process is paused at a breakpoint, then flush on resume)
+
+> Scope: Node/SSR actors over the WebSocket server adapter. For browser-app inspection, use the companion Chrome DevTools extension.
+
 ## Reading the diagram
 
 ![A parallel checkout machine rendered as a statechart, with two concurrent regions, entry/exit actions, guarded transitions, and final states](https://github.com/mjbeswick/xstate-devtools/raw/main/packages/vscode-extension/images/checkout.png)
@@ -161,6 +174,7 @@ const machine = setup({
 
 | Setting | Default | Description |
 | --- | --- | --- |
+| `xstateOutline.debuggerUrl` | `ws://127.0.0.1:9301` | WebSocket URL of the running app's XState server adapter (`createServerAdapter`) that the live debugger connects to |
 | `xstateOutline.defaultScope` | `workspace` | Scan the current file only, or the whole workspace |
 | `xstateOutline.defaultViewMode` | `flat` | Flat list of machines, or grouped by file |
 | `xstateOutline.showStateConfigs` | `false` | Include `createStateConfig`/`stateConfig` patterns in the outline |

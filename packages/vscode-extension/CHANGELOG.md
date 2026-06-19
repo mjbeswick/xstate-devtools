@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.16.0] - 2026-06-19
+
+### Added
+- **Live debugger** — attach to a running Node/SSR app that uses the `@xstate-devtools/adapter` server adapter (`createServerAdapter()`, default `ws://127.0.0.1:9301`) directly from the editor:
+  - The open statechart **diagram lights up with the real active state** as the machine runs (actual resolved path, real guards/context — not the static simulator's every-branch enumeration).
+  - A new **XState Debugger** sidebar view with a live actor tree, the selected actor's status / active state / real context, and an event log.
+  - **Time travel** — click any event to freeze the diagram and inspector at that point; "Back to live" resumes. Pure client-side replay.
+  - **Send events** — fire the current state's outgoing transitions, or a custom event with a JSON payload.
+  - **Persisted snapshots** — capture and (for actors wired with `useRestorableInspectedMachine`) restore.
+  - **Session export / import** — save a captured session to JSON and replay it read-only.
+  - **Status-bar indicator** with connect/disconnect and auto-reconnect; new `xstateOutline.debuggerUrl` setting.
+  - Works alongside the VS Code (V8) debugger — independent transports, so breakpoints and live state inspection compose.
+
 ## [1.15.2] - 2026-06-18
 
 ### Fixed
