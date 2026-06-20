@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" aria-label="Icon of xstate debugger" role="img" width="500" height="500" viewBox="0 0 68 68">
+  <title>xstate debugger</title>
+  <defs>
+    <!-- Punch a clear gap in the bottom-right corner so the bug badge reads
+         separately from the X (single-colour silhouette, so the gap = no fill). -->
+    <mask id="badge-cut">
+      <rect width="68" height="68" fill="white"/>
+      <circle cx="54" cy="55" r="18" fill="black"/>
+    </mask>
+  </defs>
+  <g fill="currentColor" fill-rule="evenodd">
+    <g mask="url(#badge-cut)">
+      <path d="M 2.16 0 L 15.645 0.11 C 16.957 0.121 18.19 0.735 18.991 1.774 L 67.165 64.152 C 68.257 65.564 67.255 67.619 65.476 67.619 L 51.36 67.619 C 50.025 67.618 48.767 66.993 47.96 65.93 L 34.523 47.452 L 19.653 65.988 C 18.843 67.017 17.606 67.619 16.296 67.619 L 2.143 67.619 C 0.355 67.619 -0.644 65.545 0.465 64.136 L 24.054 34.115 L 0.444 3.455 C -0.636 2.036 0.382 -0.013 2.162 0.002 L 2.16 0 Z M 65.46 0 C 67.256 -0.014 68.269 2.068 67.155 3.483 L 46.104 30.21 C 44.604 29.023 32.951 19.22 44.192 6.095 L 45.926 4.055 L 46.24 3.685 C 46.971 2.823 47.667 2 47.879 1.743 C 48.99 0.39 49.905 0.12 51.202 0.11 L 65.459 0 L 65.46 0 Z"></path>
+    </g>
+  </g>
+  <!-- Bug badge centred in the corner gap. -->
+  <g stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+    <!-- antennae -->
+    <line x1="51" y1="45" x2="48" y2="41"/>
+    <line x1="57" y1="45" x2="60" y2="41"/>
+    <!-- legs (left / right) -->
+    <line x1="46" y1="52" x2="41" y2="49"/>
+    <line x1="46" y1="56" x2="41" y2="57"/>
+    <line x1="46" y1="60" x2="42" y2="64"/>
+    <line x1="62" y1="52" x2="67" y2="49"/>
+    <line x1="62" y1="56" x2="67" y2="57"/>
+    <line x1="62" y1="60" x2="66" y2="64"/>
+  </g>
+  <g fill="currentColor">
+    <!-- head + body -->
+    <circle cx="54" cy="46" r="3.4"/>
+    <ellipse cx="54" cy="56" rx="8" ry="10"/>
+  </g>
+</svg>

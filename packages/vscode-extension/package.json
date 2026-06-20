@@ -774,7 +774,7 @@
         {
           "id": "xstate-debugger",
           "title": "XState Debugger",
-          "icon": "$(callstack-view-session)"
+          "icon": "resources/debugger.svg"
         }
       ],
       "panel": [
