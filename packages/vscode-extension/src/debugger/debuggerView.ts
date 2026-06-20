@@ -1,26 +1,34 @@
 // packages/vscode-extension/src/debugger/debuggerView.ts
 //
-// The "XState Debugger" sidebar webview view: live actor list, the selected
-// actor's status / active state / context, and the recent event log. It is a
-// thin renderer — all state lives in the DebuggerController's shared store; the
-// controller pushes a DebuggerViewModel here, and this view posts back user
-// intents (select actor, connect, disconnect).
+// Webview view provider for the live debugger UI. One class backs two views,
+// selected by `role`:
+//   - 'debugger' (own activity-bar container): machine-instance tree + inspector
+//     + dispatch + persisted snapshot.
+//   - 'events'  (bottom panel): the event log + time-travel controls.
+// Both are thin renderers — all state lives in the DebuggerController's shared
+// store; the controller pushes a DebuggerViewModel to every registered view, and
+// the views post back user intents. The shared bundled script
+// (out/webview/debugger.js) renders the role-appropriate slice based on the
+// injected window.__ROLE__.
 import * as vscode from 'vscode';
 import type { DebuggerController, DebuggerView, DebuggerViewModel } from './debuggerController';
 
+export type DebuggerViewRole = 'debugger' | 'events';
+
 export class DebuggerViewProvider implements vscode.WebviewViewProvider, DebuggerView {
-    public static readonly viewType = 'xstateDebugger';
+    public static readonly debuggerViewType = 'xstateDebugger';
+    public static readonly eventsViewType = 'xstateEventsLog';
 
     private view: vscode.WebviewView | null = null;
-    private lastModel: DebuggerViewModel | null = null;
 
     constructor(
         private readonly extensionUri: vscode.Uri,
         private readonly controller: DebuggerController,
+        private readonly role: DebuggerViewRole,
     ) {}
 
     resolveWebviewView(webviewView: vscode.WebviewView): void {
-        this.controller.logLine('debugger view resolved');
+        this.controller.logLine(`${this.role} view resolved`);
         this.view = webviewView;
         webviewView.webview.options = {
             enableScripts: true,
@@ -29,7 +37,7 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
         webviewView.webview.html = this.getHtml(webviewView.webview);
 
         webviewView.webview.onDidReceiveMessage((msg) => {
-            this.controller.logLine(`webview → ${msg?.command ?? '(unknown)'}`);
+            this.controller.logLine(`webview(${this.role}) → ${msg?.command ?? '(unknown)'}`);
             switch (msg?.command) {
                 case 'selectActor': this.controller.selectActor(msg.sessionId ?? null); return;
                 case 'connect': this.controller.connect(); return;
@@ -40,21 +48,20 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
                 case 'capture': this.controller.capturePersisted(); return;
                 case 'restore': void this.controller.restore(); return;
                 case 'exitReplay': this.controller.exitReplay(); return;
-                case 'jserror': this.controller.logLine(`webview JS error: ${msg.error}`); return;
-                case 'ready': if (this.lastModel) { this.post(this.lastModel); } return;
+                case 'jserror': this.controller.logLine(`webview(${this.role}) JS error: ${msg.error}`); return;
+                case 'ready': this.post(this.controller.getLastModel()); return;
             }
         });
 
         webviewView.onDidDispose(() => {
             if (this.view === webviewView) { this.view = null; }
-            this.controller.setView(null);
+            this.controller.removeView(this);
         });
 
-        this.controller.setView(this);
+        this.controller.addView(this);
     }
 
     postModel(model: DebuggerViewModel): void {
-        this.lastModel = model;
         this.post(model);
     }
 
@@ -134,10 +141,11 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
 <body>
   <div class="bar">
     <span id="dot" class="dot idle"></span>
-    <span id="status" class="status">Not connected (build E)</span>
+    <span id="status" class="status">Not connected (build F)</span>
     <button id="toggle">Connect</button>
   </div>
   <div id="body"></div>
+<script nonce="${nonce}">window.__ROLE__ = ${JSON.stringify(this.role)};</script>
 <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

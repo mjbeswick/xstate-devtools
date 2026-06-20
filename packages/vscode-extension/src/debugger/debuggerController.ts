@@ -80,7 +80,8 @@ export class DebuggerController implements vscode.Disposable {
     private readonly statusBar: vscode.StatusBarItem;
     private unsubscribeStore: (() => void) | null = null;
     private status: ConnectionStatus = 'idle';
-    private view: DebuggerView | null = null;
+    private readonly views = new Set<DebuggerView>();
+    private lastModel: DebuggerViewModel | null = null;
     private readonly log: vscode.OutputChannel;
 
     constructor(private readonly graphView: XStateGraphViewProvider) {
@@ -99,10 +100,20 @@ export class DebuggerController implements vscode.Disposable {
         void this.setConnectedContext(false);
     }
 
-    /** Attach the sidebar webview view so it receives model updates. */
-    setView(view: DebuggerView | null): void {
-        this.view = view;
-        this.pushModel();
+    /** Register a webview view (debugger or events) to receive model updates. */
+    addView(view: DebuggerView): void {
+        this.views.add(view);
+        view.postModel(this.lastModel ?? this.buildViewModel());
+    }
+
+    /** Unregister a webview view (e.g. on dispose). */
+    removeView(view: DebuggerView): void {
+        this.views.delete(view);
+    }
+
+    /** The most recently built view-model (for a view's ready handshake). */
+    getLastModel(): DebuggerViewModel {
+        return this.lastModel ?? this.buildViewModel();
     }
 
     /** Select an actor (drives the inspector + which diagram is emphasised). */
@@ -268,8 +279,9 @@ export class DebuggerController implements vscode.Disposable {
 
     /** Build and push the current view-model to the attached webview view. */
     private pushModel(): void {
-        if (!this.view) { return; }
-        this.view.postModel(this.buildViewModel());
+        const model = this.buildViewModel();
+        this.lastModel = model;
+        for (const view of this.views) { view.postModel(model); }
     }
 
     private buildViewModel(): DebuggerViewModel {

@@ -58,11 +58,20 @@
         {
           "id": "xstateMachineErrors",
           "name": "Errors"
-        },
+        }
+      ],
+      "xstate-debugger": [
         {
           "type": "webview",
           "id": "xstateDebugger",
           "name": "Debugger"
+        }
+      ],
+      "xstate-events": [
+        {
+          "type": "webview",
+          "id": "xstateEventsLog",
+          "name": "Events"
         }
       ]
     },
@@ -752,6 +761,18 @@
         {
           "id": "xstate-outline",
           "title": "xState Devtools",
+          "icon": "resources/xstate.svg"
+        },
+        {
+          "id": "xstate-debugger",
+          "title": "XState Debugger",
+          "icon": "resources/xstate.svg"
+        }
+      ],
+      "panel": [
+        {
+          "id": "xstate-events",
+          "title": "XState",
           "icon": "resources/xstate.svg"
         }
       ]

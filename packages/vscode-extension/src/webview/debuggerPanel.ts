@@ -19,10 +19,19 @@ window.onerror = (message, _src, line, col) => {
     return false;
 };
 
-$('toggle').addEventListener('click', () => {
-    const open = ($('toggle') as HTMLElement).dataset.connected === '1';
-    vscode.postMessage({ command: open ? 'disconnect' : 'connect' });
-});
+// Injected by the host (see debuggerView.getHtml): which slice to render.
+const ROLE: string = (window as { __ROLE__?: string }).__ROLE__ || 'debugger';
+
+const toggleBtn = document.getElementById('toggle');
+if (ROLE === 'events') {
+    // The events panel doesn't own the connection — hide its Connect button.
+    if (toggleBtn) { toggleBtn.style.display = 'none'; }
+} else if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+        const open = toggleBtn.dataset.connected === '1';
+        vscode.postMessage({ command: open ? 'disconnect' : 'connect' });
+    });
+}
 
 window.addEventListener('message', (e: MessageEvent) => {
     const msg = e.data;
@@ -42,114 +51,28 @@ function render(m: any): void {
     toggle.dataset.connected = (live || m.status === 'connecting') ? '1' : '0';
 
     const body = $('body');
-    if (!m.actors.length) {
-        body.innerHTML = '<div class="empty">' + (live
-            ? 'No actors yet. Make sure the app calls createServerAdapter().'
-            : 'Connect to a running app that uses createServerAdapter().') + '</div>';
-        return;
-    }
 
-    let html = '';
-
-    // Replay / time-travel banners
+    // Replay / time-travel banner — shared global state, shown in both views.
+    let banner = '';
     if (m.replayMode) {
-        html += '<div class="banner replay"><span class="grow">● Replay' + (m.replayName ? (' · ' + esc(m.replayName)) : '') +
+        banner = '<div class="banner replay"><span class="grow">● Replay' + (m.replayName ? (' · ' + esc(m.replayName)) : '') +
             '</span><button class="secondary" id="exit-replay">Exit replay</button></div>';
     } else if (m.timeTravelSeq !== null) {
-        html += '<div class="banner tt"><span class="grow">⏱ Time travel · seq ' + m.timeTravelSeq +
+        banner = '<div class="banner tt"><span class="grow">⏱ Time travel · seq ' + m.timeTravelSeq +
             '</span><button class="secondary" id="back-live">Back to live</button></div>';
     }
 
-    // Machine-instance tree — actors ordered depth-first, parents then children.
-    html += '<div class="section"><h3>Machine instances</h3>';
-    for (const a of m.actors) {
-        const branch = a.depth > 0 ? '<span class="branch">└</span>' : '';
-        html += '<div class="actor ' + (a.selected ? 'sel ' : '') + (a.status === 'stopped' ? 'stopped' : '') +
-            '" data-id="' + esc(a.sessionId) + '" style="padding-left:' + (6 + a.depth * 14) + 'px">' +
-            branch +
-            '<span class="dot ' + (a.status === 'active' ? 'open' : 'idle') + '"></span>' +
-            '<span class="alabel">' + esc(a.label) + '</span>' +
-            (a.state ? '<span class="astate">' + esc(a.state) + '</span>' : '') +
-            '</div>';
-    }
-    html += '</div>';
-
-    // Selected inspector
-    if (m.selected) {
-        const s = m.selected;
-        html += '<div class="section"><h3>State</h3>';
-        html += '<div class="muted">status: ' + esc(s.status) + '</div>';
-        html += '<div style="margin-top:4px">' + (s.activeLeaves.length
-            ? s.activeLeaves.map((l: string) => '<span class="chip">' + esc(l) + '</span>').join('')
-            : '<span class="muted">—</span>') + '</div>';
-        html += '</div>';
-
-        // Machine state tree (runtime), with the active configuration highlighted.
-        if (s.machine) {
-            const activeSet = new Set<string>(s.activeIds || []);
-            html += '<div class="section"><h3>Machine</h3><div class="tree">' +
-                renderTree(s.machine, activeSet, 0) + '</div></div>';
-        }
-
-        html += '<div class="section"><h3>Context</h3><pre class="ctx">' +
-            esc(safeJson(s.context)) + '</pre></div>';
-
-        // Dispatch — transition buttons + custom event
-        html += '<div class="section"><h3>Send event</h3>';
-        if (!m.canInteract) {
-            html += '<div class="muted">' + (m.timeTravelSeq !== null || m.replayMode
-                ? 'Return to live to send events.' : 'Connect to send events.') + '</div>';
-        } else {
-            if (s.transitions.length) {
-                for (const t of s.transitions) {
-                    html += '<div class="tx"><button class="dispatch" data-ev="' + esc(t.eventType) + '">Send</button>' +
-                        '<span class="ev">' + esc(t.eventType) + '</span>' +
-                        (t.guard ? '<span class="gd">[' + esc(t.guard) + ']</span>' : '') + '</div>';
-                }
-            } else {
-                html += '<div class="muted">No outgoing events from the current state.</div>';
-            }
-            html += '<div class="custom">' +
-                '<input id="cev-type" type="text" placeholder="CUSTOM_EVENT" />' +
-                '<textarea id="cev-payload" placeholder=\'{ "key": "value" }\'></textarea>' +
-                '<div class="row"><button id="cev-send">Send custom</button></div></div>';
-        }
-        html += '</div>';
-
-        // Persisted snapshot capture / restore
-        html += '<div class="section"><h3>Persisted snapshot</h3>';
-        if (!m.canInteract) {
-            html += '<div class="muted">Available when live.</div>';
-        } else {
-            html += '<div class="row"><button id="capture">Capture</button>' +
-                (s.persisted.captured ? '<button id="restore" class="secondary">⏮ Restore</button>' : '') + '</div>';
-            if (s.persisted.error) { html += '<div class="muted" style="margin-top:4px">' + esc(s.persisted.error) + '</div>'; }
-            else if (s.persisted.captured) { html += '<div class="muted" style="margin-top:4px">Snapshot captured.</div>'; }
-        }
-        html += '</div>';
-    }
-
-    // Event log
-    html += '<div class="section"><h3>Events</h3>';
-    if (!m.events.length) {
-        html += '<div class="muted">No events captured yet.</div>';
+    if (ROLE === 'events') {
+        body.innerHTML = banner + renderEvents(m);
+    } else if (!m.actors.length) {
+        body.innerHTML = banner + '<div class="empty">' + (live
+            ? 'No actors yet. Make sure the app calls createServerAdapter().'
+            : 'Connect to a running app that uses createServerAdapter().') + '</div>';
     } else {
-        html += '<table class="events">';
-        for (let i = m.events.length - 1; i >= 0; i--) {
-            const ev = m.events[i];
-            const isCur = m.timeTravelSeq !== null && ev.seq === m.timeTravelSeq;
-            const isFuture = m.timeTravelSeq !== null && ev.seq > m.timeTravelSeq;
-            html += '<tr class="evrow' + (isCur ? ' tt' : '') + (isFuture ? ' future' : '') + '" data-seq="' + ev.seq + '">' +
-                '<td class="t">' + esc(fmtTime(ev.time)) + '</td>' +
-                '<td class="ev">' + esc(ev.type) + '</td>' +
-                '<td class="t">#' + ev.seq + '</td></tr>';
-        }
-        html += '</table>';
+        body.innerHTML = banner + renderInstances(m) + renderInspector(m);
     }
-    html += '</div>';
 
-    body.innerHTML = html;
-
+    // Wire listeners — each guarded; only the relevant elements exist per role.
     body.querySelectorAll('.actor').forEach((el) => {
         el.addEventListener('click', () => vscode.postMessage({ command: 'selectActor', sessionId: (el as HTMLElement).dataset.id }));
     });
@@ -168,6 +91,104 @@ function render(m: any): void {
         type: (document.getElementById('cev-type') as HTMLInputElement | null)?.value || '',
         payload: (document.getElementById('cev-payload') as HTMLTextAreaElement | null)?.value || '',
     }));
+}
+
+// Machine-instance tree — actors ordered depth-first, parents then children.
+function renderInstances(m: any): string {
+    let html = '<div class="section"><h3>Machine instances</h3>';
+    for (const a of m.actors) {
+        const branch = a.depth > 0 ? '<span class="branch">└</span>' : '';
+        html += '<div class="actor ' + (a.selected ? 'sel ' : '') + (a.status === 'stopped' ? 'stopped' : '') +
+            '" data-id="' + esc(a.sessionId) + '" style="padding-left:' + (6 + a.depth * 14) + 'px">' +
+            branch +
+            '<span class="dot ' + (a.status === 'active' ? 'open' : 'idle') + '"></span>' +
+            '<span class="alabel">' + esc(a.label) + '</span>' +
+            (a.state ? '<span class="astate">' + esc(a.state) + '</span>' : '') +
+            '</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+// Selected actor: state, runtime machine tree, context, dispatch, persisted.
+function renderInspector(m: any): string {
+    if (!m.selected) { return ''; }
+    const s = m.selected;
+    let html = '<div class="section"><h3>State</h3>';
+    html += '<div class="muted">status: ' + esc(s.status) + '</div>';
+    html += '<div style="margin-top:4px">' + (s.activeLeaves.length
+        ? s.activeLeaves.map((l: string) => '<span class="chip">' + esc(l) + '</span>').join('')
+        : '<span class="muted">—</span>') + '</div>';
+    html += '</div>';
+
+    if (s.machine) {
+        const activeSet = new Set<string>(s.activeIds || []);
+        html += '<div class="section"><h3>Machine</h3><div class="tree">' +
+            renderTree(s.machine, activeSet, 0) + '</div></div>';
+    }
+
+    html += '<div class="section"><h3>Context</h3><pre class="ctx">' +
+        esc(safeJson(s.context)) + '</pre></div>';
+
+    html += '<div class="section"><h3>Send event</h3>';
+    if (!m.canInteract) {
+        html += '<div class="muted">' + (m.timeTravelSeq !== null || m.replayMode
+            ? 'Return to live to send events.' : 'Connect to send events.') + '</div>';
+    } else {
+        if (s.transitions.length) {
+            for (const t of s.transitions) {
+                html += '<div class="tx"><button class="dispatch" data-ev="' + esc(t.eventType) + '">Send</button>' +
+                    '<span class="ev">' + esc(t.eventType) + '</span>' +
+                    (t.guard ? '<span class="gd">[' + esc(t.guard) + ']</span>' : '') + '</div>';
+            }
+        } else {
+            html += '<div class="muted">No outgoing events from the current state.</div>';
+        }
+        html += '<div class="custom">' +
+            '<input id="cev-type" type="text" placeholder="CUSTOM_EVENT" />' +
+            '<textarea id="cev-payload" placeholder=\'{ "key": "value" }\'></textarea>' +
+            '<div class="row"><button id="cev-send">Send custom</button></div></div>';
+    }
+    html += '</div>';
+
+    html += '<div class="section"><h3>Persisted snapshot</h3>';
+    if (!m.canInteract) {
+        html += '<div class="muted">Available when live.</div>';
+    } else {
+        html += '<div class="row"><button id="capture">Capture</button>' +
+            (s.persisted.captured ? '<button id="restore" class="secondary">⏮ Restore</button>' : '') + '</div>';
+        if (s.persisted.error) { html += '<div class="muted" style="margin-top:4px">' + esc(s.persisted.error) + '</div>'; }
+        else if (s.persisted.captured) { html += '<div class="muted" style="margin-top:4px">Snapshot captured.</div>'; }
+    }
+    html += '</div>';
+    return html;
+}
+
+// Event log (bottom panel) — newest first, with the actor each event hit,
+// clickable to time-travel.
+function renderEvents(m: any): string {
+    const labelBy: Record<string, string> = {};
+    for (const a of m.actors) { labelBy[a.sessionId] = a.label; }
+    let html = '<div class="section"><h3>Events</h3>';
+    if (!m.events.length) {
+        html += '<div class="muted">' + (m.status === 'open'
+            ? 'No events captured yet.' : 'Connect from the Debugger view to capture events.') + '</div>';
+    } else {
+        html += '<table class="events">';
+        for (let i = m.events.length - 1; i >= 0; i--) {
+            const ev = m.events[i];
+            const isCur = m.timeTravelSeq !== null && ev.seq === m.timeTravelSeq;
+            const isFuture = m.timeTravelSeq !== null && ev.seq > m.timeTravelSeq;
+            html += '<tr class="evrow' + (isCur ? ' tt' : '') + (isFuture ? ' future' : '') + '" data-seq="' + ev.seq + '">' +
+                '<td class="t">' + esc(fmtTime(ev.time)) + '</td>' +
+                '<td class="t">' + esc(labelBy[ev.sessionId] || '') + '</td>' +
+                '<td class="ev">' + esc(ev.type) + '</td>' +
+                '<td class="t">#' + ev.seq + '</td></tr>';
+        }
+        html += '</table>';
+    }
+    html += '</div>';
+    return html;
 }
 
 function renderTree(node: any, activeSet: Set<string>, depth: number): string {
