@@ -770,7 +770,7 @@ export async function activate(context: vscode.ExtensionContext) {
         new DebuggerViewProvider(context.extensionUri, debuggerController, 'events'),
     );
     // Native instances tree (machine instances + their live state trees).
-    const debuggerTreeProvider = new DebuggerTreeProvider(debuggerController);
+    const debuggerTreeProvider = new DebuggerTreeProvider(context.extensionUri, debuggerController);
     const debuggerTreeView = vscode.window.createTreeView('xstateDebuggerInstances', {
         treeDataProvider: debuggerTreeProvider,
     });

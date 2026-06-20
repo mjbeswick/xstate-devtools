@@ -11,6 +11,7 @@ import type { StoreApi } from 'zustand/vanilla';
 import type { ExtensionToPageMessage, PageToExtensionMessage, SerializedEvent, SerializedStateNode } from '@xstate-devtools/protocol';
 import { DebuggerWsClient, type ConnectionStatus } from './wsClient';
 import { XStateGraphViewProvider, type LiveStateValue } from '../graphView';
+import { summarizeLeaves, summarizeLeafTokens } from './format';
 
 const DEFAULT_URL = 'ws://127.0.0.1:9301';
 
@@ -296,10 +297,10 @@ export class DebuggerController implements vscode.Disposable {
             const a = state.actors.get(sessionId);
             if (!a?.machine) { return ''; }
             const snap = getDisplaySnapshot(state, sessionId) ?? a.snapshot;
-            return getActivePaths(snap?.value as LiveStateValue, a.machine.root)
+            const leaves = getActivePaths(snap?.value as LiveStateValue, a.machine.root)
                 .map((p) => p[p.length - 1]?.key)
-                .filter((k): k is string => !!k)
-                .join(', ');
+                .filter((k): k is string => !!k);
+            return summarizeLeaves(leaves);
         };
         const actors: ActorVM[] = [];
         const walk = (sessionId: string, depth: number): void => {
@@ -353,7 +354,7 @@ export class DebuggerController implements vscode.Disposable {
                     sessionId: selId,
                     machineId: actor.machine?.id ?? null,
                     status: snapshot.status,
-                    activeLeaves,
+                    activeLeaves: summarizeLeafTokens(activeLeaves),
                     transitions,
                     persisted: {
                         captured: persistedEntry?.persisted !== undefined,

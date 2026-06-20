@@ -9,6 +9,7 @@ import * as vscode from 'vscode';
 import type { SerializedStateNode } from '@xstate-devtools/protocol';
 import { getActiveNodeIds, getActivePaths, getDisplaySnapshot } from '@xstate-devtools/panel-core';
 import type { DebuggerController } from './debuggerController';
+import { summarizeLeaves } from './format';
 
 export class DebuggerTreeItem extends vscode.TreeItem {
     constructor(
@@ -20,16 +21,14 @@ export class DebuggerTreeItem extends vscode.TreeItem {
     }
 }
 
-const GREEN = new vscode.ThemeColor('charts.green');
-
-function stateIconName(type: SerializedStateNode['type']): string {
-    switch (type) {
-        case 'compound': return 'symbol-namespace';
-        case 'parallel': return 'split-horizontal';
-        case 'final': return 'pass-filled';
-        case 'history': return 'history';
-        default: return 'circle-outline';
-    }
+// The same Harel-shape SVG mapping the outline tree uses (XStateMachineTreeItem
+// .stateIconFile): history → parallel → initial → final → default.
+function stateIconFile(node: SerializedStateNode, isInitial: boolean): string {
+    if (node.type === 'history') { return 'state-history.svg'; }
+    if (node.type === 'parallel') { return 'state-parallel.svg'; }
+    if (isInitial) { return 'state-initial.svg'; }
+    if (node.type === 'final') { return 'state-final.svg'; }
+    return 'state.svg';
 }
 
 export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTreeItem>, vscode.Disposable {
@@ -37,10 +36,15 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
     private readonly unsubscribe: () => void;
+    private readonly iconBase: vscode.Uri;
     // Active state-node ids per actor, memoised per refresh (cleared on change).
     private activeCache = new Map<string, Set<string>>();
 
-    constructor(private readonly controller: DebuggerController) {
+    constructor(
+        extensionUri: vscode.Uri,
+        private readonly controller: DebuggerController,
+    ) {
+        this.iconBase = vscode.Uri.joinPath(extensionUri, 'resources', 'icons');
         this.unsubscribe = this.controller.getStore().subscribe(() => {
             this.activeCache.clear();
             this._onDidChangeTreeData.fire();
@@ -74,14 +78,15 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
             const machine = state.actors.get(element.sessionId)?.machine;
             if (machine) {
                 for (const node of Object.values(machine.root.states)) {
-                    items.push(this.stateItem(element.sessionId, node));
+                    items.push(this.stateItem(element.sessionId, node, machine.root.initial));
                 }
             }
             return items;
         }
         // state node → its child states
-        const children = element.node ? Object.values(element.node.states) : [];
-        return children.map((node) => this.stateItem(element.sessionId, node));
+        const parent = element.node;
+        if (!parent) { return []; }
+        return Object.values(parent.states).map((node) => this.stateItem(element.sessionId, node, parent.initial));
     }
 
     /** Active node ids for an actor's current (display) snapshot, memoised. */
@@ -111,9 +116,13 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
                 .filter((k): k is string => !!k)
             : [];
         const stopped = actor.status === 'stopped';
-        item.description = (stopped ? '(stopped) ' : '') + leaves.join(', ');
+        item.description = (stopped ? '(stopped) ' : '') + summarizeLeaves(leaves);
         item.contextValue = 'xstateDebuggerActor';
-        item.iconPath = new vscode.ThemeIcon(stopped ? 'circle-slash' : 'circle-filled', stopped ? undefined : GREEN);
+        // Match the outline's machine icon (package); tint by run status.
+        item.iconPath = new vscode.ThemeIcon(
+            'package',
+            new vscode.ThemeColor(stopped ? 'disabledForeground' : 'charts.green'),
+        );
         const hasChildren = !!actor.machine || [...state.actors.values()].some((a) => a.parentSessionId === sessionId);
         item.collapsibleState = hasChildren
             ? vscode.TreeItemCollapsibleState.Expanded
@@ -122,14 +131,20 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
         return item;
     }
 
-    private stateItem(sessionId: string, node: SerializedStateNode): DebuggerTreeItem {
+    private stateItem(sessionId: string, node: SerializedStateNode, parentInitial?: string): DebuggerTreeItem {
         const active = this.activeIds(sessionId).has(node.id);
         const item = new DebuggerTreeItem('state', sessionId, node);
         item.id = `state:${sessionId}:${node.id}`;
         item.label = node.key;
         item.description = active ? '● active' : undefined;
         item.contextValue = 'xstateDebuggerState';
-        item.iconPath = new vscode.ThemeIcon(stateIconName(node.type), active ? GREEN : undefined);
+        // Same bundled Harel-shape SVGs as the outline tree (can't be tinted, so
+        // active is shown via the description above).
+        const file = stateIconFile(node, node.key === parentInitial);
+        item.iconPath = {
+            light: vscode.Uri.joinPath(this.iconBase, 'light', file),
+            dark: vscode.Uri.joinPath(this.iconBase, 'dark', file),
+        };
         const hasChildren = Object.keys(node.states).length > 0;
         item.collapsibleState = hasChildren
             ? (active ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed)
