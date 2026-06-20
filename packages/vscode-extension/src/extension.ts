@@ -15,6 +15,7 @@ import { XStateGraphViewProvider } from './graphView';
 import { DebuggerController } from './debugger/debuggerController';
 import { DebuggerViewProvider } from './debugger/debuggerView';
 import { DebuggerTreeProvider } from './debugger/debuggerTreeProvider';
+import { DebuggerContextTreeProvider } from './debugger/debuggerContextTreeProvider';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
 import { ErrorsTreeProvider, ErrorsGrouping, ErrorsFilter } from './errorsView';
 import { XStateCodeLensProvider } from './codeLensProvider';
@@ -777,6 +778,11 @@ export async function activate(context: vscode.ExtensionContext) {
         const item = e.selection[0];
         if (item) { debuggerController.selectActor(item.sessionId); }
     });
+    // Native context tree for the selected actor (expandable JSON).
+    const debuggerContextTreeProvider = new DebuggerContextTreeProvider(debuggerController);
+    const debuggerContextTreeView = vscode.window.createTreeView('xstateDebuggerContext', {
+        treeDataProvider: debuggerContextTreeProvider,
+    });
     const debuggerConnectCommand = vscode.commands.registerCommand('xstateDebugger.connect', () => debuggerController.connect());
     const debuggerDisconnectCommand = vscode.commands.registerCommand('xstateDebugger.disconnect', () => debuggerController.disconnect());
     const debuggerToggleCommand = vscode.commands.registerCommand('xstateDebugger.toggle', () => debuggerController.toggle());
@@ -1186,6 +1192,8 @@ export async function activate(context: vscode.ExtensionContext) {
         debuggerTreeProvider,
         debuggerTreeView,
         debuggerTreeSelectionListener,
+        debuggerContextTreeProvider,
+        debuggerContextTreeView,
         debuggerExportSessionCommand,
         debuggerImportSessionCommand,
         debuggerConnectCommand,

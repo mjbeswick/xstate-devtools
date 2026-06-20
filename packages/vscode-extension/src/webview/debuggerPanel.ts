@@ -107,9 +107,6 @@ function renderInspector(m: any): string {
         : '<span class="muted">—</span>') + '</div>';
     html += '</div>';
 
-    html += '<div class="section"><h3>Context</h3><pre class="ctx">' +
-        esc(safeJson(s.context)) + '</pre></div>';
-
     html += '<div class="section"><h3>Send event</h3>';
     if (!m.canInteract) {
         html += '<div class="muted">' + (m.timeTravelSeq !== null || m.replayMode
@@ -171,9 +168,6 @@ function renderEvents(m: any): string {
     return html;
 }
 
-function safeJson(v: unknown): string {
-    try { return JSON.stringify(v, null, 2); } catch { return String(v); }
-}
 function fmtTime(ms: number): string {
     if (!ms) { return ''; }
     const d = new Date(ms);

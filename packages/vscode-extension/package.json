@@ -69,6 +69,10 @@
           "type": "webview",
           "id": "xstateDebugger",
           "name": "Inspector"
+        },
+        {
+          "id": "xstateDebuggerContext",
+          "name": "Context"
         }
       ],
       "xstate-events": [

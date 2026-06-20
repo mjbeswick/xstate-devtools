@@ -56,7 +56,6 @@ export interface DebuggerViewModel {
         machineId: string | null;
         status: string;
         activeLeaves: string[];
-        context: unknown;
         transitions: TransitionVM[];
         persisted: { captured: boolean; error?: string };
     } | null;
@@ -355,7 +354,6 @@ export class DebuggerController implements vscode.Disposable {
                     machineId: actor.machine?.id ?? null,
                     status: snapshot.status,
                     activeLeaves,
-                    context: snapshot.context,
                     transitions,
                     persisted: {
                         captured: persistedEntry?.persisted !== undefined,
