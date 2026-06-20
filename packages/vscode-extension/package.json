@@ -66,11 +66,6 @@
           "name": "Instances"
         },
         {
-          "type": "webview",
-          "id": "xstateDebugger",
-          "name": "Inspector"
-        },
-        {
           "id": "xstateDebuggerContext",
           "name": "Context"
         }
@@ -115,7 +110,7 @@
         "command": "xstateDebugger.connect",
         "title": "Connect Live Debugger",
         "category": "XState Debugger",
-        "icon": "$(debug-alt)"
+        "icon": "$(plug)"
       },
       {
         "command": "xstateDebugger.disconnect",
@@ -502,6 +497,16 @@
     },
     "menus": {
       "view/title": [
+        {
+          "command": "xstateDebugger.connect",
+          "when": "view == xstateDebuggerInstances && !xstateDebugger.connected",
+          "group": "navigation@0"
+        },
+        {
+          "command": "xstateDebugger.disconnect",
+          "when": "view == xstateDebuggerInstances && xstateDebugger.connected",
+          "group": "navigation@0"
+        },
         {
           "command": "xstateDebugger.hideStopped",
           "when": "view == xstateDebuggerInstances && xstateDebugger.showStopped",

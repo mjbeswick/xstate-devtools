@@ -758,13 +758,9 @@ export async function activate(context: vscode.ExtensionContext) {
     // WebSocket and overlays each running machine's active state onto its open
     // statechart diagram.
     const debuggerController = new DebuggerController(graphViewProvider);
-    // Two webview views back the debugger UI: the instances/inspector panel (its
-    // own activity-bar container, dockable to the right) and the event log
-    // (bottom panel). Both share the controller's store.
-    const debuggerViewRegistration = vscode.window.registerWebviewViewProvider(
-        DebuggerViewProvider.debuggerViewType,
-        new DebuggerViewProvider(context.extensionUri, debuggerController, 'debugger'),
-    );
+    // The event log is a webview (bottom panel); instances + context are native
+    // trees; connection is driven from the Instances view's title icon + the
+    // status bar. All share the controller's store.
     const eventsViewRegistration = vscode.window.registerWebviewViewProvider(
         DebuggerViewProvider.eventsViewType,
         new DebuggerViewProvider(context.extensionUri, debuggerController, 'events'),
@@ -1195,7 +1191,6 @@ export async function activate(context: vscode.ExtensionContext) {
         documentChangeListener,
         cursorChangeListener,
         debuggerController,
-        debuggerViewRegistration,
         eventsViewRegistration,
         debuggerTreeProvider,
         debuggerTreeView,
