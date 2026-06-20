@@ -328,6 +328,12 @@
         "title": "Go to Source"
       },
       {
+        "command": "xstateMachineOutline.goToSource",
+        "title": "Go to Source",
+        "category": "XState",
+        "icon": "$(go-to-file)"
+      },
+      {
         "command": "xstateMachineOutline.goToImplementation",
         "title": "Go to Implementation",
         "icon": "$(go-to-file)"
@@ -700,9 +706,14 @@
           "group": "1_actor@2"
         },
         {
+          "command": "xstateMachineOutline.goToSource",
+          "when": "view == xstateMachineOutline && xstateOutline.navIsDiagram && (viewItem == machine || viewItem == state)",
+          "group": "navigation@0"
+        },
+        {
           "command": "xstateMachineOutline.openGraphView",
           "when": "view == xstateMachineOutline && (viewItem == machine || viewItem == state)",
-          "group": "navigation@0"
+          "group": "navigation@1"
         },
         {
           "command": "xstateMachineOutline.exportMermaid",
@@ -803,6 +814,10 @@
         },
         {
           "command": "xstateDebugger.restoreSnapshot",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.goToSource",
           "when": "false"
         },
         {

@@ -514,6 +514,21 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    // Always reveal a node's source — used by the context menu so source is
+    // reachable even in diagram-nav mode (where a click focuses the diagram).
+    const goToSourceCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.goToSource',
+        async (treeItem) => {
+            if (!treeItem?.uri || !treeItem?.range) { return; }
+            await vscode.window.showTextDocument(treeItem.uri, {
+                selection: treeItem.range,
+                preserveFocus: false,
+                preview: false,
+            });
+            treeView.reveal(treeItem, { select: true, focus: false });
+        }
+    );
+
     // ── Cursor sync ───────────────────────────────────────────────────────────
     let isTreeSelectionChange = false;
 
@@ -1178,6 +1193,7 @@ export async function activate(context: vscode.ExtensionContext) {
         openGraphViewAtCursorCommand,
         refreshGraphOnlyCommand,
         navigateToNodeCommand,
+        goToSourceCommand,
         goToImplementationCommand,
         definitionProvider,
         implementationProvider,
