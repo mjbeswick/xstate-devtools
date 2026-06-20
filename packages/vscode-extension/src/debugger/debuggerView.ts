@@ -141,7 +141,7 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
 <body>
   <div class="bar">
     <span id="dot" class="dot idle"></span>
-    <span id="status" class="status">Not connected (build F)</span>
+    <span id="status" class="status">Not connected (build G)</span>
     <button id="toggle">Connect</button>
   </div>
   <div id="body"></div>

@@ -64,18 +64,20 @@ function render(m: any): void {
 
     if (ROLE === 'events') {
         body.innerHTML = banner + renderEvents(m);
-    } else if (!m.actors.length) {
-        body.innerHTML = banner + '<div class="empty">' + (live
-            ? 'No actors yet. Make sure the app calls createServerAdapter().'
-            : 'Connect to a running app that uses createServerAdapter().') + '</div>';
+    } else if (!m.selected) {
+        // Instances now live in the native "Instances" tree; this webview is the
+        // inspector for whatever is selected there.
+        const hint = !live
+            ? 'Connect to a running app, then select an instance in the Instances view.'
+            : (m.actors.length
+                ? 'Select an instance in the Instances view.'
+                : 'No running machine instances yet. Make sure the app calls createServerAdapter().');
+        body.innerHTML = banner + '<div class="empty">' + hint + '</div>';
     } else {
-        body.innerHTML = banner + renderInstances(m) + renderInspector(m);
+        body.innerHTML = banner + renderInspector(m);
     }
 
     // Wire listeners — each guarded; only the relevant elements exist per role.
-    body.querySelectorAll('.actor').forEach((el) => {
-        el.addEventListener('click', () => vscode.postMessage({ command: 'selectActor', sessionId: (el as HTMLElement).dataset.id }));
-    });
     body.querySelectorAll('.dispatch').forEach((el) => {
         el.addEventListener('click', () => vscode.postMessage({ command: 'dispatch', eventType: (el as HTMLElement).dataset.ev }));
     });
@@ -93,39 +95,17 @@ function render(m: any): void {
     }));
 }
 
-// Machine-instance tree — actors ordered depth-first, parents then children.
-function renderInstances(m: any): string {
-    let html = '<div class="section"><h3>Machine instances</h3>';
-    for (const a of m.actors) {
-        const branch = a.depth > 0 ? '<span class="branch">└</span>' : '';
-        html += '<div class="actor ' + (a.selected ? 'sel ' : '') + (a.status === 'stopped' ? 'stopped' : '') +
-            '" data-id="' + esc(a.sessionId) + '" style="padding-left:' + (6 + a.depth * 14) + 'px">' +
-            branch +
-            '<span class="dot ' + (a.status === 'active' ? 'open' : 'idle') + '"></span>' +
-            '<span class="alabel">' + esc(a.label) + '</span>' +
-            (a.state ? '<span class="astate">' + esc(a.state) + '</span>' : '') +
-            '</div>';
-    }
-    html += '</div>';
-    return html;
-}
-
-// Selected actor: state, runtime machine tree, context, dispatch, persisted.
+// Selected actor inspector: state summary, context, dispatch, persisted.
+// (The instances + machine state tree live in the native "Instances" TreeView.)
 function renderInspector(m: any): string {
     if (!m.selected) { return ''; }
     const s = m.selected;
     let html = '<div class="section"><h3>State</h3>';
-    html += '<div class="muted">status: ' + esc(s.status) + '</div>';
+    html += '<div class="muted">' + esc(s.machineId || s.sessionId) + ' · ' + esc(s.status) + '</div>';
     html += '<div style="margin-top:4px">' + (s.activeLeaves.length
         ? s.activeLeaves.map((l: string) => '<span class="chip">' + esc(l) + '</span>').join('')
         : '<span class="muted">—</span>') + '</div>';
     html += '</div>';
-
-    if (s.machine) {
-        const activeSet = new Set<string>(s.activeIds || []);
-        html += '<div class="section"><h3>Machine</h3><div class="tree">' +
-            renderTree(s.machine, activeSet, 0) + '</div></div>';
-    }
 
     html += '<div class="section"><h3>Context</h3><pre class="ctx">' +
         esc(safeJson(s.context)) + '</pre></div>';
@@ -188,19 +168,6 @@ function renderEvents(m: any): string {
         html += '</table>';
     }
     html += '</div>';
-    return html;
-}
-
-function renderTree(node: any, activeSet: Set<string>, depth: number): string {
-    const active = activeSet.has(node.id);
-    const tag = (node.type || 'state').slice(0, 4);
-    let html = '<div class="tnode ' + (active ? 'active' : '') + '" style="padding-left:' + (4 + depth * 14) + 'px">' +
-        '<span class="dotg"></span><span class="tag">' + esc(tag) + '</span>' +
-        '<span>' + esc(node.key || node.id) + '</span></div>';
-    const states = node.states || {};
-    for (const key of Object.keys(states)) {
-        html += renderTree(states[key], activeSet, depth + 1);
-    }
     return html;
 }
 

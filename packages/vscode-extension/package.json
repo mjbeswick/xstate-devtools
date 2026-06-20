@@ -62,9 +62,13 @@
       ],
       "xstate-debugger": [
         {
+          "id": "xstateDebuggerInstances",
+          "name": "Instances"
+        },
+        {
           "type": "webview",
           "id": "xstateDebugger",
-          "name": "Debugger"
+          "name": "Inspector"
         }
       ],
       "xstate-events": [

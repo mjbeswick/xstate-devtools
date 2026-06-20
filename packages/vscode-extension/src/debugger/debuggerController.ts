@@ -6,7 +6,7 @@
 // status-bar indicator, and the bridge that overlays each running machine's
 // active state onto its open statechart diagram.
 import * as vscode from 'vscode';
-import { createInspectorStore, exportSession, getActiveNodeIds, getActivePaths, getDisplaySnapshot, importSession, type InspectorStore } from '@xstate-devtools/panel-core';
+import { createInspectorStore, exportSession, getActivePaths, getDisplaySnapshot, importSession, type InspectorStore } from '@xstate-devtools/panel-core';
 import type { StoreApi } from 'zustand/vanilla';
 import type { ExtensionToPageMessage, PageToExtensionMessage, SerializedEvent, SerializedStateNode } from '@xstate-devtools/protocol';
 import { DebuggerWsClient, type ConnectionStatus } from './wsClient';
@@ -57,10 +57,6 @@ export interface DebuggerViewModel {
         status: string;
         activeLeaves: string[];
         context: unknown;
-        /** The running machine's state-node tree (null for non-machine actors). */
-        machine: SerializedStateNode | null;
-        /** Ids of the currently-active state nodes, for tree highlighting. */
-        activeIds: string[];
         transitions: TransitionVM[];
         persisted: { captured: boolean; error?: string };
     } | null;
@@ -354,17 +350,12 @@ export class DebuggerController implements vscode.Disposable {
                     }
                 }
                 const persistedEntry = state.persistedSnapshots.get(selId);
-                const activeIds = actor.machine
-                    ? [...getActiveNodeIds(snapshot.value as LiveStateValue, actor.machine.root)]
-                    : [];
                 selected = {
                     sessionId: selId,
                     machineId: actor.machine?.id ?? null,
                     status: snapshot.status,
                     activeLeaves,
                     context: snapshot.context,
-                    machine: actor.machine?.root ?? null,
-                    activeIds,
                     transitions,
                     persisted: {
                         captured: persistedEntry?.persisted !== undefined,
