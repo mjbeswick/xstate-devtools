@@ -10,6 +10,7 @@ import type { SerializedStateNode } from '@xstate-devtools/protocol';
 import { getActiveNodeIds, getActivePaths, getDisplaySnapshot } from '@xstate-devtools/panel-core';
 import type { DebuggerController } from './debuggerController';
 import { summarizeLeaves } from './format';
+import { ACTIVE_SCHEME } from './debuggerDecorationProvider';
 
 export class DebuggerTreeItem extends vscode.TreeItem {
     constructor(
@@ -153,8 +154,12 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
         const item = new DebuggerTreeItem('state', sessionId, node);
         item.id = `state:${sessionId}:${node.id}`;
         item.label = node.key;
-        item.description = active ? '● active' : undefined;
         item.contextValue = 'xstateDebuggerState';
+        // Active states are shown by colouring the label green (via the
+        // FileDecorationProvider keyed on this scheme), not a dot/text suffix.
+        if (active) {
+            item.resourceUri = vscode.Uri.parse(`${ACTIVE_SCHEME}:/${sessionId}/${encodeURIComponent(node.id)}`);
+        }
         // Same bundled Harel-shape SVGs as the outline tree (can't be tinted, so
         // active is shown via the description above).
         const file = stateIconFile(node, node.key === parentInitial);

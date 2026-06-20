@@ -17,6 +17,7 @@ import { DebuggerViewProvider } from './debugger/debuggerView';
 import { DebuggerTreeProvider } from './debugger/debuggerTreeProvider';
 import { DebuggerContextTreeProvider } from './debugger/debuggerContextTreeProvider';
 import { registerDebuggerCommands } from './debugger/debuggerCommands';
+import { DebuggerActiveDecorationProvider } from './debugger/debuggerDecorationProvider';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
 import { ErrorsTreeProvider, ErrorsGrouping, ErrorsFilter } from './errorsView';
 import { XStateCodeLensProvider } from './codeLensProvider';
@@ -805,6 +806,9 @@ export async function activate(context: vscode.ExtensionContext) {
     const debuggerHideStoppedCommand = vscode.commands.registerCommand('xstateDebugger.hideStopped', () => setShowStopped(false));
     // Right-click actions on the Instances tree.
     const debuggerItemCommands = registerDebuggerCommands(debuggerController, graphViewProvider, workspaceScanner);
+    // Colour active state labels green in the Instances tree.
+    const debuggerDecorationProvider = new DebuggerActiveDecorationProvider(debuggerController);
+    const debuggerDecorationRegistration = vscode.window.registerFileDecorationProvider(debuggerDecorationProvider);
     const debuggerConnectCommand = vscode.commands.registerCommand('xstateDebugger.connect', () => debuggerController.connect());
     const debuggerDisconnectCommand = vscode.commands.registerCommand('xstateDebugger.disconnect', () => debuggerController.disconnect());
     const debuggerToggleCommand = vscode.commands.registerCommand('xstateDebugger.toggle', () => debuggerController.toggle());
@@ -1219,6 +1223,8 @@ export async function activate(context: vscode.ExtensionContext) {
         debuggerShowStoppedCommand,
         debuggerHideStoppedCommand,
         ...debuggerItemCommands,
+        debuggerDecorationProvider,
+        debuggerDecorationRegistration,
         debuggerExportSessionCommand,
         debuggerImportSessionCommand,
         debuggerConnectCommand,
