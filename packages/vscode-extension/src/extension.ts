@@ -783,6 +783,14 @@ export async function activate(context: vscode.ExtensionContext) {
     const debuggerContextTreeView = vscode.window.createTreeView('xstateDebuggerContext', {
         treeDataProvider: debuggerContextTreeProvider,
     });
+    // Show/hide stopped actors — toggle in the Instances view's "…" menu.
+    const setShowStopped = (value: boolean) => {
+        debuggerTreeProvider.setShowStopped(value);
+        void vscode.commands.executeCommand('setContext', 'xstateDebugger.showStopped', value);
+    };
+    void vscode.commands.executeCommand('setContext', 'xstateDebugger.showStopped', debuggerTreeProvider.getShowStopped());
+    const debuggerShowStoppedCommand = vscode.commands.registerCommand('xstateDebugger.showStopped', () => setShowStopped(true));
+    const debuggerHideStoppedCommand = vscode.commands.registerCommand('xstateDebugger.hideStopped', () => setShowStopped(false));
     const debuggerConnectCommand = vscode.commands.registerCommand('xstateDebugger.connect', () => debuggerController.connect());
     const debuggerDisconnectCommand = vscode.commands.registerCommand('xstateDebugger.disconnect', () => debuggerController.disconnect());
     const debuggerToggleCommand = vscode.commands.registerCommand('xstateDebugger.toggle', () => debuggerController.toggle());
@@ -1194,6 +1202,8 @@ export async function activate(context: vscode.ExtensionContext) {
         debuggerTreeSelectionListener,
         debuggerContextTreeProvider,
         debuggerContextTreeView,
+        debuggerShowStoppedCommand,
+        debuggerHideStoppedCommand,
         debuggerExportSessionCommand,
         debuggerImportSessionCommand,
         debuggerConnectCommand,

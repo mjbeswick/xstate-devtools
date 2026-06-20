@@ -129,6 +129,18 @@
         "category": "XState Debugger"
       },
       {
+        "command": "xstateDebugger.showStopped",
+        "title": "Show Stopped Actors",
+        "category": "XState Debugger",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "xstateDebugger.hideStopped",
+        "title": "Hide Stopped Actors",
+        "category": "XState Debugger",
+        "icon": "$(eye-closed)"
+      },
+      {
         "command": "xstateDebugger.exportSession",
         "title": "Export Session…",
         "category": "XState Debugger",
@@ -386,6 +398,11 @@
           "default": "ws://127.0.0.1:9301",
           "description": "WebSocket URL of the running app's XState server adapter (createServerAdapter) that the live debugger connects to."
         },
+        "xstateOutline.debuggerShowStopped": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show stopped actors in the XState Debugger Instances view."
+        },
         "xstateOutline.defaultScope": {
           "type": "string",
           "enum": [
@@ -485,6 +502,16 @@
     },
     "menus": {
       "view/title": [
+        {
+          "command": "xstateDebugger.hideStopped",
+          "when": "view == xstateDebuggerInstances && xstateDebugger.showStopped",
+          "group": "1_visibility@1"
+        },
+        {
+          "command": "xstateDebugger.showStopped",
+          "when": "view == xstateDebuggerInstances && !xstateDebugger.showStopped",
+          "group": "1_visibility@1"
+        },
         {
           "command": "xstateDebugger.importSession",
           "when": "view == xstateDebugger",

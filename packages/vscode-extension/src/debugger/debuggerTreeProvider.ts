@@ -37,6 +37,7 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
 
     private readonly unsubscribe: () => void;
     private readonly iconBase: vscode.Uri;
+    private showStopped: boolean;
     // Active state-node ids per actor, memoised per refresh (cleared on change).
     private activeCache = new Map<string, Set<string>>();
 
@@ -45,10 +46,25 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
         private readonly controller: DebuggerController,
     ) {
         this.iconBase = vscode.Uri.joinPath(extensionUri, 'resources', 'icons');
+        this.showStopped = vscode.workspace.getConfiguration('xstateOutline').get('debuggerShowStopped', true);
         this.unsubscribe = this.controller.getStore().subscribe(() => {
             this.activeCache.clear();
             this._onDidChangeTreeData.fire();
         });
+    }
+
+    getShowStopped(): boolean {
+        return this.showStopped;
+    }
+
+    setShowStopped(value: boolean): void {
+        this.showStopped = value;
+        void vscode.workspace.getConfiguration('xstateOutline').update('debuggerShowStopped', value, true);
+        this._onDidChangeTreeData.fire();
+    }
+
+    private includeActor(status: string): boolean {
+        return this.showStopped || status !== 'stopped';
     }
 
     getTreeItem(element: DebuggerTreeItem): vscode.TreeItem {
@@ -62,7 +78,9 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
             const roots: DebuggerTreeItem[] = [];
             for (const [sessionId, a] of state.actors) {
                 const parent = a.parentSessionId;
-                if (!parent || !state.actors.has(parent)) { roots.push(this.actorItem(sessionId)); }
+                if ((!parent || !state.actors.has(parent)) && this.includeActor(a.status)) {
+                    roots.push(this.actorItem(sessionId));
+                }
             }
             return roots.filter((i): i is DebuggerTreeItem => !!i);
         }
@@ -70,9 +88,8 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
             const items: DebuggerTreeItem[] = [];
             // Child actors first, then the machine's top-level states.
             for (const [sessionId, a] of state.actors) {
-                if (a.parentSessionId === element.sessionId) {
-                    const child = this.actorItem(sessionId);
-                    if (child) { items.push(child); }
+                if (a.parentSessionId === element.sessionId && this.includeActor(a.status)) {
+                    items.push(this.actorItem(sessionId));
                 }
             }
             const machine = state.actors.get(element.sessionId)?.machine;
