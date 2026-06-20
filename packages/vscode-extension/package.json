@@ -124,6 +124,36 @@
         "category": "XState Debugger"
       },
       {
+        "command": "xstateDebugger.goToSource",
+        "title": "Go to Source",
+        "category": "XState Debugger",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "xstateDebugger.revealInDiagram",
+        "title": "Reveal in Diagram",
+        "category": "XState Debugger",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "xstateDebugger.sendEvent",
+        "title": "Send Event…",
+        "category": "XState Debugger",
+        "icon": "$(send)"
+      },
+      {
+        "command": "xstateDebugger.captureSnapshot",
+        "title": "Capture Snapshot",
+        "category": "XState Debugger",
+        "icon": "$(device-camera)"
+      },
+      {
+        "command": "xstateDebugger.restoreSnapshot",
+        "title": "Restore Snapshot",
+        "category": "XState Debugger",
+        "icon": "$(debug-restart)"
+      },
+      {
         "command": "xstateDebugger.showStopped",
         "title": "Show Stopped Actors",
         "category": "XState Debugger",
@@ -645,6 +675,31 @@
       ],
       "view/item/context": [
         {
+          "command": "xstateDebugger.goToSource",
+          "when": "view == xstateDebuggerInstances && (viewItem == xstateDebuggerActor || viewItem == xstateDebuggerState)",
+          "group": "navigation@0"
+        },
+        {
+          "command": "xstateDebugger.revealInDiagram",
+          "when": "view == xstateDebuggerInstances && (viewItem == xstateDebuggerActor || viewItem == xstateDebuggerState)",
+          "group": "navigation@1"
+        },
+        {
+          "command": "xstateDebugger.sendEvent",
+          "when": "view == xstateDebuggerInstances && (viewItem == xstateDebuggerActor || viewItem == xstateDebuggerState)",
+          "group": "1_actor@0"
+        },
+        {
+          "command": "xstateDebugger.captureSnapshot",
+          "when": "view == xstateDebuggerInstances && viewItem == xstateDebuggerActor",
+          "group": "1_actor@1"
+        },
+        {
+          "command": "xstateDebugger.restoreSnapshot",
+          "when": "view == xstateDebuggerInstances && viewItem == xstateDebuggerActor",
+          "group": "1_actor@2"
+        },
+        {
           "command": "xstateMachineOutline.openGraphView",
           "when": "view == xstateMachineOutline && (viewItem == machine || viewItem == state)",
           "group": "navigation@0"
@@ -730,6 +785,26 @@
         }
       ],
       "commandPalette": [
+        {
+          "command": "xstateDebugger.goToSource",
+          "when": "false"
+        },
+        {
+          "command": "xstateDebugger.revealInDiagram",
+          "when": "false"
+        },
+        {
+          "command": "xstateDebugger.sendEvent",
+          "when": "false"
+        },
+        {
+          "command": "xstateDebugger.captureSnapshot",
+          "when": "false"
+        },
+        {
+          "command": "xstateDebugger.restoreSnapshot",
+          "when": "false"
+        },
         {
           "command": "xstateMachineOutline.openGraphView",
           "when": "false"

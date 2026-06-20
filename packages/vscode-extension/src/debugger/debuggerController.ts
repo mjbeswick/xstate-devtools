@@ -122,15 +122,14 @@ export class DebuggerController implements vscode.Disposable {
         this.store.getState().timeTravel(seq);
     }
 
-    /** Send an event to the selected running actor. */
-    dispatch(event: SerializedEvent): void {
-        const sessionId = this.store.getState().selectedActorId;
+    /** Send an event to a running actor (defaults to the selected one). */
+    dispatch(event: SerializedEvent, sessionId = this.store.getState().selectedActorId): void {
         if (!sessionId) { return; }
         this.send({ type: 'XSTATE_DISPATCH', sessionId, event });
     }
 
     /** Send a custom event with a JSON payload; reports a parse error to the UI. */
-    dispatchCustom(type: string, payloadJson: string): void {
+    dispatchCustom(type: string, payloadJson: string, sessionId = this.store.getState().selectedActorId): void {
         let payload: Record<string, unknown> = {};
         if (payloadJson.trim()) {
             try {
@@ -142,20 +141,18 @@ export class DebuggerController implements vscode.Disposable {
             }
         }
         if (!type.trim()) { return; }
-        this.dispatch({ type: type.trim(), ...payload });
+        this.dispatch({ type: type.trim(), ...payload }, sessionId);
     }
 
-    /** Ask the running app for the selected actor's persisted snapshot. */
-    capturePersisted(): void {
-        const sessionId = this.store.getState().selectedActorId;
+    /** Ask the running app for an actor's persisted snapshot (defaults to selected). */
+    capturePersisted(sessionId = this.store.getState().selectedActorId): void {
         if (!sessionId) { return; }
         this.send({ type: 'XSTATE_REQUEST_PERSISTED', sessionId });
     }
 
-    /** Recreate the selected actor from its captured persisted snapshot. */
-    async restore(): Promise<void> {
+    /** Recreate an actor from its captured persisted snapshot (defaults to selected). */
+    async restore(sessionId = this.store.getState().selectedActorId): Promise<void> {
         const state = this.store.getState();
-        const sessionId = state.selectedActorId;
         if (!sessionId) { return; }
         const entry = state.persistedSnapshots.get(sessionId);
         if (!entry || entry.persisted === undefined) {

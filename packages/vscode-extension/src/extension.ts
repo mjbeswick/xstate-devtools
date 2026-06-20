@@ -16,6 +16,7 @@ import { DebuggerController } from './debugger/debuggerController';
 import { DebuggerViewProvider } from './debugger/debuggerView';
 import { DebuggerTreeProvider } from './debugger/debuggerTreeProvider';
 import { DebuggerContextTreeProvider } from './debugger/debuggerContextTreeProvider';
+import { registerDebuggerCommands } from './debugger/debuggerCommands';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
 import { ErrorsTreeProvider, ErrorsGrouping, ErrorsFilter } from './errorsView';
 import { XStateCodeLensProvider } from './codeLensProvider';
@@ -787,6 +788,8 @@ export async function activate(context: vscode.ExtensionContext) {
     void vscode.commands.executeCommand('setContext', 'xstateDebugger.showStopped', debuggerTreeProvider.getShowStopped());
     const debuggerShowStoppedCommand = vscode.commands.registerCommand('xstateDebugger.showStopped', () => setShowStopped(true));
     const debuggerHideStoppedCommand = vscode.commands.registerCommand('xstateDebugger.hideStopped', () => setShowStopped(false));
+    // Right-click actions on the Instances tree.
+    const debuggerItemCommands = registerDebuggerCommands(debuggerController, graphViewProvider, workspaceScanner);
     const debuggerConnectCommand = vscode.commands.registerCommand('xstateDebugger.connect', () => debuggerController.connect());
     const debuggerDisconnectCommand = vscode.commands.registerCommand('xstateDebugger.disconnect', () => debuggerController.disconnect());
     const debuggerToggleCommand = vscode.commands.registerCommand('xstateDebugger.toggle', () => debuggerController.toggle());
@@ -1199,6 +1202,7 @@ export async function activate(context: vscode.ExtensionContext) {
         debuggerContextTreeView,
         debuggerShowStoppedCommand,
         debuggerHideStoppedCommand,
+        ...debuggerItemCommands,
         debuggerExportSessionCommand,
         debuggerImportSessionCommand,
         debuggerConnectCommand,
