@@ -86,32 +86,32 @@
       },
       {
         "view": "xstateDebuggerInstances",
-        "contents": "❌ No XState machines found in this workspace.\nThe debugger inspects running XState actors over a WebSocket.\n[XState docs](https://stately.ai/docs/xstate)\n[Check Setup](command:xstateDebugger.recheckSetup)",
+        "contents": "❌ No XState machines found in this workspace.\nThe debugger inspects running XState actors over a WebSocket — [XState docs](https://stately.ai/docs/xstate).\n[Check setup](command:xstateDebugger.recheckSetup)",
         "when": "!xstateDebugger.connected && !xstateDebugger.setupChecking && xstateDebugger.setup == no-xstate"
       },
       {
         "view": "xstateDebuggerInstances",
-        "contents": "❌ This workspace uses XState but not @xstate-devtools/adapter.\nInstall it and wire createServerAdapter() into your app to debug.\n[Setup guide](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension#-live-debugger)\n[Check Setup](command:xstateDebugger.recheckSetup)\n[Connect anyway](command:xstateDebugger.connect)",
+        "contents": "❌ This workspace uses XState but not @xstate-devtools/adapter.\nInstall it and wire createServerAdapter() into your app — [Setup guide](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension#-live-debugger), or [connect anyway](command:xstateDebugger.connect).\n[Check setup](command:xstateDebugger.recheckSetup)",
         "when": "!xstateDebugger.connected && !xstateDebugger.setupChecking && xstateDebugger.setup == no-adapter"
       },
       {
         "view": "xstateDebuggerInstances",
-        "contents": "❌ @xstate-devtools/adapter is installed, but no createServerAdapter() call was found.\nThe VS Code debugger attaches to Node/SSR actors — add a createServerAdapter() inspector to your server. (Browser-only actors use the Chrome extension.)\n[Setup guide](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension#-live-debugger)\n[Check Setup](command:xstateDebugger.recheckSetup)\n[Connect anyway](command:xstateDebugger.connect)",
+        "contents": "❌ @xstate-devtools/adapter is installed, but no createServerAdapter() call was found.\nThe debugger attaches to Node/SSR actors — add a createServerAdapter() inspector to your server (browser-only actors use the Chrome extension). [Setup guide](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension#-live-debugger), or [connect anyway](command:xstateDebugger.connect).\n[Check setup](command:xstateDebugger.recheckSetup)",
         "when": "!xstateDebugger.connected && !xstateDebugger.setupChecking && xstateDebugger.setup == no-server-adapter"
       },
       {
         "view": "xstateDebuggerInstances",
-        "contents": "❌ Found createServerAdapter(), but its inspect isn't passed to any actor.\nPass it when creating your root actor: createActor(machine, { inspect }).\n[Setup guide](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension#-live-debugger)\n[Check Setup](command:xstateDebugger.recheckSetup)\n[Connect anyway](command:xstateDebugger.connect)",
+        "contents": "❌ Found createServerAdapter(), but its inspect isn't passed to any actor.\nPass it to your root actor: createActor(machine, { inspect }). [Setup guide](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension#-live-debugger), or [connect anyway](command:xstateDebugger.connect).\n[Check setup](command:xstateDebugger.recheckSetup)",
         "when": "!xstateDebugger.connected && !xstateDebugger.setupChecking && xstateDebugger.setup == inspect-not-wired"
       },
       {
         "view": "xstateDebuggerInstances",
-        "contents": "✅ Setup looks ready.\nStart your app, then connect to inspect its XState actors.\n[Connect](command:xstateDebugger.connect)\n[Check Setup](command:xstateDebugger.recheckSetup)",
+        "contents": "✅ Setup looks ready.\nStart your app, then connect to inspect its actors.\n[Connect](command:xstateDebugger.connect)\nNot connecting? [Check setup](command:xstateDebugger.recheckSetup).",
         "when": "!xstateDebugger.connected && !xstateDebugger.setupChecking && xstateDebugger.setup == ready"
       },
       {
         "view": "xstateDebuggerInstances",
-        "contents": "Start your app, then connect to inspect its XState actors.\n[Connect](command:xstateDebugger.connect)\n[Check Setup](command:xstateDebugger.recheckSetup)",
+        "contents": "Start your app, then connect to inspect its XState actors.\n[Connect](command:xstateDebugger.connect)\nNot sure it's set up? [Check setup](command:xstateDebugger.recheckSetup).",
         "when": "!xstateDebugger.connected && !xstateDebugger.setupChecking && xstateDebugger.setup == unknown"
       },
       {
