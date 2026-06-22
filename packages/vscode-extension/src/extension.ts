@@ -18,7 +18,7 @@ import { DebuggerTreeProvider } from './debugger/debuggerTreeProvider';
 import { DebuggerContextTreeProvider, ContextTreeItem } from './debugger/debuggerContextTreeProvider';
 import { registerDebuggerCommands } from './debugger/debuggerCommands';
 import { DebuggerActiveDecorationProvider } from './debugger/debuggerDecorationProvider';
-import { DebuggerSetupDetector, SETUP_DESCRIPTION } from './debugger/debuggerSetup';
+import { DebuggerSetupDetector } from './debugger/debuggerSetup';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
 import { ErrorsTreeProvider, ErrorsGrouping, ErrorsFilter } from './errorsView';
 import { XStateCodeLensProvider } from './codeLensProvider';
@@ -789,6 +789,7 @@ export async function activate(context: vscode.ExtensionContext) {
     void vscode.commands.executeCommand('setContext', 'xstateDebugger.showStopped',
         vscode.workspace.getConfiguration('xstateOutline').get('debuggerShowStopped', true));
     void vscode.commands.executeCommand('setContext', 'xstateDebugger.setup', 'unknown');
+    void vscode.commands.executeCommand('setContext', 'xstateDebugger.setupChecking', false);
     // Native instances tree (machine instances + their live state trees).
     const debuggerTreeProvider = new DebuggerTreeProvider(context.extensionUri, debuggerController);
     const debuggerTreeView = vscode.window.createTreeView('xstateDebuggerInstances', {
@@ -827,9 +828,15 @@ export async function activate(context: vscode.ExtensionContext) {
     // Detect how ready the workspace is for the debugger → tailored welcome text.
     const debuggerSetupDetector = new DebuggerSetupDetector(workspaceScanner);
     const debuggerRecheckCommand = vscode.commands.registerCommand('xstateDebugger.recheckSetup', async () => {
-        await debuggerSetupDetector.refresh();
-        // Surface the result so the command isn't a silent no-op when nothing changed.
-        void vscode.window.showInformationMessage(`XState debugger — ${SETUP_DESCRIPTION[debuggerSetupDetector.getState()]}`);
+        // Flip the welcome to a "Checking…" state, then back, so the result
+        // (the ✅/❌ welcome variant for the new setup state) visibly replaces
+        // the button — instead of the command looking like a silent no-op.
+        await vscode.commands.executeCommand('setContext', 'xstateDebugger.setupChecking', true);
+        try {
+            await debuggerSetupDetector.refresh();
+        } finally {
+            await vscode.commands.executeCommand('setContext', 'xstateDebugger.setupChecking', false);
+        }
     });
     // Recompute when the Instances view is shown, when package.json/source change.
     const debuggerSetupOnVisible = debuggerTreeView.onDidChangeVisibility((e) => {

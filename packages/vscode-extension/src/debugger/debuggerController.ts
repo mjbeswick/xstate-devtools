@@ -80,6 +80,7 @@ export class DebuggerController implements vscode.Disposable {
     private lastModel: DebuggerViewModel | null = null;
     private lastTimeTravelling = false;
     private flushTimer: ReturnType<typeof setTimeout> | null = null;
+    private announceConnectFailure = false;
     private readonly log: vscode.OutputChannel;
 
     constructor(private readonly graphView: XStateGraphViewProvider) {
@@ -253,6 +254,9 @@ export class DebuggerController implements vscode.Disposable {
 
     connect(): void {
         this.log.appendLine(`[${stamp()}] connect → ${this.url()}`);
+        // Announce the next failed attempt once — so clicking Connect when the
+        // app isn't running surfaces a message instead of silently retrying.
+        this.announceConnectFailure = true;
         if (!this.client) {
             this.client = new DebuggerWsClient(this.url(), {
                 onMessage: (msg) => this.onMessage(msg),
@@ -315,6 +319,17 @@ export class DebuggerController implements vscode.Disposable {
         this.renderStatusBar();
         void this.setConnectedContext(status === 'open');
         if (status !== 'open') { this.graphView.clearLiveConfig(); }
+        if (status === 'open') {
+            this.announceConnectFailure = false;
+        } else if ((status === 'error' || status === 'closed') && this.announceConnectFailure) {
+            // First failure of a user-initiated connect — tell them why, once.
+            // Auto-reconnect keeps retrying silently from here.
+            this.announceConnectFailure = false;
+            void vscode.window.showWarningMessage(
+                `XState debugger: couldn't reach the app at ${this.url()}. ` +
+                'Make sure it\'s running and its createServerAdapter() server is listening — it will keep retrying.',
+            );
+        }
         this.pushModel();
     }
 

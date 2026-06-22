@@ -19,16 +19,6 @@ export type DebuggerSetupState =
 
 const SOURCE_SCAN_CAP = 2000;
 
-/** Human-readable summary of a setup state, for the "Check Setup" feedback. */
-export const SETUP_DESCRIPTION: Record<DebuggerSetupState, string> = {
-    unknown: 'Setup state unknown — start your app, then connect.',
-    'no-xstate': 'No XState usage found in this workspace.',
-    'no-adapter': '@xstate-devtools/adapter is not installed.',
-    'no-server-adapter': 'No createServerAdapter() call found — add one to your server.',
-    'inspect-not-wired': "createServerAdapter() found, but its inspect isn't passed to any actor.",
-    ready: 'Ready — start your app and connect to inspect its actors.',
-};
-
 export class DebuggerSetupDetector implements vscode.Disposable {
     private state: DebuggerSetupState = 'unknown';
     private running: Promise<void> | null = null;
