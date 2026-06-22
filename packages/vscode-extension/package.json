@@ -612,12 +612,12 @@
         {
           "command": "xstateDebugger.hideStopped",
           "when": "view == xstateDebuggerInstances && xstateDebugger.showStopped",
-          "group": "1_visibility@1"
+          "group": "navigation@1"
         },
         {
           "command": "xstateDebugger.showStopped",
           "when": "view == xstateDebuggerInstances && !xstateDebugger.showStopped",
-          "group": "1_visibility@1"
+          "group": "navigation@1"
         },
         {
           "command": "xstateDebugger.stepBack",
@@ -642,127 +642,127 @@
         {
           "command": "xstateDebugger.importSession",
           "when": "view == xstateEventsLog",
-          "group": "1_session@0"
+          "group": "navigation@4"
         },
         {
           "command": "xstateDebugger.exportSession",
           "when": "view == xstateEventsLog",
-          "group": "1_session@1"
+          "group": "navigation@5"
         },
         {
           "command": "xstateMachineOutline.refresh",
           "when": "view == xstateMachineOutline",
-          "group": "navigation@3"
+          "group": "navigation@0"
         },
         {
           "command": "xstateMachineOutline.toggleGraphSyncExpansion",
           "when": "view == xstateMachineOutline && !xstateOutline.graphReflectsTreeExpansion",
-          "group": "0_cursor@0"
+          "group": "navigation@1"
         },
         {
           "command": "xstateMachineOutline.toggleGraphSyncExpansionActive",
           "when": "view == xstateMachineOutline && xstateOutline.graphReflectsTreeExpansion",
-          "group": "0_cursor@0"
+          "group": "navigation@1"
         },
         {
           "command": "xstateMachineOutline.toggleFollowCursor",
           "when": "view == xstateMachineOutline && !xstateOutline.followCursor",
-          "group": "0_cursor@1"
+          "group": "navigation@2"
         },
         {
           "command": "xstateMachineOutline.toggleFollowCursorActive",
           "when": "view == xstateMachineOutline && xstateOutline.followCursor",
-          "group": "0_cursor@1"
+          "group": "navigation@2"
         },
         {
           "command": "xstateMachineOutline.setNavDiagram",
           "when": "view == xstateMachineOutline && !xstateOutline.navIsDiagram",
-          "group": "0_cursor@2"
+          "group": "navigation@3"
         },
         {
           "command": "xstateMachineOutline.setNavCode",
           "when": "view == xstateMachineOutline && xstateOutline.navIsDiagram",
-          "group": "0_cursor@2"
+          "group": "navigation@3"
         },
         {
           "command": "xstateMachineOutline.setScopeFile",
           "when": "view == xstateMachineOutline && xstateOutline.scopeIsWorkspace",
-          "group": "1_scope@1"
+          "group": "navigation@4"
         },
         {
           "command": "xstateMachineOutline.setScopeWorkspace",
           "when": "view == xstateMachineOutline && !xstateOutline.scopeIsWorkspace",
-          "group": "1_scope@2"
+          "group": "navigation@4"
         },
         {
           "command": "xstateMachineOutline.setViewGrouped",
           "when": "view == xstateMachineOutline && xstateOutline.viewModeIsFlat",
-          "group": "2_view@1"
+          "group": "navigation@5"
         },
         {
           "command": "xstateMachineOutline.setViewFlat",
           "when": "view == xstateMachineOutline && !xstateOutline.viewModeIsFlat",
-          "group": "2_view@2"
+          "group": "navigation@5"
         },
         {
           "command": "xstateMachineOutline.setStateConfigsShow",
           "when": "view == xstateMachineOutline && !xstateOutline.showStateConfigs",
-          "group": "3_configs@1"
+          "group": "navigation@6"
         },
         {
           "command": "xstateMachineOutline.setStateConfigsHide",
           "when": "view == xstateMachineOutline && xstateOutline.showStateConfigs",
-          "group": "3_configs@2"
+          "group": "navigation@6"
         },
         {
           "command": "xstateMachineOutline.setGroupHandlersOn",
           "when": "view == xstateMachineOutline && !xstateOutline.groupEventHandlers",
-          "group": "4_handlers@1"
+          "group": "navigation@7"
         },
         {
           "command": "xstateMachineOutline.setGroupHandlersOff",
           "when": "view == xstateMachineOutline && xstateOutline.groupEventHandlers",
-          "group": "4_handlers@2"
+          "group": "navigation@7"
         },
         {
           "command": "xstateMachineOutline.setSortChildrenSorted",
           "when": "view == xstateMachineOutline && !xstateOutline.sortChildrenIsSorted",
-          "group": "5_sort@1"
+          "group": "navigation@8"
         },
         {
           "command": "xstateMachineOutline.setSortChildrenOriginal",
           "when": "view == xstateMachineOutline && xstateOutline.sortChildrenIsSorted",
-          "group": "5_sort@2"
+          "group": "navigation@8"
         },
         {
           "command": "xstateMachineOutline.setErrorsFilterAll",
           "when": "view == xstateMachineErrors && xstateErrors.filter != all",
-          "group": "0_filter@1"
+          "group": "navigation@0"
         },
         {
           "command": "xstateMachineOutline.setErrorsFilterWarnings",
           "when": "view == xstateMachineErrors && xstateErrors.filter != warning",
-          "group": "0_filter@2"
+          "group": "navigation@1"
         },
         {
           "command": "xstateMachineOutline.setErrorsFilterErrors",
           "when": "view == xstateMachineErrors && xstateErrors.filter != error",
-          "group": "0_filter@3"
+          "group": "navigation@2"
         },
         {
           "command": "xstateMachineOutline.setErrorsGroupingFile",
           "when": "view == xstateMachineErrors && xstateErrors.grouping != file",
-          "group": "1_grouping@1"
+          "group": "navigation@3"
         },
         {
           "command": "xstateMachineOutline.setErrorsGroupingSeverity",
           "when": "view == xstateMachineErrors && xstateErrors.grouping != severity",
-          "group": "1_grouping@2"
+          "group": "navigation@4"
         },
         {
           "command": "xstateMachineOutline.setErrorsGroupingFlat",
           "when": "view == xstateMachineErrors && xstateErrors.grouping != flat",
-          "group": "1_grouping@3"
+          "group": "navigation@5"
         }
       ],
       "view/item/context": [

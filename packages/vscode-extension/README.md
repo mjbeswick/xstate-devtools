@@ -35,7 +35,7 @@ A dedicated **Errors** view collects every problem the static analyzer finds acr
 - **What it catches** — unreachable / orphaned states, unknown action / guard / actor references (not defined in `setup()`), duplicate explicit `id`s, invalid config properties, the deprecated `cond`, and unused `setup` entries
 - **Real vs. soft** — genuine runtime failures (unknown references, duplicate ids) are **errors**; static heuristics (unreachable state, invalid property) are **warnings**; deprecations and unused-setup entries are informational
 - **Severity filter** — show **all**, **warnings & errors** (the default), or **errors only** to focus on what actually fails at runtime
-- **Grouping** — organize problems **by file**, **by severity**, or as a **flat list**, from the title-bar menu
+- **Grouping** — organize problems **by file**, **by severity**, or as a **flat list**, from the title-bar icons
 - **Navigate & copy** — click a problem to jump to its source; copy a single issue or a whole group (right-click or **Ctrl/Cmd+C**)
 - **At a glance** — a badge shows the total count, and the pane follows the outline's file/workspace scope
 
@@ -183,7 +183,7 @@ const machine = setup({
 | `xstateOutline.defaultViewMode` | `flat` | Flat list of machines, or grouped by file |
 | `xstateOutline.showStateConfigs` | `false` | Include `createStateConfig`/`stateConfig` patterns in the outline |
 | `xstateOutline.followCursor` | `true` | Reveal the tree node matching the editor cursor |
-| `xstateOutline.navTarget` | `code` | Where clicking a tree node navigates: `code` (jump to source) or `diagram` (focus the state in the diagram). Toggle from the outline title menu |
+| `xstateOutline.navTarget` | `code` | Where clicking a tree node navigates: `code` (jump to source) or `diagram` (focus the state in the diagram). Toggle from the outline title bar |
 | `xstateOutline.graphReflectsTreeExpansion` | `true` | Make the diagram render only the states expanded in the outline |
 | `xstateOutline.codeLens` | `true` | Show a CodeLens (counts + "View Diagram") above each machine |
 | `xstateOutline.showInternalTransitions` | `true` | Show internal (action-only) transitions inside state boxes in the diagram (toggle live from the diagram toolbar) |
