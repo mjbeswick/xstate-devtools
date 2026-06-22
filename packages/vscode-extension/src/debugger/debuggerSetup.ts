@@ -84,15 +84,23 @@ export class DebuggerSetupDetector implements vscode.Disposable {
         const files = await vscode.workspace.findFiles('**/*.{ts,tsx,js,jsx}', SCAN_EXCLUDE_GLOB, SOURCE_SCAN_CAP);
         let hasServerAdapter = false;
         let hasInspectWired = false;
-        for (const uri of files) {
-            if (hasServerAdapter && hasInspectWired) { break; }
-            let text: string;
-            try {
-                text = Buffer.from(await vscode.workspace.fs.readFile(uri)).toString('utf8');
-            } catch { continue; }
-            if (!hasServerAdapter && text.includes('createServerAdapter')) { hasServerAdapter = true; }
-            if (!hasInspectWired && text.includes('createActor') && text.includes('inspect')) {
-                if (fileWiresInspect(uri.fsPath, text)) { hasInspectWired = true; }
+        // Read in bounded-concurrency batches (not 2000 reads at once → no FD
+        // exhaustion), and stop at the first batch boundary once both markers
+        // are found so the common case still short-circuits early.
+        const BATCH = 16;
+        for (let i = 0; i < files.length && !(hasServerAdapter && hasInspectWired); i += BATCH) {
+            const batch = files.slice(i, i + BATCH);
+            const texts = await Promise.all(batch.map(async (uri) => {
+                try { return Buffer.from(await vscode.workspace.fs.readFile(uri)).toString('utf8'); }
+                catch { return null; }
+            }));
+            for (let j = 0; j < texts.length; j++) {
+                const text = texts[j];
+                if (!text) { continue; }
+                if (!hasServerAdapter && text.includes('createServerAdapter')) { hasServerAdapter = true; }
+                if (!hasInspectWired && text.includes('createActor') && text.includes('inspect')) {
+                    if (fileWiresInspect(batch[j].fsPath, text)) { hasInspectWired = true; }
+                }
             }
         }
         return { hasServerAdapter, hasInspectWired };

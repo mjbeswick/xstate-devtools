@@ -11,14 +11,29 @@ import type { XStateGraphViewProvider } from '../graphView';
 import type { WorkspaceScanner } from '../workspaceScanner';
 import type { MachineNode } from '../parser';
 
-/** Locate the statically-parsed machine whose root id matches a running machine. */
-function findStaticMachine(scanner: WorkspaceScanner, machineId: string): MachineNode | undefined {
+/**
+ * Locate the statically-parsed machine whose root id matches a running machine.
+ * When several machines share the id (e.g. a machine and a fixture copy), prefer
+ * the one whose file the runtime reported in `sourceLocation`, falling back to
+ * the first match.
+ */
+function findStaticMachine(
+    scanner: WorkspaceScanner,
+    machineId: string,
+    sourceLocation?: string,
+): MachineNode | undefined {
+    const matches: MachineNode[] = [];
     for (const file of scanner.getCached()) {
         for (const machine of file.machines) {
-            if (machine.label === machineId) { return machine; }
+            if (machine.label === machineId) { matches.push(machine); }
         }
     }
-    return undefined;
+    if (matches.length <= 1) { return matches[0]; }
+    if (sourceLocation) {
+        const byFile = matches.find((m) => m.uri && sourceLocation.includes(m.uri.fsPath));
+        if (byFile) { return byFile; }
+    }
+    return matches[0];
 }
 
 /** Key chain from a machine's root down to the node with the given id. */
@@ -77,7 +92,7 @@ export function registerDebuggerCommands(
             const state = controller.getStore().getState();
             const actor = state.actors.get(item.sessionId);
             if (!actor?.machine) { return; }
-            const machine = findStaticMachine(scanner, actor.machine.id);
+            const machine = findStaticMachine(scanner, actor.machine.id, actor.machine.sourceLocation);
             // State node → its exact definition, via the static parse.
             if (item.kind === 'state' && item.node && machine) {
                 const path = pathToNode(actor.machine.root, item.node.id);
@@ -108,7 +123,7 @@ export function registerDebuggerCommands(
             if (!item) { return; }
             const actor = controller.getStore().getState().actors.get(item.sessionId);
             if (!actor?.machine) { return; }
-            const machine = findStaticMachine(scanner, actor.machine.id);
+            const machine = findStaticMachine(scanner, actor.machine.id, actor.machine.sourceLocation);
             if (!machine) {
                 void vscode.window.showWarningMessage(
                     `No diagram available — machine "${actor.machine.id}" isn't in the workspace.`,

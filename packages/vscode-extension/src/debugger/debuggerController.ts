@@ -79,6 +79,7 @@ export class DebuggerController implements vscode.Disposable {
     private readonly views = new Set<DebuggerView>();
     private lastModel: DebuggerViewModel | null = null;
     private lastTimeTravelling = false;
+    private flushTimer: ReturnType<typeof setTimeout> | null = null;
     private readonly log: vscode.OutputChannel;
 
     constructor(private readonly graphView: XStateGraphViewProvider) {
@@ -90,18 +91,11 @@ export class DebuggerController implements vscode.Disposable {
 
         // Re-derive the live diagram overlay and re-push the view-model whenever
         // the store changes.
-        this.unsubscribeStore = this.store.subscribe(() => {
-            this.syncDiagram();
-            this.pushModel();
-            // Only touch the context key when it actually flips — the store
-            // fires on every inspector message, so an unconditional setContext
-            // here is one IPC round-trip per event for a value that rarely changes.
-            const timeTravelling = this.store.getState().timeTravelSeq !== null;
-            if (timeTravelling !== this.lastTimeTravelling) {
-                this.lastTimeTravelling = timeTravelling;
-                void vscode.commands.executeCommand('setContext', 'xstateDebugger.timeTravelling', timeTravelling);
-            }
-        });
+        // The store fires once per inspector message; a burst of events (several
+        // actors, a fast emitter) would otherwise rebuild the diagram overlay and
+        // the full view-model once per message. Coalesce into a single deferred
+        // flush so a queued burst costs one rebuild instead of N.
+        this.unsubscribeStore = this.store.subscribe(() => this.scheduleFlush());
         void this.setConnectedContext(false);
     }
 
@@ -324,6 +318,23 @@ export class DebuggerController implements vscode.Disposable {
         this.pushModel();
     }
 
+    /** Coalesce store-driven rebuilds: at most one deferred flush in flight. */
+    private scheduleFlush(): void {
+        if (this.flushTimer) { return; }
+        this.flushTimer = setTimeout(() => {
+            this.flushTimer = null;
+            this.syncDiagram();
+            this.pushModel();
+            // Only touch the context key when it actually flips — avoids an IPC
+            // round-trip per event for a value that rarely changes.
+            const timeTravelling = this.store.getState().timeTravelSeq !== null;
+            if (timeTravelling !== this.lastTimeTravelling) {
+                this.lastTimeTravelling = timeTravelling;
+                void vscode.commands.executeCommand('setContext', 'xstateDebugger.timeTravelling', timeTravelling);
+            }
+        }, 0);
+    }
+
     /** Build and push the current view-model to the attached webview view. */
     private pushModel(): void {
         const model = this.buildViewModel();
@@ -475,6 +486,7 @@ export class DebuggerController implements vscode.Disposable {
     }
 
     dispose(): void {
+        if (this.flushTimer) { clearTimeout(this.flushTimer); this.flushTimer = null; }
         this.unsubscribeStore?.();
         this.client?.dispose();
         this.statusBar.dispose();
