@@ -155,6 +155,18 @@ export const inspectorStoreInitializer: StateCreator<InspectorStore> = (set, get
           })
           return { actors, registeredSnapshots, events, persistedSnapshots }
         }
+        case 'XSTATE_REPLAY_DONE': {
+          // Reconcile to the server's authoritative live set: drop actors left
+          // over from a previous session, keep the ones just replayed.
+          const live = new Set(msg.sessionIds)
+          for (const id of [...actors.keys()]) {
+            if (!live.has(id)) { actors.delete(id); registeredSnapshots.delete(id) }
+          }
+          const selectedActorId = state.selectedActorId && actors.has(state.selectedActorId)
+            ? state.selectedActorId
+            : null
+          return { actors, registeredSnapshots, events, selectedActorId }
+        }
       }
 
       return { actors, registeredSnapshots, events }

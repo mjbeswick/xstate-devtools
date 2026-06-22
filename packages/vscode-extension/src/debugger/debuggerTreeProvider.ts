@@ -46,9 +46,9 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
     // tree-item ids so a re-added actor that reuses its old sessionId gets a
     // fresh identity — VS Code's tree model won't re-render a recycled id after
     // the view was emptied, so existing actors would otherwise stay hidden on
-    // reconnect while newly-spawned ones appeared. The controller empties the
-    // store at the start of every connection attempt (onStatus 'connecting'),
-    // so this empty→non-empty transition fires reliably on every reconnect.
+    // reconnect while newly-spawned ones appeared. This covers the explicit
+    // disconnect→reconnect path, where disconnect() empties the store and the
+    // reconnect repopulates it (empty→non-empty).
     private generation = 0;
     private lastActorCount = 0;
 

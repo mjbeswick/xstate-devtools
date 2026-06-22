@@ -51,6 +51,12 @@ describe('server reconnect replay', () => {
     const snaps = typesOf(second, 'XSTATE_SNAPSHOT')
     expect(snaps.some((s) => s.snapshot.value === 'b')).toBe(true)
 
+    // Every connect ends with the authoritative live set so the panel can
+    // reconcile (prune ghosts) instead of clearing on reconnect.
+    const done = typesOf(second, 'XSTATE_REPLAY_DONE')
+    expect(done.length).toBe(1)
+    expect(done[0].sessionIds).toEqual(reg.sessionId ? [reg.sessionId] : [])
+
     actor.stop()
     adapter.close()
   }, 6000)

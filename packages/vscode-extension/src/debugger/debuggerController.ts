@@ -312,18 +312,13 @@ export class DebuggerController implements vscode.Disposable {
 
     private onStatus(status: ConnectionStatus): void {
         this.log.appendLine(`[${stamp()}] status → ${status}`);
-        const prev = this.status;
         this.status = status;
-        // Starting a fresh connection attempt: drop any actors from the previous
-        // session so a reconnect — including a passive auto-reconnect after the
-        // inspected app restarts — rebuilds from the server's replay instead of
-        // accumulating ghost actors. (Only explicit disconnect() did this before,
-        // so passive reconnects leaked stale actors.) Emptying the store here also
-        // makes the Instances tree's generation counter bump reliably on every
-        // reconnect, since the actor set always returns through zero.
-        if (status === 'connecting' && prev !== 'connecting') {
-            this.store.getState().exitReplay();
-        }
+        // Ghost actors from a previous session are pruned by the server's
+        // XSTATE_REPLAY_DONE reconcile on (re)connect — NOT by clearing the
+        // store here. Clearing on every 'connecting' wiped live actors whenever
+        // the socket flapped (a transient close after open → auto-reconnect →
+        // another 'connecting'), which is the "actor appears then disappears"
+        // bug. Only an explicit disconnect() empties the store now.
         this.renderStatusBar();
         void this.setConnectedContext(status === 'open');
         this._onDidChangeStatus.fire(status);

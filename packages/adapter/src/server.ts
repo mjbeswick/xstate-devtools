@@ -141,6 +141,16 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
               } catch { /* ignore */ }
             }
           }
+          // Tell the panel the authoritative live set so it can prune actors
+          // from a previous session (reconnect/app-restart) without wiping the
+          // ones we just replayed.
+          try {
+            ws.send(JSON.stringify({
+              type: 'XSTATE_REPLAY_DONE',
+              sessionIds: [...server.liveActors.keys()],
+              __xstateDevtools: true,
+            }))
+          } catch { /* ignore */ }
           // Flush the pre-connection event backlog once, to the first panel only.
           if (!server.activated) {
             server.activated = true

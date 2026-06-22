@@ -137,6 +137,10 @@ export type PageToExtensionMessage =
       error?: string               // set when the actor can't be persisted
       timestamp: number
     }
+  | {
+      type: 'XSTATE_REPLAY_DONE'
+      sessionIds: string[]         // authoritative set of live actors just replayed (for reconcile)
+    }
 
 // panel → service worker → content script → injected world → adapter
 export type ExtensionToPageMessage =
