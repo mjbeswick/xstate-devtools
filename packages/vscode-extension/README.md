@@ -58,7 +58,7 @@ A dedicated **Errors** view collects every problem the static analyzer finds acr
 
 ### 🐞 Live debugger
 - **Attach to a running app** — connect to a Node/SSR app that uses the `@xstate-devtools/adapter` server adapter (`createServerAdapter()`, default `ws://127.0.0.1:9301`) straight from the editor. Connect/disconnect from the **status-bar item** or the **XState Debugger** view; the connection auto-reconnects if the app restarts
-- **Live on the diagram** — the open statechart diagram lights up with the machine's **real** active state as it runs — unlike the static simulator, this is the actual resolved path, with real guard outcomes and context
+- **Live on the diagram** — the open statechart diagram lights up with the machine's **real** active state as it runs — unlike the static simulator, this is the actual resolved path, with real guard outcomes and context. Toggle **Follow Actor in Diagram** in the Instances title bar to auto-open/reveal the diagram for whichever actor you select, and stepping through the event log moves the highlight to that historical state
 - **Machine-instance tree** — the **Instances** view is a native tree of running actors (parent → child) with each instance's current state shown; expand an instance to see its **live state-node tree with the active configuration highlighted**. Connect/disconnect from the Instances view's title icon. Selecting an instance drives the **Context** view — a native, expandable tree of the actor's **real context**. Right-click an instance or state for **Go to Source**, **Reveal in Diagram**, **Send Event…**, and **Capture / Restore Snapshot**
 - **Event log** — the **Events** view (bottom panel) lists every event each machine receives, with actor, timestamp, and sequence number. Title actions: **Step Back / Forward** through history, **Back to Live**, **Clear log**, and **Export / Import session**. Stepping/selecting an event freezes the Instances + Context trees at that point (the Instances view shows a "⏱ Time travel" banner). Right-click a Context value to **Copy** it
 - **Time travel** — click any event to freeze the diagram and inspector at that point in history; **Back to live** resumes. Pure client-side replay — it never touches the running app
@@ -180,6 +180,7 @@ const machine = setup({
 | --- | --- | --- |
 | `xstateOutline.debuggerUrl` | `ws://127.0.0.1:9301` | WebSocket URL of the running app's XState server adapter (`createServerAdapter`) that the live debugger connects to |
 | `xstateOutline.debuggerShowStopped` | `true` | Show stopped actors in the live debugger's Instances tree (toggle from the Instances title bar) |
+| `xstateOutline.debuggerFollowDiagram` | `false` | Auto-open/reveal the statechart diagram for the selected actor in the live debugger (toggle from the Instances title bar) |
 | `xstateOutline.defaultScope` | `workspace` | Scan the current file only, or the whole workspace |
 | `xstateOutline.defaultViewMode` | `flat` | Flat list of machines, or grouped by file |
 | `xstateOutline.showStateConfigs` | `false` | Include `createStateConfig`/`stateConfig` patterns in the outline |

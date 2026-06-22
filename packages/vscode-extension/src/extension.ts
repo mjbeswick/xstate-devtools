@@ -16,7 +16,7 @@ import { DebuggerController } from './debugger/debuggerController';
 import { DebuggerViewProvider } from './debugger/debuggerView';
 import { DebuggerTreeProvider } from './debugger/debuggerTreeProvider';
 import { DebuggerContextTreeProvider, ContextTreeItem } from './debugger/debuggerContextTreeProvider';
-import { registerDebuggerCommands } from './debugger/debuggerCommands';
+import { registerDebuggerCommands, findStaticMachine } from './debugger/debuggerCommands';
 import { DebuggerActiveDecorationProvider } from './debugger/debuggerDecorationProvider';
 import { DebuggerSetupDetector } from './debugger/debuggerSetup';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
@@ -790,6 +790,8 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.workspace.getConfiguration('xstateOutline').get('debuggerShowStopped', true));
     void vscode.commands.executeCommand('setContext', 'xstateDebugger.setup', 'unknown');
     void vscode.commands.executeCommand('setContext', 'xstateDebugger.setupChecking', false);
+    void vscode.commands.executeCommand('setContext', 'xstateDebugger.followDiagram',
+        vscode.workspace.getConfiguration('xstateOutline').get('debuggerFollowDiagram', false));
     // Native instances tree (machine instances + their live state trees).
     const debuggerTreeProvider = new DebuggerTreeProvider(context.extensionUri, debuggerController);
     const debuggerTreeView = vscode.window.createTreeView('xstateDebuggerInstances', {
@@ -820,6 +822,35 @@ export async function activate(context: vscode.ExtensionContext) {
     };
     const debuggerShowStoppedCommand = vscode.commands.registerCommand('xstateDebugger.showStopped', () => setShowStopped(true));
     const debuggerHideStoppedCommand = vscode.commands.registerCommand('xstateDebugger.hideStopped', () => setShowStopped(false));
+    // "Follow actor in diagram" — when on, selecting an actor opens/reveals its
+    // statechart diagram (the live overlay then tracks it, incl. time-travel).
+    let followDiagram = vscode.workspace.getConfiguration('xstateOutline').get('debuggerFollowDiagram', false);
+    let lastFollowedActor: string | null = null;
+    const openDiagramForActor = (sessionId: string | null): void => {
+        if (!sessionId) { return; }
+        const actor = debuggerController.getStore().getState().actors.get(sessionId);
+        if (!actor?.machine) { return; }
+        const machine = findStaticMachine(workspaceScanner, actor.machine.id, actor.machine.sourceLocation);
+        if (machine) { graphViewProvider.show(machine, machine.label); }
+    };
+    const setFollowDiagram = (value: boolean) => {
+        followDiagram = value;
+        void vscode.workspace.getConfiguration('xstateOutline').update('debuggerFollowDiagram', value, vscode.ConfigurationTarget.Global);
+        void vscode.commands.executeCommand('setContext', 'xstateDebugger.followDiagram', value);
+        if (value) {
+            lastFollowedActor = debuggerController.getStore().getState().selectedActorId;
+            openDiagramForActor(lastFollowedActor);
+        }
+    };
+    const debuggerFollowDiagramCommand = vscode.commands.registerCommand('xstateDebugger.followDiagram', () => setFollowDiagram(true));
+    const debuggerUnfollowDiagramCommand = vscode.commands.registerCommand('xstateDebugger.unfollowDiagram', () => setFollowDiagram(false));
+    const debuggerFollowSub = debuggerController.getStore().subscribe(() => {
+        if (!followDiagram) { return; }
+        const sel = debuggerController.getStore().getState().selectedActorId;
+        if (sel === lastFollowedActor) { return; }
+        lastFollowedActor = sel;
+        openDiagramForActor(sel);
+    });
     // Right-click actions on the Instances tree.
     const debuggerItemCommands = registerDebuggerCommands(debuggerController, graphViewProvider, workspaceScanner);
     // Colour active state labels green in the Instances tree.
@@ -1274,6 +1305,9 @@ export async function activate(context: vscode.ExtensionContext) {
         debuggerContextTreeView,
         debuggerShowStoppedCommand,
         debuggerHideStoppedCommand,
+        debuggerFollowDiagramCommand,
+        debuggerUnfollowDiagramCommand,
+        { dispose: debuggerFollowSub },
         ...debuggerItemCommands,
         debuggerDecorationProvider,
         debuggerDecorationRegistration,

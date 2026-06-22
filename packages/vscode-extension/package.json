@@ -237,6 +237,18 @@
         "icon": "$(eye-closed)"
       },
       {
+        "command": "xstateDebugger.followDiagram",
+        "title": "Follow Actor in Diagram",
+        "category": "XState Debugger",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "xstateDebugger.unfollowDiagram",
+        "title": "Stop Following in Diagram",
+        "category": "XState Debugger",
+        "icon": "$(type-hierarchy-sub)"
+      },
+      {
         "command": "xstateDebugger.exportSession",
         "title": "Export Session…",
         "category": "XState Debugger",
@@ -505,6 +517,11 @@
           "default": true,
           "description": "Show stopped actors in the XState Debugger Instances view."
         },
+        "xstateOutline.debuggerFollowDiagram": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically open/reveal the statechart diagram for the selected actor in the live debugger, with its live state highlighted."
+        },
         "xstateOutline.defaultScope": {
           "type": "string",
           "enum": [
@@ -623,6 +640,16 @@
           "command": "xstateDebugger.showStopped",
           "when": "view == xstateDebuggerInstances && !xstateDebugger.showStopped",
           "group": "navigation@1"
+        },
+        {
+          "command": "xstateDebugger.unfollowDiagram",
+          "when": "view == xstateDebuggerInstances && xstateDebugger.followDiagram",
+          "group": "navigation@2"
+        },
+        {
+          "command": "xstateDebugger.followDiagram",
+          "when": "view == xstateDebuggerInstances && !xstateDebugger.followDiagram",
+          "group": "navigation@2"
         },
         {
           "command": "xstateDebugger.stepBack",

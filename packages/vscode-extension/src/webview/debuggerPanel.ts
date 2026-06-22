@@ -64,6 +64,12 @@ function render(m: any): void {
 
     if (ROLE === 'events') {
         body.innerHTML = banner + renderEvents(m);
+        // Keep the selected event in view while time-travelling — the innerHTML
+        // rebuild otherwise resets scroll to the top (newest) on every new event,
+        // yanking the user off the row they selected.
+        if (m.timeTravelSeq !== null) {
+            body.querySelector('tr.tt')?.scrollIntoView({ block: 'nearest' });
+        }
     } else if (!m.selected) {
         // Instances now live in the native "Instances" tree; this webview is the
         // inspector for whatever is selected there.

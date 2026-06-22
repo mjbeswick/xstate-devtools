@@ -17,7 +17,7 @@ import type { MachineNode } from '../parser';
  * the one whose file the runtime reported in `sourceLocation`, falling back to
  * the first match.
  */
-function findStaticMachine(
+export function findStaticMachine(
     scanner: WorkspaceScanner,
     machineId: string,
     sourceLocation?: string,
