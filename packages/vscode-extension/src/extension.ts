@@ -18,6 +18,7 @@ import { DebuggerTreeProvider } from './debugger/debuggerTreeProvider';
 import { DebuggerContextTreeProvider, ContextTreeItem } from './debugger/debuggerContextTreeProvider';
 import { registerDebuggerCommands } from './debugger/debuggerCommands';
 import { DebuggerActiveDecorationProvider } from './debugger/debuggerDecorationProvider';
+import { DebuggerSetupDetector } from './debugger/debuggerSetup';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
 import { ErrorsTreeProvider, ErrorsGrouping, ErrorsFilter } from './errorsView';
 import { XStateCodeLensProvider } from './codeLensProvider';
@@ -818,6 +819,19 @@ export async function activate(context: vscode.ExtensionContext) {
     // Colour active state labels green in the Instances tree.
     const debuggerDecorationProvider = new DebuggerActiveDecorationProvider(debuggerController);
     const debuggerDecorationRegistration = vscode.window.registerFileDecorationProvider(debuggerDecorationProvider);
+    // Detect how ready the workspace is for the debugger → tailored welcome text.
+    const debuggerSetupDetector = new DebuggerSetupDetector(workspaceScanner);
+    void vscode.commands.executeCommand('setContext', 'xstateDebugger.setup', 'unknown');
+    const debuggerRecheckCommand = vscode.commands.registerCommand('xstateDebugger.recheckSetup', () => debuggerSetupDetector.refresh());
+    // Recompute when the Instances view is shown, when package.json/source change.
+    const debuggerSetupOnVisible = debuggerTreeView.onDidChangeVisibility((e) => {
+        if (e.visible) { void debuggerSetupDetector.refresh(); }
+    });
+    const debuggerSetupOnScan = workspaceScanner.onDidChange(() => void debuggerSetupDetector.refresh());
+    const debuggerPkgWatcher = vscode.workspace.createFileSystemWatcher('**/package.json');
+    debuggerPkgWatcher.onDidChange(() => void debuggerSetupDetector.refresh());
+    debuggerPkgWatcher.onDidCreate(() => void debuggerSetupDetector.refresh());
+    debuggerPkgWatcher.onDidDelete(() => void debuggerSetupDetector.refresh());
     // Events-panel + time-travel commands.
     const debuggerBackToLiveCommand = vscode.commands.registerCommand('xstateDebugger.backToLive', () => debuggerController.backToLive());
     const debuggerStepBackCommand = vscode.commands.registerCommand('xstateDebugger.stepBack', () => debuggerController.stepBack());
@@ -1248,6 +1262,11 @@ export async function activate(context: vscode.ExtensionContext) {
         ...debuggerItemCommands,
         debuggerDecorationProvider,
         debuggerDecorationRegistration,
+        debuggerSetupDetector,
+        debuggerRecheckCommand,
+        debuggerSetupOnVisible,
+        debuggerSetupOnScan,
+        debuggerPkgWatcher,
         debuggerBackToLiveCommand,
         debuggerStepBackCommand,
         debuggerStepForwardCommand,
