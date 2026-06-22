@@ -80,6 +80,16 @@
     },
     "viewsWelcome": [
       {
+        "view": "xstateDebuggerInstances",
+        "contents": "Connect to a running app to inspect its XState actors.\n[Connect](command:xstateDebugger.connect)\n\nThe app must run createServerAdapter() (Node/SSR) on the configured port (default ws://127.0.0.1:9301).",
+        "when": "!xstateDebugger.connected"
+      },
+      {
+        "view": "xstateDebuggerInstances",
+        "contents": "Connected — waiting for actors.\nIf your adapter starts lazily (e.g. inside a route loader), load a page so it initialises.\n[Disconnect](command:xstateDebugger.disconnect)",
+        "when": "xstateDebugger.connected"
+      },
+      {
         "view": "xstateMachineOutline",
         "contents": "All machines in this file are state configs, which are hidden.\n[Show State Configs](command:xstateMachineOutline.setStateConfigsShow)",
         "when": "xstateOutline.emptyReason == stateConfigsHidden"
