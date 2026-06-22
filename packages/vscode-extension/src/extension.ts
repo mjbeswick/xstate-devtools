@@ -18,7 +18,7 @@ import { DebuggerTreeProvider } from './debugger/debuggerTreeProvider';
 import { DebuggerContextTreeProvider, ContextTreeItem } from './debugger/debuggerContextTreeProvider';
 import { registerDebuggerCommands } from './debugger/debuggerCommands';
 import { DebuggerActiveDecorationProvider } from './debugger/debuggerDecorationProvider';
-import { DebuggerSetupDetector } from './debugger/debuggerSetup';
+import { DebuggerSetupDetector, SETUP_DESCRIPTION } from './debugger/debuggerSetup';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
 import { ErrorsTreeProvider, ErrorsGrouping, ErrorsFilter } from './errorsView';
 import { XStateCodeLensProvider } from './codeLensProvider';
@@ -822,7 +822,11 @@ export async function activate(context: vscode.ExtensionContext) {
     // Detect how ready the workspace is for the debugger → tailored welcome text.
     const debuggerSetupDetector = new DebuggerSetupDetector(workspaceScanner);
     void vscode.commands.executeCommand('setContext', 'xstateDebugger.setup', 'unknown');
-    const debuggerRecheckCommand = vscode.commands.registerCommand('xstateDebugger.recheckSetup', () => debuggerSetupDetector.refresh());
+    const debuggerRecheckCommand = vscode.commands.registerCommand('xstateDebugger.recheckSetup', async () => {
+        await debuggerSetupDetector.refresh();
+        // Surface the result so the command isn't a silent no-op when nothing changed.
+        void vscode.window.showInformationMessage(`XState debugger — ${SETUP_DESCRIPTION[debuggerSetupDetector.getState()]}`);
+    });
     // Recompute when the Instances view is shown, when package.json/source change.
     const debuggerSetupOnVisible = debuggerTreeView.onDidChangeVisibility((e) => {
         if (e.visible) { void debuggerSetupDetector.refresh(); }

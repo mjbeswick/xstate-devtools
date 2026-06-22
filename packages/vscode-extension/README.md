@@ -67,7 +67,7 @@ A dedicated **Errors** view collects every problem the static analyzer finds acr
 - **Record & replay** — export the captured session to a JSON file and re-import it later as a read-only replay
 - **Works alongside the VS Code debugger** — the WebSocket attach is independent of the V8 inspector, so you can set breakpoints in an action/guard and inspect state/event flow at the same time (live updates pause while the process is paused at a breakpoint, then flush on resume)
 
-When disconnected, the **Instances** view shows setup-aware guidance — whether the workspace uses XState, whether `@xstate-devtools/adapter` is installed, whether a `createServerAdapter()` exists, and whether its `inspect` is wired into a `createActor(machine, { inspect })` — so it tells you exactly what's missing (with a **Recheck setup** action).
+When disconnected, the **Instances** view shows setup-aware guidance — whether the workspace uses XState, whether `@xstate-devtools/adapter` is installed, whether a `createServerAdapter()` exists, and whether its `inspect` is wired into a `createActor(machine, { inspect })` — so it tells you exactly what's missing (with a **Check Setup** action).
 
 **Layout.** The live debugger spans dockable surfaces: the **XState Debugger** container (its own activity-bar icon) holds the **Instances** and **Context** native trees (connect from the Instances title bar); the **Events** view sits in the **bottom panel**; and the **statechart diagram** opens in the editor. To dock the debugger on the right, drag its activity-bar icon into the **secondary side bar** (View → Appearance → Secondary Side Bar, or drag-and-drop) — VS Code remembers the placement. (VS Code can't default a view to the right side bar, so this one-time move is expected.)
 

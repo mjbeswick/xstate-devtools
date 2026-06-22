@@ -41,6 +41,13 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
     private showStopped: boolean;
     // Active state-node ids per actor, memoised per refresh (cleared on change).
     private activeCache = new Map<string, Set<string>>();
+    // Bumped each time the actor set repopulates from empty (i.e. on every
+    // reconnect). Folded into tree-item ids so a re-added actor that reuses its
+    // old sessionId gets a fresh identity — VS Code's tree model won't re-render
+    // a recycled id after the view was emptied, so existing actors would
+    // otherwise stay hidden on reconnect while newly-spawned ones appeared.
+    private generation = 0;
+    private lastActorCount = 0;
 
     constructor(
         extensionUri: vscode.Uri,
@@ -49,6 +56,9 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
         this.iconBase = vscode.Uri.joinPath(extensionUri, 'resources', 'icons');
         this.showStopped = vscode.workspace.getConfiguration('xstateOutline').get('debuggerShowStopped', true);
         this.unsubscribe = this.controller.getStore().subscribe(() => {
+            const count = this.controller.getStore().getState().actors.size;
+            if (count > 0 && this.lastActorCount === 0) { this.generation++; }
+            this.lastActorCount = count;
             this.activeCache.clear();
             this._onDidChangeTreeData.fire();
         });
@@ -125,7 +135,7 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
         const state = this.controller.getStore().getState();
         const actor = state.actors.get(sessionId)!;
         const item = new DebuggerTreeItem('actor', sessionId);
-        item.id = `actor:${sessionId}`;
+        item.id = `actor:${this.generation}:${sessionId}`;
         item.label = actor.machine?.id ?? sessionId.slice(0, 8);
         const snap = getDisplaySnapshot(state, sessionId) ?? actor.snapshot;
         const leaves = actor.machine && snap
@@ -152,7 +162,7 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
     private stateItem(sessionId: string, node: SerializedStateNode, parentInitial?: string): DebuggerTreeItem {
         const active = this.activeIds(sessionId).has(node.id);
         const item = new DebuggerTreeItem('state', sessionId, node);
-        item.id = `state:${sessionId}:${node.id}`;
+        item.id = `state:${this.generation}:${sessionId}:${node.id}`;
         item.label = node.key;
         item.contextValue = 'xstateDebuggerState';
         // Active states are shown by colouring the label green (via the

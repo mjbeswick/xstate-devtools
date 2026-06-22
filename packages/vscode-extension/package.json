@@ -96,12 +96,12 @@
       },
       {
         "view": "xstateDebuggerInstances",
-        "contents": "Found createServerAdapter(), but its inspect isn't passed to any actor.\nPass it when creating your root actor: createActor(machine, { inspect }).\n[Setup guide](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension#-live-debugger)\n[Recheck](command:xstateDebugger.recheckSetup)\n[Connect anyway](command:xstateDebugger.connect)",
+        "contents": "Found createServerAdapter(), but its inspect isn't passed to any actor.\nPass it when creating your root actor: createActor(machine, { inspect }).\n[Setup guide](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension#-live-debugger)\n[Check Setup](command:xstateDebugger.recheckSetup)\n[Connect anyway](command:xstateDebugger.connect)",
         "when": "!xstateDebugger.connected && xstateDebugger.setup == inspect-not-wired"
       },
       {
         "view": "xstateDebuggerInstances",
-        "contents": "Start your app, then connect to inspect its XState actors.\n[Connect](command:xstateDebugger.connect)\n[Recheck setup](command:xstateDebugger.recheckSetup)",
+        "contents": "Start your app, then connect to inspect its XState actors.\n[Connect](command:xstateDebugger.connect)\n[Check Setup](command:xstateDebugger.recheckSetup)",
         "when": "!xstateDebugger.connected && (xstateDebugger.setup == ready || xstateDebugger.setup == unknown)"
       },
       {
@@ -179,7 +179,7 @@
       },
       {
         "command": "xstateDebugger.recheckSetup",
-        "title": "Recheck Setup",
+        "title": "Check Setup",
         "category": "XState Debugger",
         "icon": "$(refresh)"
       },
