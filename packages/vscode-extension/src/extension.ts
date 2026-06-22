@@ -15,7 +15,7 @@ import { XStateGraphViewProvider } from './graphView';
 import { DebuggerController } from './debugger/debuggerController';
 import { DebuggerViewProvider } from './debugger/debuggerView';
 import { DebuggerTreeProvider } from './debugger/debuggerTreeProvider';
-import { DebuggerContextTreeProvider } from './debugger/debuggerContextTreeProvider';
+import { DebuggerContextTreeProvider, ContextTreeItem } from './debugger/debuggerContextTreeProvider';
 import { registerDebuggerCommands } from './debugger/debuggerCommands';
 import { DebuggerActiveDecorationProvider } from './debugger/debuggerDecorationProvider';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
@@ -791,6 +791,15 @@ export async function activate(context: vscode.ExtensionContext) {
         const item = e.selection[0];
         if (item) { debuggerController.selectActor(item.sessionId); }
     });
+    // Show a "frozen" indicator on the Instances view while time-travelling / replaying.
+    const debuggerFreezeIndicator = debuggerController.getStore().subscribe(() => {
+        const s = debuggerController.getStore().getState();
+        debuggerTreeView.message = s.timeTravelSeq !== null
+            ? `⏱ Time travel — seq ${s.timeTravelSeq}`
+            : s.replayMode
+                ? `● Replay${s.replayName ? ` — ${s.replayName}` : ''}`
+                : undefined;
+    });
     // Native context tree for the selected actor (expandable JSON).
     const debuggerContextTreeProvider = new DebuggerContextTreeProvider(debuggerController);
     const debuggerContextTreeView = vscode.window.createTreeView('xstateDebuggerContext', {
@@ -809,6 +818,20 @@ export async function activate(context: vscode.ExtensionContext) {
     // Colour active state labels green in the Instances tree.
     const debuggerDecorationProvider = new DebuggerActiveDecorationProvider(debuggerController);
     const debuggerDecorationRegistration = vscode.window.registerFileDecorationProvider(debuggerDecorationProvider);
+    // Events-panel + time-travel commands.
+    const debuggerBackToLiveCommand = vscode.commands.registerCommand('xstateDebugger.backToLive', () => debuggerController.backToLive());
+    const debuggerStepBackCommand = vscode.commands.registerCommand('xstateDebugger.stepBack', () => debuggerController.stepBack());
+    const debuggerStepForwardCommand = vscode.commands.registerCommand('xstateDebugger.stepForward', () => debuggerController.stepForward());
+    const debuggerClearEventsCommand = vscode.commands.registerCommand('xstateDebugger.clearEvents', () => debuggerController.clearEvents());
+    const debuggerCopyContextCommand = vscode.commands.registerCommand(
+        'xstateDebugger.copyContextValue',
+        (item?: ContextTreeItem) => {
+            if (!item) { return; }
+            const v = item.value;
+            const text = typeof v === 'string' ? v : JSON.stringify(v, null, 2);
+            void vscode.env.clipboard.writeText(text ?? String(v));
+        },
+    );
     const debuggerConnectCommand = vscode.commands.registerCommand('xstateDebugger.connect', () => debuggerController.connect());
     const debuggerDisconnectCommand = vscode.commands.registerCommand('xstateDebugger.disconnect', () => debuggerController.disconnect());
     const debuggerToggleCommand = vscode.commands.registerCommand('xstateDebugger.toggle', () => debuggerController.toggle());
@@ -1225,6 +1248,12 @@ export async function activate(context: vscode.ExtensionContext) {
         ...debuggerItemCommands,
         debuggerDecorationProvider,
         debuggerDecorationRegistration,
+        debuggerBackToLiveCommand,
+        debuggerStepBackCommand,
+        debuggerStepForwardCommand,
+        debuggerClearEventsCommand,
+        debuggerCopyContextCommand,
+        { dispose: debuggerFreezeIndicator },
         debuggerExportSessionCommand,
         debuggerImportSessionCommand,
         debuggerConnectCommand,

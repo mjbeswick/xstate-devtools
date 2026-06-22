@@ -124,6 +124,36 @@
         "category": "XState Debugger"
       },
       {
+        "command": "xstateDebugger.stepBack",
+        "title": "Step Back",
+        "category": "XState Debugger",
+        "icon": "$(debug-step-back)"
+      },
+      {
+        "command": "xstateDebugger.stepForward",
+        "title": "Step Forward",
+        "category": "XState Debugger",
+        "icon": "$(debug-step-over)"
+      },
+      {
+        "command": "xstateDebugger.backToLive",
+        "title": "Back to Live",
+        "category": "XState Debugger",
+        "icon": "$(history)"
+      },
+      {
+        "command": "xstateDebugger.clearEvents",
+        "title": "Clear Event Log",
+        "category": "XState Debugger",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "xstateDebugger.copyContextValue",
+        "title": "Copy Value",
+        "category": "XState Debugger",
+        "icon": "$(copy)"
+      },
+      {
         "command": "xstateDebugger.goToSource",
         "title": "Go to Source",
         "category": "XState Debugger",
@@ -554,14 +584,34 @@
           "group": "1_visibility@1"
         },
         {
-          "command": "xstateDebugger.importSession",
-          "when": "view == xstateDebugger",
+          "command": "xstateDebugger.stepBack",
+          "when": "view == xstateEventsLog",
+          "group": "navigation@0"
+        },
+        {
+          "command": "xstateDebugger.stepForward",
+          "when": "view == xstateEventsLog",
           "group": "navigation@1"
         },
         {
-          "command": "xstateDebugger.exportSession",
-          "when": "view == xstateDebugger",
+          "command": "xstateDebugger.backToLive",
+          "when": "view == xstateEventsLog && xstateDebugger.timeTravelling",
           "group": "navigation@2"
+        },
+        {
+          "command": "xstateDebugger.clearEvents",
+          "when": "view == xstateEventsLog",
+          "group": "navigation@3"
+        },
+        {
+          "command": "xstateDebugger.importSession",
+          "when": "view == xstateEventsLog",
+          "group": "1_session@0"
+        },
+        {
+          "command": "xstateDebugger.exportSession",
+          "when": "view == xstateEventsLog",
+          "group": "1_session@1"
         },
         {
           "command": "xstateMachineOutline.refresh",
@@ -706,6 +756,11 @@
           "group": "1_actor@2"
         },
         {
+          "command": "xstateDebugger.copyContextValue",
+          "when": "view == xstateDebuggerContext && viewItem == xstateDebuggerContext",
+          "group": "navigation@0"
+        },
+        {
           "command": "xstateMachineOutline.goToSource",
           "when": "view == xstateMachineOutline && xstateOutline.navIsDiagram && (viewItem == machine || viewItem == state)",
           "group": "navigation@0"
@@ -796,6 +851,10 @@
         }
       ],
       "commandPalette": [
+        {
+          "command": "xstateDebugger.copyContextValue",
+          "when": "false"
+        },
         {
           "command": "xstateDebugger.goToSource",
           "when": "false"

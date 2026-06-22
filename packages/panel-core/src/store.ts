@@ -44,6 +44,8 @@ export interface InspectorStore {
   selectStateNode: (id: string | null) => void
   timeTravel: (seq: number | null) => void
   setTreeFilter: (filter: string) => void
+  /** Clear the captured event log (and any time-travel point); keeps actors. */
+  clearEvents: () => void
 
   /** Replace store contents with an imported session and enter replay mode. */
   loadSession: (data: SessionExport, name: string) => void
@@ -173,6 +175,10 @@ export const inspectorStoreInitializer: StateCreator<InspectorStore> = (set, get
 
   setTreeFilter(filter) {
     set({ treeFilter: filter })
+  },
+
+  clearEvents() {
+    set({ events: [], timeTravelSeq: null })
   },
 
   loadSession(data, name) {

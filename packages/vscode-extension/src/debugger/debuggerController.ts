@@ -92,6 +92,11 @@ export class DebuggerController implements vscode.Disposable {
         this.unsubscribeStore = this.store.subscribe(() => {
             this.syncDiagram();
             this.pushModel();
+            void vscode.commands.executeCommand(
+                'setContext',
+                'xstateDebugger.timeTravelling',
+                this.store.getState().timeTravelSeq !== null,
+            );
         });
         void this.setConnectedContext(false);
     }
@@ -120,6 +125,38 @@ export class DebuggerController implements vscode.Disposable {
     /** Freeze the display at a captured event seq (null = back to live). */
     timeTravel(seq: number | null): void {
         this.store.getState().timeTravel(seq);
+    }
+
+    /** Exit time-travel and resume showing live snapshots. */
+    backToLive(): void {
+        this.store.getState().timeTravel(null);
+    }
+
+    /** Move the time-travel point one event earlier (live → last event). */
+    stepBack(): void {
+        const { events, timeTravelSeq } = this.store.getState();
+        if (!events.length) { return; }
+        if (timeTravelSeq === null) {
+            this.timeTravel(events[events.length - 1].globalSeq);
+            return;
+        }
+        const idx = events.findIndex((e) => e.globalSeq === timeTravelSeq);
+        if (idx > 0) { this.timeTravel(events[idx - 1].globalSeq); }
+    }
+
+    /** Move the time-travel point one event later (past the last → back to live). */
+    stepForward(): void {
+        const { events, timeTravelSeq } = this.store.getState();
+        if (timeTravelSeq === null) { return; }
+        const idx = events.findIndex((e) => e.globalSeq === timeTravelSeq);
+        if (idx === -1) { return; }
+        if (idx >= events.length - 1) { this.timeTravel(null); }
+        else { this.timeTravel(events[idx + 1].globalSeq); }
+    }
+
+    /** Clear the captured event log (keeps actors connected). */
+    clearEvents(): void {
+        this.store.getState().clearEvents();
     }
 
     /** Send an event to a running actor (defaults to the selected one). */
