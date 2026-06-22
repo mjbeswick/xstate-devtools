@@ -14,7 +14,7 @@ import { ACTIVE_SCHEME } from './debuggerDecorationProvider';
 
 export class DebuggerTreeItem extends vscode.TreeItem {
     constructor(
-        public readonly kind: 'actor' | 'state',
+        public readonly kind: 'actor' | 'state' | 'waiting',
         public readonly sessionId: string,
         public readonly node?: SerializedStateNode,
     ) {
@@ -37,6 +37,7 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
     private readonly unsubscribe: () => void;
+    private readonly statusSub: vscode.Disposable;
     private readonly iconBase: vscode.Uri;
     private showStopped: boolean;
     // Active state-node ids per actor, memoised per refresh (cleared on change).
@@ -64,6 +65,9 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
             this.activeCache.clear();
             this._onDidChangeTreeData.fire();
         });
+        // Connection status drives the "Waiting for actors…" placeholder row
+        // (below) but doesn't change the store, so refresh on it too.
+        this.statusSub = this.controller.onDidChangeStatus(() => this._onDidChangeTreeData.fire());
     }
 
     getShowStopped(): boolean {
@@ -94,6 +98,13 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
                 if ((!parent || !state.actors.has(parent)) && this.includeActor(a.status)) {
                     roots.push(this.actorItem(sessionId));
                 }
+            }
+            // Connected but nothing to show yet: render an in-tree placeholder
+            // rather than relying on viewsWelcome. The native tree reliably
+            // swaps this row for the actor rows once they arrive, whereas the
+            // empty→welcome→content transition can stick on reconnect.
+            if (roots.length === 0 && this.controller.isConnected()) {
+                return [this.waitingItem()];
             }
             return roots.filter((i): i is DebuggerTreeItem => !!i);
         }
@@ -131,6 +142,16 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
             : new Set<string>();
         this.activeCache.set(sessionId, ids);
         return ids;
+    }
+
+    private waitingItem(): DebuggerTreeItem {
+        const item = new DebuggerTreeItem('waiting', '');
+        item.id = 'waiting';
+        item.label = 'Waiting for actors…';
+        item.description = 'load a page if your adapter starts lazily';
+        item.tooltip = 'Connected. If your adapter starts lazily (e.g. inside a route loader), load a page so it initialises.';
+        item.iconPath = new vscode.ThemeIcon('loading~spin');
+        return item;
     }
 
     private actorItem(sessionId: string): DebuggerTreeItem {
@@ -188,6 +209,7 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
 
     dispose(): void {
         this.unsubscribe();
+        this.statusSub.dispose();
         this._onDidChangeTreeData.dispose();
     }
 }

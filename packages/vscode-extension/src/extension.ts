@@ -797,7 +797,7 @@ export async function activate(context: vscode.ExtensionContext) {
     });
     const debuggerTreeSelectionListener = debuggerTreeView.onDidChangeSelection((e) => {
         const item = e.selection[0];
-        if (item) { debuggerController.selectActor(item.sessionId); }
+        if (item && item.kind !== 'waiting') { debuggerController.selectActor(item.sessionId); }
     });
     // Show a "frozen" indicator on the Instances view while time-travelling / replaying.
     const debuggerFreezeIndicator = debuggerController.getStore().subscribe(() => {

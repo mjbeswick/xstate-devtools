@@ -81,6 +81,9 @@ export class DebuggerController implements vscode.Disposable {
     private lastTimeTravelling = false;
     private flushTimer: ReturnType<typeof setTimeout> | null = null;
     private announceConnectFailure = false;
+    private readonly _onDidChangeStatus = new vscode.EventEmitter<ConnectionStatus>();
+    /** Fires on every connection-status change (for surfaces that key off it). */
+    readonly onDidChangeStatus = this._onDidChangeStatus.event;
     private readonly log: vscode.OutputChannel;
 
     constructor(private readonly graphView: XStateGraphViewProvider) {
@@ -291,6 +294,11 @@ export class DebuggerController implements vscode.Disposable {
         return this.store;
     }
 
+    /** True while a live connection is open. */
+    isConnected(): boolean {
+        return this.status === 'open';
+    }
+
     private onMessage(msg: PageToExtensionMessage): void {
         this.log.appendLine(`[${stamp()}] ← ${msg.type}${'sessionId' in msg ? ` (${msg.sessionId})` : ''}`);
         const state = this.store.getState();
@@ -318,6 +326,7 @@ export class DebuggerController implements vscode.Disposable {
         }
         this.renderStatusBar();
         void this.setConnectedContext(status === 'open');
+        this._onDidChangeStatus.fire(status);
         if (status !== 'open') { this.graphView.clearLiveConfig(); }
         if (status === 'open') {
             this.announceConnectFailure = false;
@@ -502,6 +511,7 @@ export class DebuggerController implements vscode.Disposable {
 
     dispose(): void {
         if (this.flushTimer) { clearTimeout(this.flushTimer); this.flushTimer = null; }
+        this._onDidChangeStatus.dispose();
         this.unsubscribeStore?.();
         this.client?.dispose();
         this.statusBar.dispose();

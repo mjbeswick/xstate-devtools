@@ -115,11 +115,6 @@
         "when": "!xstateDebugger.connected && !xstateDebugger.setupChecking && xstateDebugger.setup == unknown"
       },
       {
-        "view": "xstateDebuggerInstances",
-        "contents": "Connected — waiting for actors.\nIf your adapter starts lazily (e.g. inside a route loader), load a page so it initialises.\n[Disconnect](command:xstateDebugger.disconnect)",
-        "when": "xstateDebugger.connected"
-      },
-      {
         "view": "xstateMachineOutline",
         "contents": "All machines in this file are state configs, which are hidden.\n[Show State Configs](command:xstateMachineOutline.setStateConfigsShow)",
         "when": "xstateOutline.emptyReason == stateConfigsHidden"
