@@ -41,11 +41,13 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
     private showStopped: boolean;
     // Active state-node ids per actor, memoised per refresh (cleared on change).
     private activeCache = new Map<string, Set<string>>();
-    // Bumped each time the actor set repopulates from empty (i.e. on every
-    // reconnect). Folded into tree-item ids so a re-added actor that reuses its
-    // old sessionId gets a fresh identity — VS Code's tree model won't re-render
-    // a recycled id after the view was emptied, so existing actors would
-    // otherwise stay hidden on reconnect while newly-spawned ones appeared.
+    // Bumped each time the actor set repopulates from empty. Folded into
+    // tree-item ids so a re-added actor that reuses its old sessionId gets a
+    // fresh identity — VS Code's tree model won't re-render a recycled id after
+    // the view was emptied, so existing actors would otherwise stay hidden on
+    // reconnect while newly-spawned ones appeared. The controller empties the
+    // store at the start of every connection attempt (onStatus 'connecting'),
+    // so this empty→non-empty transition fires reliably on every reconnect.
     private generation = 0;
     private lastActorCount = 0;
 

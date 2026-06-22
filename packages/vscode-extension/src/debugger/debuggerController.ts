@@ -78,6 +78,7 @@ export class DebuggerController implements vscode.Disposable {
     private status: ConnectionStatus = 'idle';
     private readonly views = new Set<DebuggerView>();
     private lastModel: DebuggerViewModel | null = null;
+    private lastTimeTravelling = false;
     private readonly log: vscode.OutputChannel;
 
     constructor(private readonly graphView: XStateGraphViewProvider) {
@@ -92,11 +93,14 @@ export class DebuggerController implements vscode.Disposable {
         this.unsubscribeStore = this.store.subscribe(() => {
             this.syncDiagram();
             this.pushModel();
-            void vscode.commands.executeCommand(
-                'setContext',
-                'xstateDebugger.timeTravelling',
-                this.store.getState().timeTravelSeq !== null,
-            );
+            // Only touch the context key when it actually flips — the store
+            // fires on every inspector message, so an unconditional setContext
+            // here is one IPC round-trip per event for a value that rarely changes.
+            const timeTravelling = this.store.getState().timeTravelSeq !== null;
+            if (timeTravelling !== this.lastTimeTravelling) {
+                this.lastTimeTravelling = timeTravelling;
+                void vscode.commands.executeCommand('setContext', 'xstateDebugger.timeTravelling', timeTravelling);
+            }
         });
         void this.setConnectedContext(false);
     }
@@ -178,7 +182,9 @@ export class DebuggerController implements vscode.Disposable {
             }
         }
         if (!type.trim()) { return; }
-        this.dispatch({ type: type.trim(), ...payload }, sessionId);
+        // Spread payload first so the chosen event type always wins over a
+        // stray `type` key in the payload JSON.
+        this.dispatch({ ...payload, type: type.trim() }, sessionId);
     }
 
     /** Ask the running app for an actor's persisted snapshot (defaults to selected). */
@@ -300,7 +306,18 @@ export class DebuggerController implements vscode.Disposable {
 
     private onStatus(status: ConnectionStatus): void {
         this.log.appendLine(`[${stamp()}] status → ${status}`);
+        const prev = this.status;
         this.status = status;
+        // Starting a fresh connection attempt: drop any actors from the previous
+        // session so a reconnect — including a passive auto-reconnect after the
+        // inspected app restarts — rebuilds from the server's replay instead of
+        // accumulating ghost actors. (Only explicit disconnect() did this before,
+        // so passive reconnects leaked stale actors.) Emptying the store here also
+        // makes the Instances tree's generation counter bump reliably on every
+        // reconnect, since the actor set always returns through zero.
+        if (status === 'connecting' && prev !== 'connecting') {
+            this.store.getState().exitReplay();
+        }
         this.renderStatusBar();
         void this.setConnectedContext(status === 'open');
         if (status !== 'open') { this.graphView.clearLiveConfig(); }

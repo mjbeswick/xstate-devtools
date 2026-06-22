@@ -179,6 +179,7 @@ const machine = setup({
 | Setting | Default | Description |
 | --- | --- | --- |
 | `xstateOutline.debuggerUrl` | `ws://127.0.0.1:9301` | WebSocket URL of the running app's XState server adapter (`createServerAdapter`) that the live debugger connects to |
+| `xstateOutline.debuggerShowStopped` | `true` | Show stopped actors in the live debugger's Instances tree (toggle from the Instances title bar) |
 | `xstateOutline.defaultScope` | `workspace` | Scan the current file only, or the whole workspace |
 | `xstateOutline.defaultViewMode` | `flat` | Flat list of machines, or grouped by file |
 | `xstateOutline.showStateConfigs` | `false` | Include `createStateConfig`/`stateConfig` patterns in the outline |

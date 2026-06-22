@@ -783,6 +783,12 @@ export async function activate(context: vscode.ExtensionContext) {
         DebuggerViewProvider.eventsViewType,
         new DebuggerViewProvider(context.extensionUri, debuggerController, 'events'),
     );
+    // Seed the menu/welcome context keys BEFORE the Instances tree view is
+    // created, so the first render shows the correct toggle + welcome variant
+    // (per the "View state & menu conventions" in CLAUDE.md).
+    void vscode.commands.executeCommand('setContext', 'xstateDebugger.showStopped',
+        vscode.workspace.getConfiguration('xstateOutline').get('debuggerShowStopped', true));
+    void vscode.commands.executeCommand('setContext', 'xstateDebugger.setup', 'unknown');
     // Native instances tree (machine instances + their live state trees).
     const debuggerTreeProvider = new DebuggerTreeProvider(context.extensionUri, debuggerController);
     const debuggerTreeView = vscode.window.createTreeView('xstateDebuggerInstances', {
@@ -811,7 +817,6 @@ export async function activate(context: vscode.ExtensionContext) {
         debuggerTreeProvider.setShowStopped(value);
         void vscode.commands.executeCommand('setContext', 'xstateDebugger.showStopped', value);
     };
-    void vscode.commands.executeCommand('setContext', 'xstateDebugger.showStopped', debuggerTreeProvider.getShowStopped());
     const debuggerShowStoppedCommand = vscode.commands.registerCommand('xstateDebugger.showStopped', () => setShowStopped(true));
     const debuggerHideStoppedCommand = vscode.commands.registerCommand('xstateDebugger.hideStopped', () => setShowStopped(false));
     // Right-click actions on the Instances tree.
@@ -821,7 +826,6 @@ export async function activate(context: vscode.ExtensionContext) {
     const debuggerDecorationRegistration = vscode.window.registerFileDecorationProvider(debuggerDecorationProvider);
     // Detect how ready the workspace is for the debugger → tailored welcome text.
     const debuggerSetupDetector = new DebuggerSetupDetector(workspaceScanner);
-    void vscode.commands.executeCommand('setContext', 'xstateDebugger.setup', 'unknown');
     const debuggerRecheckCommand = vscode.commands.registerCommand('xstateDebugger.recheckSetup', async () => {
         await debuggerSetupDetector.refresh();
         // Surface the result so the command isn't a silent no-op when nothing changed.
