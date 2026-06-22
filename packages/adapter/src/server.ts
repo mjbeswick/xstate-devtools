@@ -20,27 +20,54 @@ interface ClientLike {
 
 const OPEN_STATE = 1
 
+type ActorRegistered = Extract<PageToExtensionMessage, { type: 'XSTATE_ACTOR_REGISTERED' }>
+
 interface CachedServer {
   clients: Set<ClientLike>
   dispatchHandlers: Set<(msg: ExtensionToPageMessage) => void>
-  buffer: string[]
+  /** Currently-live actors (registration message, snapshot kept current). */
+  liveActors: Map<string, ActorRegistered>
+  /** Bounded ring of recent event/snapshot payloads, for the panel's log. */
+  recentEvents: string[]
   bufferSize: number
-  activated: boolean
   close: () => void
+}
+
+/** Track live-actor state so it can be replayed to every connecting panel. */
+function trackLive(server: CachedServer, message: PageToExtensionMessage): void {
+  switch (message.type) {
+    case 'XSTATE_ACTOR_REGISTERED':
+      server.liveActors.set(message.sessionId, message)
+      break
+    case 'XSTATE_SNAPSHOT': {
+      const reg = server.liveActors.get(message.sessionId)
+      if (reg) { reg.snapshot = message.snapshot }
+      break
+    }
+    case 'XSTATE_EVENT': {
+      const reg = server.liveActors.get(message.sessionId)
+      if (reg) { reg.snapshot = message.snapshotAfter }
+      break
+    }
+    case 'XSTATE_ACTOR_STOPPED':
+      server.liveActors.delete(message.sessionId)
+      break
+  }
 }
 
 /**
  * Start a local WebSocket server that the DevTools panel can connect to.
  * Returns the inspector callback. Multiple panels can connect simultaneously.
  *
- * The WS server, connected clients, dispatch handlers, and pre-connection
- * buffer are all stashed on globalThis keyed by port. This makes the function
+ * The WS server, connected clients, dispatch handlers, and the live-actor
+ * registry are all stashed on globalThis keyed by port. This makes the function
  * idempotent across HMR re-evaluation: subsequent calls reuse the existing
  * server and only register new inspector hooks.
  *
- * Inspection events emitted before the first panel connects are buffered (up
- * to `bufferSize`, default 200) and flushed to the first connecting client so
- * actors registered at boot are visible.
+ * Every connecting panel — including a reconnect after the editor/host restarts
+ * — is replayed the current set of live actors (with their latest snapshots)
+ * plus recent events, so actors registered at boot stay visible across
+ * reconnects (not just for the first panel).
  */
 export function createServerAdapter(options: ServerAdapterOptions = {}) {
   const port = options.port
@@ -59,19 +86,20 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
   } else {
     const clients = new Set<ClientLike>()
     const dispatchHandlers = new Set<(msg: ExtensionToPageMessage) => void>()
-    const buffer: string[] = []
+    const liveActors = new Map<string, ActorRegistered>()
+    const recentEvents: string[] = []
     let wss: any = null
     let closed = false
 
     server = {
-      clients, dispatchHandlers, buffer, bufferSize,
-      activated: false,
+      clients, dispatchHandlers, liveActors, recentEvents, bufferSize,
       close: () => {
         closed = true
         try { wss?.close() } catch { /* noop */ }
         clients.clear()
         dispatchHandlers.clear()
-        buffer.length = 0
+        liveActors.clear()
+        recentEvents.length = 0
         delete (globalThis as Record<string, unknown>)[key]
       },
     }
@@ -85,13 +113,13 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
         if (closed) return
         wss = new WSServer({ port, host })
         wss.on('connection', (ws: ClientLike) => {
-          // Drain bootstrap buffer to the first client only.
-          if (!server.activated) {
-            server.activated = true
-            for (const payload of server.buffer) {
-              try { ws.send(payload) } catch { /* ignore */ }
-            }
-            server.buffer.length = 0
+          // Replay current live actors (latest snapshots) + recent events to
+          // every connecting panel, so reconnects see the current state.
+          for (const reg of server.liveActors.values()) {
+            try { ws.send(JSON.stringify({ ...reg, __xstateDevtools: true })) } catch { /* ignore */ }
+          }
+          for (const payload of server.recentEvents) {
+            try { ws.send(payload) } catch { /* ignore */ }
           }
           server.clients.add(ws)
           ws.on('message', (raw: unknown) => {
@@ -122,12 +150,13 @@ export function createServerAdapter(options: ServerAdapterOptions = {}) {
 
   const transport: Transport = {
     send(message: PageToExtensionMessage) {
+      // Maintain the live-actor registry + recent-events ring so any panel that
+      // connects (or reconnects) later can be replayed the current state.
+      trackLive(server, message)
       const payload = JSON.stringify({ ...message, __xstateDevtools: true })
-      if (!server.activated) {
-        // No panel has connected yet — buffer for the first one.
-        if (server.buffer.length >= server.bufferSize) server.buffer.shift()
-        server.buffer.push(payload)
-        return
+      if (message.type === 'XSTATE_EVENT' || message.type === 'XSTATE_SNAPSHOT') {
+        server.recentEvents.push(payload)
+        if (server.recentEvents.length > server.bufferSize) server.recentEvents.shift()
       }
       for (const ws of server.clients) {
         if (ws.readyState === OPEN_STATE) {
