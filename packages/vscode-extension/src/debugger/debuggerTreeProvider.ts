@@ -14,7 +14,7 @@ import { ACTIVE_SCHEME } from './debuggerDecorationProvider';
 
 export class DebuggerTreeItem extends vscode.TreeItem {
     constructor(
-        public readonly kind: 'actor' | 'state' | 'waiting',
+        public readonly kind: 'actor' | 'state',
         public readonly sessionId: string,
         public readonly node?: SerializedStateNode,
     ) {
@@ -51,6 +51,7 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
     // reconnect repopulates it (empty→non-empty).
     private generation = 0;
     private lastActorCount = 0;
+    private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(
         extensionUri: vscode.Uri,
@@ -58,16 +59,29 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
     ) {
         this.iconBase = vscode.Uri.joinPath(extensionUri, 'resources', 'icons');
         this.showStopped = vscode.workspace.getConfiguration('xstateOutline').get('debuggerShowStopped', true);
-        this.unsubscribe = this.controller.getStore().subscribe(() => {
+        // Both sources (store changes, connection-status changes) feed one
+        // coalesced refresh — see scheduleRefresh.
+        this.unsubscribe = this.controller.getStore().subscribe(() => this.scheduleRefresh());
+        this.statusSub = this.controller.onDidChangeStatus(() => this.scheduleRefresh());
+    }
+
+    // Coalesce refreshes via setTimeout(0). On (re)connect the store fills in a
+    // rapid flurry — status→open, then one XSTATE_ACTOR_REGISTERED per replayed
+    // actor, then XSTATE_REPLAY_DONE. Firing per message let VS Code's
+    // empty→content transition race the burst and stick on the stale empty
+    // (viewsWelcome) snapshot. Collapsing to one deferred fire means the tree
+    // reads the final state — actors already present — so it renders them
+    // directly and never flashes the welcome.
+    private scheduleRefresh(): void {
+        if (this.refreshTimer) { return; }
+        this.refreshTimer = setTimeout(() => {
+            this.refreshTimer = null;
             const count = this.controller.getStore().getState().actors.size;
             if (count > 0 && this.lastActorCount === 0) { this.generation++; }
             this.lastActorCount = count;
             this.activeCache.clear();
             this._onDidChangeTreeData.fire();
-        });
-        // Connection status drives the "Waiting for actors…" placeholder row
-        // (below) but doesn't change the store, so refresh on it too.
-        this.statusSub = this.controller.onDidChangeStatus(() => this._onDidChangeTreeData.fire());
+        }, 0);
     }
 
     getShowStopped(): boolean {
@@ -99,13 +113,8 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
                     roots.push(this.actorItem(sessionId));
                 }
             }
-            // Connected but nothing to show yet: render an in-tree placeholder
-            // rather than relying on viewsWelcome. The native tree reliably
-            // swaps this row for the actor rows once they arrive, whereas the
-            // empty→welcome→content transition can stick on reconnect.
-            if (roots.length === 0 && this.controller.isConnected()) {
-                return [this.waitingItem()];
-            }
+            // No roots → empty tree → VS Code shows the viewsWelcome panel
+            // (the "Connected — waiting for actors" variant when connected).
             return roots.filter((i): i is DebuggerTreeItem => !!i);
         }
         if (element.kind === 'actor') {
@@ -142,16 +151,6 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
             : new Set<string>();
         this.activeCache.set(sessionId, ids);
         return ids;
-    }
-
-    private waitingItem(): DebuggerTreeItem {
-        const item = new DebuggerTreeItem('waiting', '');
-        item.id = 'waiting';
-        item.label = 'Waiting for actors…';
-        item.description = 'load a page if your adapter starts lazily';
-        item.tooltip = 'Connected. If your adapter starts lazily (e.g. inside a route loader), load a page so it initialises.';
-        item.iconPath = new vscode.ThemeIcon('loading~spin');
-        return item;
     }
 
     private actorItem(sessionId: string): DebuggerTreeItem {
@@ -208,6 +207,7 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
     }
 
     dispose(): void {
+        if (this.refreshTimer) { clearTimeout(this.refreshTimer); }
         this.unsubscribe();
         this.statusSub.dispose();
         this._onDidChangeTreeData.dispose();
