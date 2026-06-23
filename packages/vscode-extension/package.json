@@ -82,7 +82,7 @@
       {
         "view": "xstateDebuggerInstances",
         "contents": "Connected — waiting for actors.\nInteract with or reload your app to see its XState actors.\nIf your adapter starts lazily (e.g. inside a route loader), load a page so it initialises.\n[Disconnect](command:xstateDebugger.disconnect)",
-        "when": "xstateDebugger.connected"
+        "when": "xstateDebugger.connected && !xstateDebugger.hasActors"
       },
       {
         "view": "xstateDebuggerInstances",
