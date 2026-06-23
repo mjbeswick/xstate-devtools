@@ -59,27 +59,32 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
     ) {
         this.iconBase = vscode.Uri.joinPath(extensionUri, 'resources', 'icons');
         this.showStopped = vscode.workspace.getConfiguration('xstateOutline').get('debuggerShowStopped', true);
-        // Both sources (store changes, connection-status changes) feed one
-        // coalesced refresh — see scheduleRefresh.
-        this.unsubscribe = this.controller.getStore().subscribe(() => this.scheduleRefresh());
-        this.statusSub = this.controller.onDidChangeStatus(() => this.scheduleRefresh());
-    }
-
-    // Coalesce refreshes via setTimeout(0). On (re)connect the store fills in a
-    // rapid flurry — status→open, then one XSTATE_ACTOR_REGISTERED per replayed
-    // actor, then XSTATE_REPLAY_DONE. Firing per message let VS Code's
-    // empty→content transition race the burst and stick on the stale empty
-    // (viewsWelcome) snapshot. Collapsing to one deferred fire means the tree
-    // reads the final state — actors already present — so it renders them
-    // directly and never flashes the welcome.
-    private scheduleRefresh(): void {
-        if (this.refreshTimer) { return; }
-        this.refreshTimer = setTimeout(() => {
-            this.refreshTimer = null;
+        this.unsubscribe = this.controller.getStore().subscribe(() => {
+            // Generation bookkeeping runs synchronously on every store change so
+            // it reliably observes the count→0 transition on disconnect (and the
+            // 0→N transition on reconnect). It must NOT live inside the coalesced
+            // fire below: a quick disconnect→connect collapses into one timer
+            // that never sees count===0, so generation wouldn't bump, the
+            // re-added actor would reuse its old tree-item id, and VS Code won't
+            // re-render a recycled id — leaving actors invisible on reconnect.
             const count = this.controller.getStore().getState().actors.size;
             if (count > 0 && this.lastActorCount === 0) { this.generation++; }
             this.lastActorCount = count;
             this.activeCache.clear();
+            this.scheduleRefresh();
+        });
+        this.statusSub = this.controller.onDidChangeStatus(() => this.scheduleRefresh());
+    }
+
+    // Coalesce only the fire() via setTimeout(0). On (re)connect the store fills
+    // in a rapid flurry — status→open, then one XSTATE_ACTOR_REGISTERED per
+    // replayed actor, then XSTATE_REPLAY_DONE. Firing per message let the
+    // waiting-row → actor-rows transition flicker; one deferred fire lands on
+    // the final state and renders the actors directly.
+    private scheduleRefresh(): void {
+        if (this.refreshTimer) { return; }
+        this.refreshTimer = setTimeout(() => {
+            this.refreshTimer = null;
             this._onDidChangeTreeData.fire();
         }, 0);
     }
