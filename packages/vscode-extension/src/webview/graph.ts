@@ -52,6 +52,11 @@ const vscode = acquireVsCodeApi();
 let payload: GraphPayload = (window as unknown as { __GRAPH__: GraphPayload }).__GRAPH__;
 const elk = new ELK();
 
+// Target width:height for packing a parallel state's regions into a grid
+// (rectpacking) instead of one wide row. ~1.6 keeps it landscape-ish without
+// sprawling horizontally; raise for wider, lower for taller.
+const PARALLEL_ASPECT_RATIO = 1.6;
+
 // Layout flow direction, toggled from the toolbar. 'DOWN' = top-to-bottom,
 // 'RIGHT' = left-to-right. Edge routing adapts via per-side outward normals.
 // Initialised from the host (persisted per panel, so it survives refreshes).
@@ -185,6 +190,24 @@ function buildElkNode(id: string): ElkNode {
             labels: [{ text: d.label }],
         };
     }
+    const padding = `[top=${REGION_H + 6},left=18,bottom=14,right=18]`;
+    // Parallel regions have no edges between them, so 'layered' drops them into a
+    // single (very wide) row. Pack them into a grid instead — rectpacking wraps
+    // rows to approximate the target aspect ratio. Compound states keep 'layered'
+    // because their children are connected by transitions that need routing.
+    const layoutOptions = d.parallel
+        ? {
+            'elk.algorithm': 'rectpacking',
+            'elk.aspectRatio': String(PARALLEL_ASPECT_RATIO),
+            'elk.spacing.nodeNode': '26',
+            'elk.padding': padding,
+        }
+        : {
+            'elk.algorithm': 'layered',
+            'elk.direction': direction,
+            ...ROUTING_OPTS,
+            'elk.padding': padding,
+        };
     return {
         id,
         labels: [{
@@ -193,12 +216,7 @@ function buildElkNode(id: string): ElkNode {
             height: 16,
             layoutOptions: { 'elk.nodeLabels.placement': 'H_CENTER V_TOP INSIDE' },
         }],
-        layoutOptions: {
-            'elk.algorithm': 'layered',
-            'elk.direction': direction,
-            ...ROUTING_OPTS,
-            'elk.padding': `[top=${REGION_H + 6},left=18,bottom=14,right=18]`,
-        },
+        layoutOptions,
         children: (childrenOf.get(id) ?? []).map(buildElkNode),
     };
 }
