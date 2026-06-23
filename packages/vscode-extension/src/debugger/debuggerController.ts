@@ -79,6 +79,7 @@ export class DebuggerController implements vscode.Disposable {
     private readonly views = new Set<DebuggerView>();
     private lastModel: DebuggerViewModel | null = null;
     private lastTimeTravelling = false;
+    private lastOverlaySummary = '';
     private flushTimer: ReturnType<typeof setTimeout> | null = null;
     private announceConnectFailure = false;
     private readonly _onDidChangeStatus = new vscode.EventEmitter<ConnectionStatus>();
@@ -477,6 +478,7 @@ export class DebuggerController implements vscode.Disposable {
     // without an open diagram are silently skipped.
     private syncDiagram(): void {
         const state = this.store.getState();
+        const diag: string[] = [];
         for (const [sessionId, actor] of state.actors) {
             if (!actor.machine) { continue; }
             // Respect time-travel: show the snapshot at the frozen seq, not live.
@@ -488,7 +490,17 @@ export class DebuggerController implements vscode.Disposable {
             const machineId = this.resolveStaticLabel?.(
                 actor.machine.id, actor.machine.sourceLocation, Object.keys(actor.machine.root.states),
             ) ?? actor.machine.id;
-            this.graphView.setLiveConfig(machineId, value as LiveStateValue);
+            const r = this.graphView.setLiveConfig(machineId, value as LiveStateValue);
+            const valueKeys = typeof value === 'object' && value ? Object.keys(value as object) : [String(value)];
+            diag.push(`${actor.machine.id}→"${machineId}" value[${valueKeys.join(',')}] matched=${r.matched} painted=${r.painted}`);
+        }
+        // Diagnostic: log the overlay mapping only when it changes, so we can see
+        // when a diagram panel isn't being matched/painted.
+        const open = this.graphView.getOpenMachineLabels();
+        const summary = `panels[${open.join(',')}] | ${diag.join(' ; ')}`;
+        if (open.length > 0 && summary !== this.lastOverlaySummary) {
+            this.lastOverlaySummary = summary;
+            this.log.appendLine(`[${stamp()}] overlay ${summary}`);
         }
     }
 

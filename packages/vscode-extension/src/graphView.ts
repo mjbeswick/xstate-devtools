@@ -185,17 +185,27 @@ export class XStateGraphViewProvider {
      * name-collision pitfall of a flat name map — then push the matching diagram
      * node ids to the webview, which paints them (see `paintLive` in graph.ts).
      */
-    public setLiveConfig(machineId: string, value: LiveStateValue): void {
+    public setLiveConfig(machineId: string, value: LiveStateValue): { matched: number; painted: number } {
+        let matched = 0;
+        let painted = 0;
         for (const entry of this.panels.values()) {
             if (entry.machine.label !== machineId) { continue; }
+            matched++;
             const active = new Set<MachineNode>();
             collectActiveNodes(value, entry.machine, active);
             const ids: string[] = [];
             for (const [id, node] of entry.nodeById) {
                 if (active.has(node)) { ids.push(id); }
             }
+            painted += ids.length;
             entry.panel.webview.postMessage({ command: 'liveStates', ids });
         }
+        return { matched, painted };
+    }
+
+    /** Labels of every open diagram panel — for diagnosing overlay mismatches. */
+    public getOpenMachineLabels(): string[] {
+        return [...this.panels.values()].map((e) => e.machine.label);
     }
 
     /** Remove any live overlay from all open diagrams (e.g. on disconnect). */
