@@ -206,6 +206,7 @@ const machine = setup({
 - Tree editing focuses on common object/string forms; advanced shapes may still need manual source edits
 - In a focused sub-diagram, transitions whose target lies outside the selected subtree point to a faded stub labelled with that target
 - The **simulator** and **test paths** are structural: guards and `after` delays aren't evaluated (you pick each branch yourself), and history states restore structurally only — a reported path is a *possible* route, not a guard-validated one
+- Actors from an older `@xstate-devtools/adapter` (one without replay-on-connect) still appear with their current state, but — lacking a machine definition until they re-register — show no expandable state-node tree; update the adapter for the full tree
 
 ## Credits & acknowledgements
 
