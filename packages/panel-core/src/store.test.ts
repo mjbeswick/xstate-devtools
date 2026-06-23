@@ -36,3 +36,30 @@ describe('XSTATE_REPLAY_DONE reconcile', () => {
     expect(store.getState().selectedActorId).toBe('srv:x:5')
   })
 })
+
+describe('synthesizing actors from bare snapshots', () => {
+  it('creates a machine-less actor when a snapshot/event arrives with no prior registration', () => {
+    const store = createInspectorStore()
+    const h = store.getState().handleMessage
+    // An adapter without replay-on-connect streams live events for an
+    // already-running actor we never saw registered.
+    h({ type: 'XSTATE_EVENT', sessionId: 'srv:x:31', event: { type: 'TICK' }, snapshotAfter: snap('running'), globalSeq: 7, timestamp: 0 })
+
+    const a = store.getState().actors.get('srv:x:31')
+    expect(a).toBeTruthy()
+    expect(a!.machine).toBe(null)
+    expect(a!.snapshot.value).toBe('running')
+    expect(a!.status).toBe('active')
+    expect(store.getState().registeredSnapshots.get('srv:x:31')?.value).toBe('running')
+  })
+
+  it('does not clobber a real registration when a later snapshot arrives', () => {
+    const store = createInspectorStore()
+    const h = store.getState().handleMessage
+    h(register('srv:x:5'))   // real registration (machine: null here, but registered)
+    h({ type: 'XSTATE_SNAPSHOT', sessionId: 'srv:x:5', snapshot: snap('done'), globalSeq: 2, timestamp: 0 })
+    // Snapshot updates the existing record rather than synthesizing a new one.
+    expect(store.getState().actors.get('srv:x:5')?.snapshot.value).toBe('done')
+    expect(store.getState().actors.size).toBe(1)
+  })
+})

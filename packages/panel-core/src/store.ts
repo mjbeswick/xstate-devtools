@@ -13,6 +13,29 @@ import type {
 
 export const MAX_EVENTS = 500
 
+/**
+ * Build a minimal actor record from a bare snapshot, for an actor we never saw
+ * an XSTATE_ACTOR_REGISTERED for. Adapters predating the replay-on-connect
+ * feature don't re-register their already-running actors on (re)connect — they
+ * only stream live XSTATE_EVENT/XSTATE_SNAPSHOT — so without this those actors
+ * would never appear. machine is null (we have no definition), so the tree
+ * shows the actor and its state value but no expandable state-node tree.
+ */
+function synthesizeActor(
+  sessionId: string,
+  snapshot: SerializedSnapshot,
+  seq: number,
+): ActorRecord {
+  return {
+    sessionId,
+    machine: null,
+    snapshot,
+    status: snapshot.status,
+    registeredAt: Date.now(),
+    registeredAtSeq: seq,
+  }
+}
+
 /** A captured XState persisted snapshot (or the reason it couldn't be captured). */
 export interface PersistedEntry {
   persisted?: unknown
@@ -112,16 +135,18 @@ export const inspectorStoreInitializer: StateCreator<InspectorStore> = (set, get
         }
         case 'XSTATE_SNAPSHOT': {
           const actor = actors.get(msg.sessionId)
-          if (actor) {
-            actors.set(msg.sessionId, { ...actor, snapshot: msg.snapshot })
-          }
+          actors.set(msg.sessionId, actor
+            ? { ...actor, snapshot: msg.snapshot }
+            : synthesizeActor(msg.sessionId, msg.snapshot, msg.globalSeq))
+          if (!actor) { registeredSnapshots.set(msg.sessionId, msg.snapshot) }
           break
         }
         case 'XSTATE_EVENT': {
           const actor = actors.get(msg.sessionId)
-          if (actor) {
-            actors.set(msg.sessionId, { ...actor, snapshot: msg.snapshotAfter })
-          }
+          actors.set(msg.sessionId, actor
+            ? { ...actor, snapshot: msg.snapshotAfter }
+            : synthesizeActor(msg.sessionId, msg.snapshotAfter, msg.globalSeq))
+          if (!actor) { registeredSnapshots.set(msg.sessionId, msg.snapshotAfter) }
           events.push({
             sessionId: msg.sessionId,
             event: msg.event,

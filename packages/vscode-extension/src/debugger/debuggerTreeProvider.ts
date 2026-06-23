@@ -9,7 +9,7 @@ import * as vscode from 'vscode';
 import type { SerializedStateNode } from '@xstate-devtools/protocol';
 import { getActiveNodeIds, getActivePaths, getDisplaySnapshot } from '@xstate-devtools/panel-core';
 import type { DebuggerController } from './debuggerController';
-import { summarizeLeaves } from './format';
+import { summarizeLeaves, stateValueLeaves } from './format';
 import { ACTIVE_SCHEME } from './debuggerDecorationProvider';
 
 export class DebuggerTreeItem extends vscode.TreeItem {
@@ -189,7 +189,9 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
             ? getActivePaths(snap.value as never, actor.machine.root)
                 .map((p) => p[p.length - 1]?.key)
                 .filter((k): k is string => !!k)
-            : [];
+            // No machine definition (actor synthesized from a bare snapshot):
+            // derive leaf states straight from the snapshot value.
+            : (snap ? stateValueLeaves(snap.value) : []);
         const stopped = actor.status === 'stopped';
         item.description = (stopped ? '(stopped) ' : '') + summarizeLeaves(leaves);
         item.contextValue = 'xstateDebuggerActor';
