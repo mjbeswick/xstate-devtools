@@ -353,8 +353,12 @@ export class DebuggerController implements vscode.Disposable {
         if (this.flushTimer) { return; }
         this.flushTimer = setTimeout(() => {
             this.flushTimer = null;
-            this.syncDiagram();
-            this.pushModel();
+            // Isolate the diagram overlay: a failure there must not block the
+            // view-model push (the inspector + event log), and vice-versa.
+            try { this.syncDiagram(); }
+            catch (e) { this.log.appendLine(`[${stamp()}] syncDiagram error: ${(e as Error)?.message ?? e}`); }
+            try { this.pushModel(); }
+            catch (e) { this.log.appendLine(`[${stamp()}] pushModel error: ${(e as Error)?.message ?? e}`); }
             // Only touch the context key when it actually flips — avoids an IPC
             // round-trip per event for a value that rarely changes.
             const timeTravelling = this.store.getState().timeTravelSeq !== null;
