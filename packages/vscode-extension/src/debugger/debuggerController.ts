@@ -79,7 +79,6 @@ export class DebuggerController implements vscode.Disposable {
     private readonly views = new Set<DebuggerView>();
     private lastModel: DebuggerViewModel | null = null;
     private lastTimeTravelling = false;
-    private lastHasActors = false;
     private flushTimer: ReturnType<typeof setTimeout> | null = null;
     private announceConnectFailure = false;
     private readonly _onDidChangeStatus = new vscode.EventEmitter<ConnectionStatus>();
@@ -102,7 +101,6 @@ export class DebuggerController implements vscode.Disposable {
         // flush so a queued burst costs one rebuild instead of N.
         this.unsubscribeStore = this.store.subscribe(() => this.scheduleFlush());
         void this.setConnectedContext(false);
-        void vscode.commands.executeCommand('setContext', 'xstateDebugger.hasActors', false);
     }
 
     /** Register a webview view (debugger or events) to receive model updates. */
@@ -346,14 +344,6 @@ export class DebuggerController implements vscode.Disposable {
             this.flushTimer = null;
             this.syncDiagram();
             this.pushModel();
-            // Drives the Instances "waiting for actors" viewsWelcome: flipping
-            // this key (rather than relying on tree-emptiness) forces VS Code to
-            // tear down the welcome and render the actor rows once they arrive.
-            const hasActors = this.store.getState().actors.size > 0;
-            if (hasActors !== this.lastHasActors) {
-                this.lastHasActors = hasActors;
-                void vscode.commands.executeCommand('setContext', 'xstateDebugger.hasActors', hasActors);
-            }
             // Only touch the context key when it actually flips — avoids an IPC
             // round-trip per event for a value that rarely changes.
             const timeTravelling = this.store.getState().timeTravelSeq !== null;

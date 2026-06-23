@@ -14,7 +14,7 @@ import { ACTIVE_SCHEME } from './debuggerDecorationProvider';
 
 export class DebuggerTreeItem extends vscode.TreeItem {
     constructor(
-        public readonly kind: 'actor' | 'state',
+        public readonly kind: 'actor' | 'state' | 'waiting',
         public readonly sessionId: string,
         public readonly node?: SerializedStateNode,
     ) {
@@ -113,8 +113,15 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
                     roots.push(this.actorItem(sessionId));
                 }
             }
-            // No roots → empty tree → VS Code shows the viewsWelcome panel
-            // (the "Connected — waiting for actors" variant when connected).
+            // Connected but no actors yet: keep one in-tree placeholder so the
+            // view never goes empty. An empty tree drops VS Code into its
+            // viewsWelcome/empty state, which then sticks — a later refresh that
+            // returns actor rows fails to tear it down, so reconnect shows
+            // nothing. The native tree, by contrast, reliably swaps this row for
+            // the actor rows once they arrive.
+            if (roots.length === 0 && this.controller.isConnected()) {
+                return [this.waitingItem()];
+            }
             return roots.filter((i): i is DebuggerTreeItem => !!i);
         }
         if (element.kind === 'actor') {
@@ -151,6 +158,19 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
             : new Set<string>();
         this.activeCache.set(sessionId, ids);
         return ids;
+    }
+
+    private waitingItem(): DebuggerTreeItem {
+        const item = new DebuggerTreeItem('waiting', '');
+        item.id = 'waiting';
+        item.label = 'Waiting for actors…';
+        // No inline description — it truncated to noise in the narrow panel.
+        // The guidance lives in the tooltip instead.
+        item.tooltip =
+            'Connected. Interact with or reload your app to see its XState actors.\n' +
+            'If your adapter starts lazily (e.g. inside a route loader), load a page so it initialises.';
+        item.iconPath = new vscode.ThemeIcon('loading~spin');
+        return item;
     }
 
     private actorItem(sessionId: string): DebuggerTreeItem {
