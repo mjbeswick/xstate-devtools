@@ -40,20 +40,36 @@ export function findStaticMachine(
     for (const file of scanner.getCached()) {
         for (const machine of file.machines) { all.push(machine); }
     }
-    let matches = all.filter((m) => m.label === machineId);
-    if (matches.length === 0 && rootStateKeys && rootStateKeys.length > 0) {
-        const want = new Set(rootStateKeys);
-        matches = all.filter((m) => {
-            const labels = topLevelStateLabels(m);
-            return labels.length === want.size && labels.every((l) => want.has(l));
-        });
+    const want = rootStateKeys && rootStateKeys.length > 0 ? new Set(rootStateKeys) : null;
+    // How many of the running machine's top-level states this candidate shares —
+    // a structural fingerprint used to disambiguate.
+    const overlap = (m: MachineNode): number =>
+        want ? topLevelStateLabels(m).reduce((n, l) => n + (want.has(l) ? 1 : 0), 0) : 0;
+
+    const byLabel = all.filter((m) => m.label === machineId);
+    let candidates: MachineNode[];
+    if (byLabel.length > 0) {
+        candidates = byLabel;
+        // Several machines share this id (e.g. two `id: 'journey'`): keep the
+        // ones whose states best match the running machine, not just the first.
+        if (want && candidates.length > 1) {
+            const best = Math.max(...candidates.map(overlap));
+            if (best > 0) { candidates = candidates.filter((m) => overlap(m) === best); }
+        }
+    } else {
+        // No id match — e.g. an anonymous machine whose runtime id is "(machine)".
+        // Resolve purely structurally; give up if nothing shares its states.
+        if (!want) { return undefined; }
+        const best = Math.max(0, ...all.map(overlap));
+        if (best === 0) { return undefined; }
+        candidates = all.filter((m) => overlap(m) === best);
     }
-    if (matches.length <= 1) { return matches[0]; }
+    if (candidates.length <= 1) { return candidates[0]; }
     if (sourceLocation) {
-        const byFile = matches.find((m) => m.uri && sourceLocation.includes(m.uri.fsPath));
+        const byFile = candidates.find((m) => m.uri && sourceLocation.includes(m.uri.fsPath));
         if (byFile) { return byFile; }
     }
-    return matches[0];
+    return candidates[0];
 }
 
 /** Key chain from a machine's root down to the node with the given id. */
