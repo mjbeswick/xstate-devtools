@@ -85,6 +85,11 @@ export class DebuggerController implements vscode.Disposable {
     /** Fires on every connection-status change (for surfaces that key off it). */
     readonly onDidChangeStatus = this._onDidChangeStatus.event;
     private readonly log: vscode.OutputChannel;
+    /** Resolves an actor to the label of its statically-parsed machine, so the
+     *  live overlay can target the open diagram even for anonymous machines
+     *  (whose runtime id is "(machine)", matching no static label). Set from
+     *  activate(); falls back to the runtime machine id when unset/unresolved. */
+    private resolveStaticLabel?: (machineId: string, sourceLocation: string | undefined, rootStateKeys: string[]) => string | undefined;
 
     constructor(private readonly graphView: XStateGraphViewProvider) {
         this.log = vscode.window.createOutputChannel('XState Debugger');
@@ -294,6 +299,11 @@ export class DebuggerController implements vscode.Disposable {
         return this.store;
     }
 
+    /** Wire the actor→static-machine-label resolver (see field doc). */
+    setStaticLabelResolver(fn: (machineId: string, sourceLocation: string | undefined, rootStateKeys: string[]) => string | undefined): void {
+        this.resolveStaticLabel = fn;
+    }
+
     /** True while a live connection is open. */
     isConnected(): boolean {
         return this.status === 'open';
@@ -468,11 +478,16 @@ export class DebuggerController implements vscode.Disposable {
     private syncDiagram(): void {
         const state = this.store.getState();
         for (const [sessionId, actor] of state.actors) {
-            const machineId = actor.machine?.id;
+            if (!actor.machine) { continue; }
             // Respect time-travel: show the snapshot at the frozen seq, not live.
             const snapshot = getDisplaySnapshot(state, sessionId) ?? actor.snapshot;
             const value = snapshot?.value;
-            if (!machineId || value === undefined || value === null) { continue; }
+            if (value === undefined || value === null) { continue; }
+            // Target the open diagram by its static label — the runtime id is
+            // "(machine)" for anonymous machines and won't match the panel.
+            const machineId = this.resolveStaticLabel?.(
+                actor.machine.id, actor.machine.sourceLocation, Object.keys(actor.machine.root.states),
+            ) ?? actor.machine.id;
             this.graphView.setLiveConfig(machineId, value as LiveStateValue);
         }
     }

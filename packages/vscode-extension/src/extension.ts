@@ -830,7 +830,7 @@ export async function activate(context: vscode.ExtensionContext) {
         if (!sessionId) { return; }
         const actor = debuggerController.getStore().getState().actors.get(sessionId);
         if (!actor?.machine) { return; }
-        const machine = findStaticMachine(workspaceScanner, actor.machine.id, actor.machine.sourceLocation);
+        const machine = findStaticMachine(workspaceScanner, actor.machine.id, actor.machine.sourceLocation, Object.keys(actor.machine.root.states));
         if (machine) { graphViewProvider.show(machine, machine.label); }
     };
     const setFollowDiagram = (value: boolean) => {
@@ -844,6 +844,11 @@ export async function activate(context: vscode.ExtensionContext) {
     };
     const debuggerFollowDiagramCommand = vscode.commands.registerCommand('xstateDebugger.followDiagram', () => setFollowDiagram(true));
     const debuggerUnfollowDiagramCommand = vscode.commands.registerCommand('xstateDebugger.unfollowDiagram', () => setFollowDiagram(false));
+    // Let the live overlay resolve each actor to its static machine (incl.
+    // anonymous machines, whose runtime id is "(machine)") so it can target the
+    // open diagram by the right label.
+    debuggerController.setStaticLabelResolver((machineId, sourceLocation, rootStateKeys) =>
+        findStaticMachine(workspaceScanner, machineId, sourceLocation, rootStateKeys)?.label);
     const debuggerFollowSub = debuggerController.getStore().subscribe(() => {
         if (!followDiagram) { return; }
         const st = debuggerController.getStore().getState();

@@ -11,22 +11,42 @@ import type { XStateGraphViewProvider } from '../graphView';
 import type { WorkspaceScanner } from '../workspaceScanner';
 import type { MachineNode } from '../parser';
 
+/** Top-level state labels of a static machine (its root regions/states). */
+function topLevelStateLabels(machine: MachineNode): string[] {
+    return (machine.children ?? [])
+        .filter((c) => c.type === 'state' && !c.isTypeMarker)
+        .map((c) => c.label);
+}
+
 /**
- * Locate the statically-parsed machine whose root id matches a running machine.
- * When several machines share the id (e.g. a machine and a fixture copy), prefer
- * the one whose file the runtime reported in `sourceLocation`, falling back to
- * the first match.
+ * Locate the statically-parsed machine for a running machine. Match by root id
+ * first; when several share the id, prefer the file the runtime reported in
+ * `sourceLocation`.
+ *
+ * An anonymous machine has no help from the id — XState v5 defaults its root id
+ * to "(machine)", which matches nothing in the workspace (the parser labels such
+ * a machine by its variable name). `sourceLocation` doesn't help either: it's
+ * the createActor call site, not the createMachine definition. So fall back to a
+ * structural fingerprint — the set of top-level state names, which is stable and
+ * almost always unique across a workspace's machines.
  */
 export function findStaticMachine(
     scanner: WorkspaceScanner,
     machineId: string,
     sourceLocation?: string,
+    rootStateKeys?: string[],
 ): MachineNode | undefined {
-    const matches: MachineNode[] = [];
+    const all: MachineNode[] = [];
     for (const file of scanner.getCached()) {
-        for (const machine of file.machines) {
-            if (machine.label === machineId) { matches.push(machine); }
-        }
+        for (const machine of file.machines) { all.push(machine); }
+    }
+    let matches = all.filter((m) => m.label === machineId);
+    if (matches.length === 0 && rootStateKeys && rootStateKeys.length > 0) {
+        const want = new Set(rootStateKeys);
+        matches = all.filter((m) => {
+            const labels = topLevelStateLabels(m);
+            return labels.length === want.size && labels.every((l) => want.has(l));
+        });
     }
     if (matches.length <= 1) { return matches[0]; }
     if (sourceLocation) {
@@ -92,7 +112,7 @@ export function registerDebuggerCommands(
             const state = controller.getStore().getState();
             const actor = state.actors.get(item.sessionId);
             if (!actor?.machine) { return; }
-            const machine = findStaticMachine(scanner, actor.machine.id, actor.machine.sourceLocation);
+            const machine = findStaticMachine(scanner, actor.machine.id, actor.machine.sourceLocation, Object.keys(actor.machine.root.states));
             // State node → its exact definition, via the static parse.
             if (item.kind === 'state' && item.node && machine) {
                 const path = pathToNode(actor.machine.root, item.node.id);
@@ -123,10 +143,11 @@ export function registerDebuggerCommands(
             if (!item) { return; }
             const actor = controller.getStore().getState().actors.get(item.sessionId);
             if (!actor?.machine) { return; }
-            const machine = findStaticMachine(scanner, actor.machine.id, actor.machine.sourceLocation);
+            const machine = findStaticMachine(scanner, actor.machine.id, actor.machine.sourceLocation, Object.keys(actor.machine.root.states));
             if (!machine) {
+                const name = actor.machine.id === '(machine)' ? (actor.machine.root ? 'this machine' : actor.machine.id) : `"${actor.machine.id}"`;
                 void vscode.window.showWarningMessage(
-                    `No diagram available — machine "${actor.machine.id}" isn't in the workspace.`,
+                    `No diagram available — ${name} isn't in the workspace (or its states don't match a machine here).`,
                 );
                 return;
             }
