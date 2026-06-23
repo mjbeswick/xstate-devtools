@@ -1046,6 +1046,18 @@
         "key": "ctrl+c",
         "mac": "cmd+c",
         "when": "focusedView == xstateMachineErrors"
+      },
+      {
+        "command": "xstateDebugger.stepBack",
+        "key": "alt+left",
+        "mac": "alt+left",
+        "when": "focusedView == xstateEventsLog"
+      },
+      {
+        "command": "xstateDebugger.stepForward",
+        "key": "alt+right",
+        "mac": "alt+right",
+        "when": "focusedView == xstateEventsLog"
       }
     ]
   },

@@ -846,10 +846,18 @@ export async function activate(context: vscode.ExtensionContext) {
     const debuggerUnfollowDiagramCommand = vscode.commands.registerCommand('xstateDebugger.unfollowDiagram', () => setFollowDiagram(false));
     const debuggerFollowSub = debuggerController.getStore().subscribe(() => {
         if (!followDiagram) { return; }
-        const sel = debuggerController.getStore().getState().selectedActorId;
-        if (sel === lastFollowedActor) { return; }
-        lastFollowedActor = sel;
-        openDiagramForActor(sel);
+        const st = debuggerController.getStore().getState();
+        // While stepping the event log, follow the actor whose event is at the
+        // current step so its diagram opens and the overlay tracks that step;
+        // otherwise follow the selected actor.
+        let target = st.selectedActorId;
+        if (st.timeTravelSeq !== null) {
+            const ev = st.events.find((e) => e.globalSeq === st.timeTravelSeq);
+            if (ev) { target = ev.sessionId; }
+        }
+        if (target === lastFollowedActor) { return; }
+        lastFollowedActor = target;
+        openDiagramForActor(target);
     });
     // Right-click actions on the Instances tree.
     const debuggerItemCommands = registerDebuggerCommands(debuggerController, graphViewProvider, workspaceScanner);

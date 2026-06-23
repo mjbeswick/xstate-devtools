@@ -14,24 +14,14 @@ const esc = (s: unknown) =>
     String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
 
 window.onerror = (message, _src, line, col) => {
-    try { ($('status') as HTMLElement).textContent = 'JS error: ' + message + ' @' + line + ':' + col; } catch { /* noop */ }
     try { vscode.postMessage({ command: 'jserror', error: String(message) + ' @' + line + ':' + col }); } catch { /* noop */ }
     return false;
 };
 
 // Injected by the host (see debuggerView.getHtml): which slice to render.
+// Connection is driven from the status-bar item and the Instances title bar,
+// so this webview no longer renders its own connection bar/toggle.
 const ROLE: string = (window as { __ROLE__?: string }).__ROLE__ || 'debugger';
-
-const toggleBtn = document.getElementById('toggle');
-if (ROLE === 'events') {
-    // The events panel doesn't own the connection — hide its Connect button.
-    if (toggleBtn) { toggleBtn.style.display = 'none'; }
-} else if (toggleBtn) {
-    toggleBtn.addEventListener('click', () => {
-        const open = toggleBtn.dataset.connected === '1';
-        vscode.postMessage({ command: open ? 'disconnect' : 'connect' });
-    });
-}
 
 window.addEventListener('message', (e: MessageEvent) => {
     const msg = e.data;
@@ -39,17 +29,7 @@ window.addEventListener('message', (e: MessageEvent) => {
 });
 
 function render(m: any): void {
-    const dot = $('dot');
-    dot.className = 'dot ' + m.status;
     const live = m.status === 'open';
-    $('status').textContent = live
-        ? (m.replayName ? ('Replay · ' + m.replayName) : ('Live · ' + m.url))
-        : (m.status === 'connecting' ? ('Connecting · ' + m.url)
-            : m.status === 'error' ? ('Error · ' + m.url) : 'Not connected');
-    const toggle = $('toggle');
-    toggle.textContent = (live || m.status === 'connecting') ? 'Disconnect' : 'Connect';
-    toggle.dataset.connected = (live || m.status === 'connecting') ? '1' : '0';
-
     const body = $('body');
 
     // Replay / time-travel banner — shared global state, shown in both views.

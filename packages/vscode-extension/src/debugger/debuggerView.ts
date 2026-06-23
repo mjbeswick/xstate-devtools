@@ -87,13 +87,6 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
 <style>
   :root { color-scheme: light dark; }
   body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground); margin: 0; padding: 0; }
-  .bar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--vscode-panel-border); position: sticky; top: 0; background: var(--vscode-sideBar-background); }
-  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-  .dot.open { background: var(--vscode-charts-green); }
-  .dot.connecting { background: var(--vscode-charts-yellow); }
-  .dot.idle, .dot.closed { background: var(--vscode-descriptionForeground); }
-  .dot.error { background: var(--vscode-charts-red); }
-  .bar .status { flex: 1; color: var(--vscode-descriptionForeground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   button { font-family: inherit; font-size: inherit; color: var(--vscode-button-foreground); background: var(--vscode-button-background); border: none; padding: 2px 10px; border-radius: 2px; cursor: pointer; }
   button:hover { background: var(--vscode-button-hoverBackground); }
   button.secondary { color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground); }
@@ -139,11 +132,6 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
 </style>
 </head>
 <body>
-  <div class="bar">
-    <span id="dot" class="dot idle"></span>
-    <span id="status" class="status">Not connected (build N)</span>
-    <button id="toggle">Connect</button>
-  </div>
   <div id="body"></div>
 <script nonce="${nonce}">window.__ROLE__ = ${JSON.stringify(this.role)};</script>
 <script nonce="${nonce}" src="${scriptUri}"></script>

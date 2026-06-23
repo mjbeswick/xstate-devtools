@@ -58,7 +58,7 @@ A dedicated **Errors** view collects every problem the static analyzer finds acr
 
 ### 🐞 Live debugger
 - **Attach to a running app** — connect to a Node/SSR app that uses the `@xstate-devtools/adapter` server adapter (`createServerAdapter()`, default `ws://127.0.0.1:9301`) straight from the editor. Connect/disconnect from the **status-bar item** or the **XState Debugger** view; the connection auto-reconnects if the app restarts
-- **Live on the diagram** — the open statechart diagram lights up with the machine's **real** active state as it runs — unlike the static simulator, this is the actual resolved path, with real guard outcomes and context. Toggle **Follow Actor in Diagram** in the Instances title bar to auto-open/reveal the diagram for whichever actor you select, and stepping through the event log moves the highlight to that historical state
+- **Live on the diagram** — the open statechart diagram lights up with the machine's **real** active state as it runs — unlike the static simulator, this is the actual resolved path, with real guard outcomes and context. Toggle **Follow Actor in Diagram** in the Instances title bar to auto-open/reveal the diagram for whichever actor you select; stepping through the event log then follows the actor of the stepped event and moves the highlight to that historical state
 - **Machine-instance tree** — the **Instances** view is a native tree of running actors (parent → child) with each instance's current state shown; expand an instance to see its **live state-node tree with the active configuration highlighted**. Connect/disconnect from the Instances view's title icon. Selecting an instance drives the **Context** view — a native, expandable tree of the actor's **real context**. Right-click an instance or state for **Go to Source**, **Reveal in Diagram**, **Send Event…**, and **Capture / Restore Snapshot**
 - **Event log** — the **Events** view (bottom panel) lists every event each machine receives, with actor, timestamp, and sequence number. Title actions: **Step Back / Forward** through history, **Back to Live**, **Clear log**, and **Export / Import session**. Stepping/selecting an event freezes the Instances + Context trees at that point (the Instances view shows a "⏱ Time travel" banner). Right-click a Context value to **Copy** it
 - **Time travel** — click any event to freeze the diagram and inspector at that point in history; **Back to live** resumes. Pure client-side replay — it never touches the running app
@@ -164,6 +164,7 @@ const machine = setup({
 | --- | --- | --- |
 | **Outline** (focused) | **F12** | Go to Implementation for the selected action / guard / target |
 | **Errors** pane (focused) | **Ctrl/Cmd+C** | Copy the selected problem(s) or group |
+| **Events** log (focused) | **Alt+← / Alt+→** | Step back / forward through the event history |
 | **Search** | **↑ / ↓ / Enter** | Move through results and open the selected one |
 | **Diagram** | **arrow keys** | Move the selection between states |
 | **Diagram** | **Enter** | Expand/collapse the selected compound, or jump a leaf state to its source |
@@ -172,7 +173,7 @@ const machine = setup({
 | **Diagram** | **`0`** or **`.`** | Fit to screen |
 | **Diagram** | **`1`** | Reset to actual size (100%) |
 
-> The **F12** and **Ctrl/Cmd+C** bindings are contributed defaults — rebind them in VS Code's *Keyboard Shortcuts* if you prefer.
+> The **F12**, **Ctrl/Cmd+C**, and **Alt+←/→** bindings are contributed defaults — rebind them in VS Code's *Keyboard Shortcuts* if you prefer.
 
 ## Settings
 
