@@ -1467,6 +1467,10 @@ document.addEventListener('contextmenu', (ev) => {
                 rerenderCollapse();
             }));
         }
+        // Invoke states run a separate machine — let the user drill into it.
+        for (const src of nodeById.get(id)?.invokes ?? []) {
+            items.push(ctxItem(`Open invoked machine: ${src}`, () => vscode.postMessage({ command: 'openInvoked', src })));
+        }
         items.push(ctxSep());
         // Source-editing actions — mirror the tree's right-click menu. The
         // machine root (nodeType 'machine') can't be renamed/deleted, and only

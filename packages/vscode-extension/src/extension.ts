@@ -1066,6 +1066,27 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    // "Open invoked machine" on an invoke state → open that machine's diagram.
+    // The invoke src is normally the invoked machine's variable/id name, so a
+    // by-name lookup resolves it; the live overlay then lights up its active
+    // states automatically if the invoked child actor is running. Falls back to
+    // a running actor whose machine id matches (covers differently-named srcs).
+    graphViewProvider.setOpenInvokedHandler((src) => {
+        let machine = findStaticMachine(workspaceScanner, src);
+        if (!machine) {
+            const running = [...debuggerController.getStore().getState().actors.values()]
+                .find((a) => a.machine?.id === src);
+            if (running?.machine) {
+                machine = findStaticMachine(
+                    workspaceScanner, running.machine.id, running.machine.sourceLocation,
+                    Object.keys(running.machine.root.states),
+                );
+            }
+        }
+        if (machine) { graphViewProvider.show(machine, machine.label); }
+        else { void vscode.window.showWarningMessage(`No machine named "${src}" found in the workspace to open.`); }
+    });
+
     // When the user selects a node in the tree, sync the diagram:
     // - state node  → highlight it in the current graph
     // - machine node → switch the graph to show that machine

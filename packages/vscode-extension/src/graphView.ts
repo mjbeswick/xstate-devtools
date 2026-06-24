@@ -61,6 +61,9 @@ export class XStateGraphViewProvider {
     // Invoked when a diagram node is clicked, so the host can select the
     // matching item in the tree outline (set from activate()).
     private revealInTree?: (node: MachineNode) => void;
+    // Invoked when the user picks "Open invoked machine" on an invoke state, so
+    // the host can resolve the invoke src to a machine and open its diagram.
+    private openInvoked?: (src: string) => void;
 
     constructor(
         private readonly extensionUri: vscode.Uri,
@@ -70,6 +73,11 @@ export class XStateGraphViewProvider {
     /** Register a callback that selects the given node in the tree outline. */
     public setRevealInTreeHandler(fn: (node: MachineNode) => void) {
         this.revealInTree = fn;
+    }
+
+    /** Register a callback that opens the diagram for an invoked machine. */
+    public setOpenInvokedHandler(fn: (src: string) => void) {
+        this.openInvoked = fn;
     }
 
     private machineKey(machine: MachineNode): string {
@@ -131,6 +139,7 @@ export class XStateGraphViewProvider {
                 case 'exportPng':   this.saveExport(message.data, 'png', title); return;
                 case 'exportMermaid': void this.exportMermaid(entry.machine, title); return;
                 case 'goToSource': void this.goToSource(message.id, entry); return;
+                case 'openInvoked': this.openInvoked?.(String(message.src)); return;
                 case 'editNode':      void this.runNodeEdit(message.id, entry, n => XStateTreeEditor.editNode(n)); return;
                 case 'addChildState': void this.runNodeEdit(message.id, entry, n => XStateTreeEditor.addChildState(n)); return;
                 case 'addTransition': void this.runNodeEdit(message.id, entry, n => XStateTreeEditor.addTransition(n)); return;
