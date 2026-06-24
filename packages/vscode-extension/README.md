@@ -41,7 +41,7 @@ A dedicated **Errors** view collects every problem the static analyzer finds acr
 
 ### 🗺️ Statechart diagram
 - **Visual statechart** — render any machine (or any compound state) as a Harel-style diagram in its own editor tab via **View State Diagram** (from the outline _or_ by right-clicking a machine/state in the code)
-- **Every transition kind** — `on` events, `after` (delayed), `always` (transient), invoke `onDone`/`onError`, and state-level `onDone`, with `EVENT [guard] / actions` labels; internal (action-only) transitions and invoked services (`invoke <src>`) show inside the state box — right-click an invoke state → **Open invoked machine** to drill into that separate machine's diagram (and, while debugging, its live state)
+- **Every transition kind** — `on` events, `after` (delayed), `always` (transient), invoke `onDone`/`onError`, and state-level `onDone`, with `EVENT [guard] / actions` labels; internal (action-only) transitions and invoked services (`invoke <src>`) show inside the state box — click the `+` toggle on an invoke state (or right-click → **Open invoked machine**) to drill into that separate machine's diagram (and, while debugging, its live state)
 - **Automatic layout** — clean hierarchical layout with smooth, curved transitions
 - **Top-down ↔ left-right** — a sensible direction is chosen from the machine's shape (left-right for linear machines, top-down for parallel/large ones); flip it anytime and your choice is remembered
 - **Live updates** — the diagram refreshes as you edit the source, **preserving your pan & zoom**, and auto-centers when first opened

@@ -333,9 +333,15 @@ function clipTxt(full: string, x: number, y: number, maxW: number, px: number, a
 // icons. Drawn (not a glyph) so the +/− sits inset from the border with padding.
 // `kind`: 'plus' = collapsed (click to expand), 'minus' = expanded (click to
 // collapse). Centred on (cx, cy).
-function toggleSquare(cx: number, cy: number, kind: 'plus' | 'minus'): SVGElement {
+function toggleSquare(cx: number, cy: number, kind: 'plus' | 'minus', role?: string): SVGElement {
     const S = 11, r = S / 2, pad = 3, a = r - pad;
     const g = el('g');
+    if (role) {
+        // Bigger transparent hit target so the small glyph is easy to click.
+        g.setAttribute('data-role', role);
+        (g as SVGElement).style.cursor = 'pointer';
+        g.appendChild(el('rect', { x: cx - 9, y: cy - 9, width: 18, height: 18, fill: 'transparent', 'pointer-events': 'all' }));
+    }
     g.appendChild(el('rect', {
         x: cx - r, y: cy - r, width: S, height: S, rx: 2.5, ry: 2.5,
         fill: 'none', stroke: C.desc, 'stroke-width': 1.1,
@@ -698,14 +704,19 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                 const internal = internalRows(d);
                 const invokes = d.invokes ?? [];
                 const collapsedToggle = isCollapsed && hasChildren;
+                // A state that only invokes one machine has no inline children to
+                // expand — its '+' drills into the invoked machine instead.
+                const drillToggle = !hasChildren && invokes.length === 1;
+                const leftToggle = collapsedToggle || drillToggle;
                 const label = d.label;
-                const titleW = collapsedToggle ? w - 40 : w - 16;  // leave room for the left '+' toggle
+                const titleW = leftToggle ? w - 40 : w - 16;  // leave room for the left toggle
                 if (entry.length > 0 || exit.length > 0 || internal.length > 0 || invokes.length > 0) {
                     const labelY = ay + NODE_V_PAD + LABEL_PX;
                     g.appendChild(clipTxt(label, ax+w/2, labelY, titleW, LABEL_PX, {
                         'text-anchor': 'middle', 'font-size': LABEL_PX, 'font-weight': '500',
                     }, '500'));
                     if (collapsedToggle) { g.appendChild(toggleSquare(ax+13, labelY - LABEL_PX/2 + 1, 'plus')); }
+                    else if (drillToggle) { g.appendChild(toggleSquare(ax+13, labelY - LABEL_PX/2 + 1, 'plus', 'drill')); }
                     const divY = labelY + NODE_V_PAD / 2;
                     g.appendChild(el('line', {
                         x1: ax+1, y1: divY, x2: ax+w-1, y2: divY,
@@ -1253,6 +1264,12 @@ container.addEventListener('click', (ev) => {
     if (kind === 'start') { return; }
     // Keep keyboard nav in sync with what was clicked.
     selectNode(id);
+    // Drill toggle on an invoke-only state: open the invoked machine.
+    if (target.closest('[data-role="drill"]')) {
+        const src = nodeById.get(id)?.invokes?.[0];
+        if (src) { vscode.postMessage({ command: 'openInvoked', src }); }
+        return;
+    }
     // Collapse/expand only when the region's header toggle is hit, or when a
     // collapsed compound is clicked to expand it. Clicking an expanded region's
     // empty body selects the region (and syncs the outline) instead.
