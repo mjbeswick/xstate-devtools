@@ -165,6 +165,20 @@ function visibleEndpoint(id: string): string {
     return id;
 }
 
+// Target width:height for packing a parallel state's regions into a grid
+// (rectpacking) instead of one ever-widening row. ~1.6 keeps it landscape-ish.
+const PARALLEL_ASPECT_RATIO = 1.6;
+
+// Visible endpoints of every routed edge, populated by buildElkGraph before the
+// children are built. Used to decide whether a parallel state is safe to pack:
+// rectpacking positions region boxes but doesn't route edges, so it only works
+// when no transition crosses into/out of/between the regions.
+const edgeEndpoints = new Set<string>();
+function subtreeHasEdge(id: string): boolean {
+    if (edgeEndpoints.has(id)) { return true; }
+    return (childrenOf.get(id) ?? []).some(subtreeHasEdge);
+}
+
 // ── ELK graph ─────────────────────────────────────────────────────────────────
 function buildElkNode(id: string): ElkNode {
     const d = nodeById.get(id)!;
@@ -185,6 +199,25 @@ function buildElkNode(id: string): ElkNode {
             labels: [{ text: d.label }],
         };
     }
+    const padding = `[top=${REGION_H + 6},left=18,bottom=14,right=18]`;
+    // A parallel state's regions have no edges between them, so 'layered' drops
+    // them into one ever-widening row. When nothing routes through the subtree,
+    // pack them into a grid instead (rectpacking wraps rows toward the target
+    // aspect ratio). If any transition crosses the regions, keep 'layered' —
+    // rectpacking can't route those edges.
+    const layoutOptions = d.parallel && !subtreeHasEdge(id)
+        ? {
+            'elk.algorithm': 'rectpacking',
+            'elk.aspectRatio': String(PARALLEL_ASPECT_RATIO),
+            'elk.spacing.nodeNode': '26',
+            'elk.padding': padding,
+        }
+        : {
+            'elk.algorithm': 'layered',
+            'elk.direction': direction,
+            ...ROUTING_OPTS,
+            'elk.padding': padding,
+        };
     return {
         id,
         labels: [{
@@ -193,12 +226,7 @@ function buildElkNode(id: string): ElkNode {
             height: 16,
             layoutOptions: { 'elk.nodeLabels.placement': 'H_CENTER V_TOP INSIDE' },
         }],
-        layoutOptions: {
-            'elk.algorithm': 'layered',
-            'elk.direction': direction,
-            ...ROUTING_OPTS,
-            'elk.padding': `[top=${REGION_H + 6},left=18,bottom=14,right=18]`,
-        },
+        layoutOptions,
         children: (childrenOf.get(id) ?? []).map(buildElkNode),
     };
 }
@@ -263,6 +291,7 @@ function wrapLabelLines(rawLines: string[], maxW: number): RenderLine[] {
 
 function buildElkGraph(): ElkNode {
     edgeMeta.clear();
+    edgeEndpoints.clear();
     // Merge transitions sharing a visible source→target pair into one routed
     // edge (skip self-loops and initial-marker edges — drawn separately).
     const merged = new Map<string, { id: string; s: string; t: string; lines: string[]; seen: Set<string> }>();
@@ -270,6 +299,7 @@ function buildElkGraph(): ElkNode {
     for (const e of payload.edges) {
         const s = visibleEndpoint(e.data.source), t = visibleEndpoint(e.data.target);
         if (s === t) { continue; }
+        edgeEndpoints.add(s); edgeEndpoints.add(t);
         if (e.data.source.startsWith('start_')) {
             // Let ELK route the initial-state arrows too, so they connect the
             // dot to the state cleanly instead of at an arbitrary angle.

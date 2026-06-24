@@ -240,15 +240,19 @@ states from the **child actor's** snapshot.
 A parallel state's regions have no edges between them, so ELK `layered` drops
 them in one ever-widening row (screenshot: `app`).
 
-- [ ] **Understand the prior revert.** Commit `91c241b` reverted exactly this
-  (`rectpacking` + `elk.aspectRatio` 1.6 for `d.parallel` in `buildElkNode`).
-  Find why before retrying — likely broke edge routing into/out of regions,
-  nested-region padding, or region-header placement.
-- [ ] **Retry with the fix.** Re-apply `rectpacking` and address what broke; or
-  use `layered` + `elk.layered.wrapping.strategy` / `elk.aspectRatio`, or a
-  manual two-pass (lay each region, then pack region boxes into a grid).
-- [ ] Confirm live overlay + self-transition loops still render after wrapping.
-- [ ] README: restore the "wrap into a grid" line the revert removed.
+- [x] **Understand the prior revert.** Commit `91c241b` reverted `d8f718e`,
+  which applied `rectpacking` to *every* parallel node. With the root's
+  `elk.hierarchyHandling: INCLUDE_CHILDREN`, edges route globally; rectpacking
+  packs region boxes but reserves no space for / doesn't route edges, so any
+  parallel state with transitions crossing its regions got mangled.
+- [x] **Retry with the fix.** Apply `rectpacking` only when the parallel node's
+  subtree has no routed edges (`subtreeHasEdge`, fed by `edgeEndpoints` built in
+  `buildElkGraph`). Self-loops are excluded (skipped before endpoints collected),
+  so they don't block packing. Edge-crossing parallels keep `layered`.
+- [x] README: restored the "wrap into a grid" line (now noting it's the
+  independent-regions case). *(B1 resolved: condition on isolation, not count.)*
+- [ ] Manual-verify via F5: the wide `app` parallel wraps; a parallel state with
+  inter-region transitions still routes correctly with `layered`.
 
 ### Open questions
 - [ ] **A1:** When the invoked actor isn't running (state inactive), nest the
