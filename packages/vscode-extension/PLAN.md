@@ -191,6 +191,74 @@ State coverage can pass while those edges are untested.
 - [ ] README: new top-level Features section; update the "static — no need to run
   your app" framing to note the optional live mode; Requirements.
 
+## Phase 5 — Invoked-actor drill-in + parallel-region wrapping
+
+**Goal.** Make invoked machines first-class in both the debugger tree and the
+diagram, and stop wide parallel states (e.g. `app` with ~15 regions) from
+sprawling into one unreadable horizontal row.
+
+### Done
+- [x] Diagram: `+` toggle on an invoke-only state opens the invoked machine
+  (currently its own diagram tab). `webview/graph.ts` `drillToggle`. *(commit)*
+- [x] Tree: invoked child actors nest under the state that invokes them
+  (match invoke `src` → child actor `machine.id`), expandable; unmatched /
+  spawned actors stay direct children. `debugger/debuggerTreeProvider.ts`. *(commit)*
+
+### 5a. Inline-nest invoked machines in the diagram (fully live)
+Replace "open in a new tab" with the invoked machine rendered as expandable
+children inside the invoke node, with the live overlay lighting up its active
+states from the **child actor's** snapshot.
+
+- [ ] **Resolve at build time.** Add `setInvokeResolver((src) => MachineNode |
+  undefined)` on `XStateGraphViewProvider`, wired in `activate()` to the same
+  `findStaticMachine(workspaceScanner, src)` chain `setOpenInvokedHandler` uses
+  (`extension.ts:1074`), incl. the running-actor (`machine.id === src`) fallback.
+- [ ] **Nest into the model.** In `buildElements`/`collect` (`graphView.ts:452`),
+  when a state has invokes, resolve each `src` and recurse `collect()` on the
+  resolved machine's root states as children of the invoke node. The node
+  becomes `compound` → gets region rendering + expand/collapse for free. Drop
+  the special `drillToggle` for resolvable invokes; keep it as the fallback for
+  unresolvable ones.
+- [ ] **Keep foreign nodes out of the simulator.** `collect()` also fills
+  `simStates`/`simTransitions`; nested foreign-machine nodes must NOT be mirrored
+  there (they'd pollute test-path/coverage) — add a `foreign` flag to skip sim
+  mirroring and cross-machine edge building.
+- [ ] **Collapse by default** via the existing `collapsedIds` path, so a large
+  invoked machine doesn't blow up layout until expanded.
+- [ ] **Live overlay across actors (the hard part).** `setLiveConfig`
+  (`graphView.ts:197`) matches a panel by `entry.machine.label` and paints one
+  machine's value. Must also paint the child actor's value onto the nested
+  subtree. Evaluate: host pushes child-actor configs keyed by invoke src, and
+  `setLiveConfig` resolves each against the nested subtree (`entry.nodeById`
+  already keys every collected node, so this mostly works once nesting lands).
+- [ ] **Node actions on foreign nodes.** `goToSource`/`selectInTree`/
+  `revealInTree` resolve via `entry.nodeById` → the foreign node's own
+  `uri`/`range`; verify reveal-in-tree degrades gracefully (no tree item).
+- [ ] README: update the `invoke <src>` line + diagram section.
+
+### 5b. Wrap parallel regions into a grid
+A parallel state's regions have no edges between them, so ELK `layered` drops
+them in one ever-widening row (screenshot: `app`).
+
+- [ ] **Understand the prior revert.** Commit `91c241b` reverted exactly this
+  (`rectpacking` + `elk.aspectRatio` 1.6 for `d.parallel` in `buildElkNode`).
+  Find why before retrying — likely broke edge routing into/out of regions,
+  nested-region padding, or region-header placement.
+- [ ] **Retry with the fix.** Re-apply `rectpacking` and address what broke; or
+  use `layered` + `elk.layered.wrapping.strategy` / `elk.aspectRatio`, or a
+  manual two-pass (lay each region, then pack region boxes into a grid).
+- [ ] Confirm live overlay + self-transition loops still render after wrapping.
+- [ ] README: restore the "wrap into a grid" line the revert removed.
+
+### Open questions
+- [ ] **A1:** When the invoked actor isn't running (state inactive), nest the
+  *static* invoked machine structure, or only show `invoke <src>` until live?
+  (Tree only nests live actors.)
+- [ ] **A2:** Recursion depth for invokes-of-invokes — cap, or rely on
+  collapse-by-default to bound it?
+- [ ] **B1:** Wrap all parallel states, or only past a region-count/width
+  threshold (small parallel states read fine as a row)?
+
 ## Cross-cutting
 
 - [ ] Keep `README.md` in sync **in the same commit** as each behavioural change
