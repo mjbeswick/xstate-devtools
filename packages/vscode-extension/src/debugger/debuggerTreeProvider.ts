@@ -131,24 +131,59 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
         }
         if (element.kind === 'actor') {
             const items: DebuggerTreeItem[] = [];
-            // Child actors first, then the machine's top-level states.
-            for (const [sessionId, a] of state.actors) {
-                if (a.parentSessionId === element.sessionId && this.includeActor(a.status)) {
-                    items.push(this.actorItem(sessionId));
-                }
-            }
             const machine = state.actors.get(element.sessionId)?.machine;
             if (machine) {
                 for (const node of Object.values(machine.root.states)) {
                     items.push(this.stateItem(element.sessionId, node, machine.root.initial));
                 }
             }
+            // Invoked actors are nested under the state that invokes them (see
+            // stateItem's children). Anything left — spawned actors, or an
+            // invoke whose src doesn't match a machine id — stays a direct
+            // child so it's never hidden.
+            const invoked = machine ? this.allInvokeSrcs(machine.root) : new Set<string>();
+            for (const [sessionId, a] of state.actors) {
+                if (a.parentSessionId === element.sessionId && this.includeActor(a.status)
+                    && !(a.machine && invoked.has(a.machine.id))) {
+                    items.push(this.actorItem(sessionId));
+                }
+            }
             return items;
         }
-        // state node → its child states
+        // state node → its child states, then any invoked actors it spawned.
         const parent = element.node;
         if (!parent) { return []; }
-        return Object.values(parent.states).map((node) => this.stateItem(element.sessionId, node, parent.initial));
+        const items = Object.values(parent.states).map((node) => this.stateItem(element.sessionId, node, parent.initial));
+        for (const sessionId of this.invokedActorsOf(element.sessionId, parent)) {
+            items.push(this.actorItem(sessionId));
+        }
+        return items;
+    }
+
+    /** All invoke `src` names anywhere in a machine's state tree. */
+    private allInvokeSrcs(root: SerializedStateNode): Set<string> {
+        const out = new Set<string>();
+        const walk = (n: SerializedStateNode) => {
+            for (const i of n.invoke) { out.add(i.src); }
+            for (const c of Object.values(n.states)) { walk(c); }
+        };
+        walk(root);
+        return out;
+    }
+
+    /** Live child actors invoked by `node` — matched src→machine.id, the same
+     *  contract the diagram's "open invoked machine" uses. */
+    private invokedActorsOf(ownerSessionId: string, node: SerializedStateNode): string[] {
+        if (node.invoke.length === 0) { return []; }
+        const srcs = new Set(node.invoke.map((i) => i.src));
+        const state = this.controller.getStore().getState();
+        const out: string[] = [];
+        for (const [sessionId, a] of state.actors) {
+            if (a.parentSessionId === ownerSessionId && a.machine && srcs.has(a.machine.id) && this.includeActor(a.status)) {
+                out.push(sessionId);
+            }
+        }
+        return out;
     }
 
     /** Active node ids for an actor's current (display) snapshot, memoised. */
@@ -226,7 +261,9 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
             light: vscode.Uri.joinPath(this.iconBase, 'light', file),
             dark: vscode.Uri.joinPath(this.iconBase, 'dark', file),
         };
-        const hasChildren = Object.keys(node.states).length > 0;
+        // Expandable if it has child states, or a live invoked actor nested
+        // under it (invoked actors only exist while the state is active).
+        const hasChildren = Object.keys(node.states).length > 0 || this.invokedActorsOf(sessionId, node).length > 0;
         item.collapsibleState = hasChildren
             ? (active ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed)
             : vscode.TreeItemCollapsibleState.None;
