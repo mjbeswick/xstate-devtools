@@ -209,32 +209,30 @@ Replace "open in a new tab" with the invoked machine rendered as expandable
 children inside the invoke node, with the live overlay lighting up its active
 states from the **child actor's** snapshot.
 
-- [ ] **Resolve at build time.** Add `setInvokeResolver((src) => MachineNode |
-  undefined)` on `XStateGraphViewProvider`, wired in `activate()` to the same
-  `findStaticMachine(workspaceScanner, src)` chain `setOpenInvokedHandler` uses
-  (`extension.ts:1074`), incl. the running-actor (`machine.id === src`) fallback.
-- [ ] **Nest into the model.** In `buildElements`/`collect` (`graphView.ts:452`),
-  when a state has invokes, resolve each `src` and recurse `collect()` on the
-  resolved machine's root states as children of the invoke node. The node
-  becomes `compound` → gets region rendering + expand/collapse for free. Drop
-  the special `drillToggle` for resolvable invokes; keep it as the fallback for
-  unresolvable ones.
-- [ ] **Keep foreign nodes out of the simulator.** `collect()` also fills
-  `simStates`/`simTransitions`; nested foreign-machine nodes must NOT be mirrored
-  there (they'd pollute test-path/coverage) — add a `foreign` flag to skip sim
-  mirroring and cross-machine edge building.
-- [ ] **Collapse by default** via the existing `collapsedIds` path, so a large
-  invoked machine doesn't blow up layout until expanded.
-- [ ] **Live overlay across actors (the hard part).** `setLiveConfig`
-  (`graphView.ts:197`) matches a panel by `entry.machine.label` and paints one
-  machine's value. Must also paint the child actor's value onto the nested
-  subtree. Evaluate: host pushes child-actor configs keyed by invoke src, and
-  `setLiveConfig` resolves each against the nested subtree (`entry.nodeById`
-  already keys every collected node, so this mostly works once nesting lands).
-- [ ] **Node actions on foreign nodes.** `goToSource`/`selectInTree`/
-  `revealInTree` resolve via `entry.nodeById` → the foreign node's own
-  `uri`/`range`; verify reveal-in-tree degrades gracefully (no tree item).
-- [ ] README: update the `invoke <src>` line + diagram section.
+- [x] **Resolve at build time.** `setInvokeResolver((src) => MachineNode |
+  undefined)` on `XStateGraphViewProvider`, wired in `activate()` to
+  `findStaticMachine(workspaceScanner, src)`.
+- [x] **Nest into the model.** `collect()` nests each resolvable invoke's root
+  states as children of the invoke node (`foreign` recursion), marks it
+  `compound`, dedups per machine key (breaks cycles + repeats). The node gets
+  the normal region expand/collapse; `drillToggle` only fires for unresolvable
+  invokes (then `hasChildren` is false). `addEdges(m)` emits each nested
+  machine's internal transitions.
+- [x] **Keep foreign nodes out of the simulator.** `foreign` flag skips
+  `simStates`/`simTransitions` for inlined nodes.
+- [x] **Collapse by default** — invoke states with nested children push to
+  `collapsedIds` when not expanded in the tree (also keeps 5b wrapping intact:
+  collapsed sub-edges resolve to `s===t` and are skipped).
+- [x] **Live overlay across actors.** `setLiveConfig` → `applyLiveConfigs(Map<
+  label, value>)`: per panel, unions active nodes from the main machine + every
+  nested invoked machine (`entry.invokedMachines`), posting once.
+  `syncDiagram` builds the map and calls it once so child overlays don't clobber
+  the parent's.
+- [x] **Node actions on foreign nodes.** Resolve via `entry.nodeById` → the
+  foreign node's own `uri`/`range` (reveal-in-tree no-ops gracefully).
+- [x] README: updated the `invoke <src>` line.
+- [ ] Manual-verify via F5: nested machine expands inline; live child-actor
+  states light up; simulator/test-paths still cover only the host machine.
 
 ### 5b. Wrap parallel regions into a grid
 A parallel state's regions have no edges between them, so ELK `layered` drops
@@ -255,11 +253,10 @@ them in one ever-widening row (screenshot: `app`).
   inter-region transitions still routes correctly with `layered`.
 
 ### Open questions
-- [ ] **A1:** When the invoked actor isn't running (state inactive), nest the
-  *static* invoked machine structure, or only show `invoke <src>` until live?
-  (Tree only nests live actors.)
-- [ ] **A2:** Recursion depth for invokes-of-invokes — cap, or rely on
-  collapse-by-default to bound it?
+- [x] **A1:** Always nest the *static* structure (diagram is useful offline);
+  the live overlay lights it up when a child actor is running.
+- [x] **A2:** Bounded by per-machine-key dedup — each machine nests once, which
+  also breaks invoke cycles. No separate depth cap needed.
 - [ ] **B1:** Wrap all parallel states, or only past a region-count/width
   threshold (small parallel states read fine as a row)?
 

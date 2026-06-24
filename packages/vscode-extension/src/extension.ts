@@ -1087,6 +1087,11 @@ export async function activate(context: vscode.ExtensionContext) {
         else { void vscode.window.showWarningMessage(`No machine named "${src}" found in the workspace to open.`); }
     });
 
+    // Resolve an invoke `src` to its static machine, so the diagram can nest the
+    // invoked machine inline (same lookup as "Open invoked machine", minus the
+    // running-actor fallback — the static structure is what we render).
+    graphViewProvider.setInvokeResolver((src) => findStaticMachine(workspaceScanner, src));
+
     // When the user selects a node in the tree, sync the diagram:
     // - state node  → highlight it in the current graph
     // - machine node → switch the graph to show that machine

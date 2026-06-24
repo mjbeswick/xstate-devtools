@@ -483,6 +483,10 @@ export class DebuggerController implements vscode.Disposable {
     private syncDiagram(): void {
         const state = this.store.getState();
         const diag: string[] = [];
+        // One config per static machine label (main + inlined invoked machines),
+        // applied to every panel in a single pass so a child actor's overlay
+        // doesn't clobber its parent's (and vice versa).
+        const configs = new Map<string, LiveStateValue>();
         for (const [sessionId, actor] of state.actors) {
             if (!actor.machine) { continue; }
             // Respect time-travel: show the snapshot at the frozen seq, not live.
@@ -494,10 +498,12 @@ export class DebuggerController implements vscode.Disposable {
             const machineId = this.resolveStaticLabel?.(
                 actor.machine.id, actor.machine.sourceLocation, Object.keys(actor.machine.root.states),
             ) ?? actor.machine.id;
-            const r = this.graphView.setLiveConfig(machineId, value as LiveStateValue);
+            configs.set(machineId, value as LiveStateValue);
             const valueKeys = typeof value === 'object' && value ? Object.keys(value as object) : [String(value)];
-            diag.push(`${actor.machine.id}→"${machineId}" value[${valueKeys.join(',')}] matched=${r.matched} painted=${r.painted}`);
+            diag.push(`${actor.machine.id}→"${machineId}" value[${valueKeys.join(',')}]`);
         }
+        const r = this.graphView.applyLiveConfigs(configs);
+        diag.push(`matched=${r.matched} painted=${r.painted}`);
         // Diagnostic: log the overlay mapping only when it changes, so we can see
         // when a diagram panel isn't being matched/painted.
         const open = this.graphView.getOpenMachineLabels();

@@ -17,6 +17,9 @@ interface PanelEntry {
     // Whether the webview HTML has been built yet. Once it has, model updates
     // are pushed incrementally via `setModel` so the user's pan/zoom survives.
     rendered?: boolean;
+    // Roots of the invoked machines nested inline into this diagram, so the live
+    // overlay can paint a *child actor's* active states onto the nested subtree.
+    invokedMachines?: MachineNode[];
 }
 
 /** XState StateValue shape from a live snapshot. */
@@ -64,6 +67,10 @@ export class XStateGraphViewProvider {
     // Invoked when the user picks "Open invoked machine" on an invoke state, so
     // the host can resolve the invoke src to a machine and open its diagram.
     private openInvoked?: (src: string) => void;
+    // Resolves an invoke `src` to its static machine definition, so invoked
+    // machines can be nested inline into the diagram. Returns undefined when no
+    // matching workspace machine is found (then the invoke stays a leaf row).
+    private resolveInvoke?: (src: string) => MachineNode | undefined;
 
     constructor(
         private readonly extensionUri: vscode.Uri,
@@ -78,6 +85,12 @@ export class XStateGraphViewProvider {
     /** Register a callback that opens the diagram for an invoked machine. */
     public setOpenInvokedHandler(fn: (src: string) => void) {
         this.openInvoked = fn;
+    }
+
+    /** Register a resolver from an invoke `src` to its static machine, used to
+     *  nest invoked machines inline into the diagram. */
+    public setInvokeResolver(fn: (src: string) => MachineNode | undefined) {
+        this.resolveInvoke = fn;
     }
 
     private machineKey(machine: MachineNode): string {
@@ -194,14 +207,24 @@ export class XStateGraphViewProvider {
      * name-collision pitfall of a flat name map — then push the matching diagram
      * node ids to the webview, which paints them (see `paintLive` in graph.ts).
      */
-    public setLiveConfig(machineId: string, value: LiveStateValue): { matched: number; painted: number } {
+    public applyLiveConfigs(configs: Map<string, LiveStateValue>): { matched: number; painted: number } {
         let matched = 0;
         let painted = 0;
         for (const entry of this.panels.values()) {
-            if (entry.machine.label !== machineId) { continue; }
-            matched++;
             const active = new Set<MachineNode>();
-            collectActiveNodes(value, entry.machine, active);
+            let matchedHere = false;
+            // The diagram's own machine, plus any invoked machines nested inline:
+            // a child actor's config lights up the nested subtree. Union the
+            // active nodes across all of them so a later push (e.g. the child
+            // actor) doesn't overwrite the parent's overlay.
+            for (const m of [entry.machine, ...(entry.invokedMachines ?? [])]) {
+                const value = configs.get(m.label);
+                if (value === undefined) { continue; }
+                matchedHere = true;
+                matched++;
+                collectActiveNodes(value, m, active);
+            }
+            if (!matchedHere) { continue; }
             const ids: string[] = [];
             for (const [id, node] of entry.nodeById) {
                 if (active.has(node)) { ids.push(id); }
@@ -419,7 +442,9 @@ export class XStateGraphViewProvider {
         entry.nodeById.clear();
         const config = vscode.workspace.getConfiguration('xstateOutline');
         const reflectExpansion = config.get<boolean>('graphReflectsTreeExpansion', true);
-        const payload = this.buildElements(entry.machine, reflectExpansion, entry.nodeById);
+        const invokedMachines: MachineNode[] = [];
+        const payload = this.buildElements(entry.machine, reflectExpansion, entry.nodeById, invokedMachines);
+        entry.invokedMachines = invokedMachines;
         if (entry.rendered) {
             // Incremental update — preserve the webview's pan/zoom/selection.
             entry.panel.webview.postMessage({ command: 'setModel', payload, direction: entry.direction });
@@ -432,7 +457,8 @@ export class XStateGraphViewProvider {
     private buildElements(
         machine: MachineNode,
         reflectExpansion: boolean,
-        nodeById: Map<string, MachineNode>
+        nodeById: Map<string, MachineNode>,
+        invokedRoots: MachineNode[] = []
     ): GraphPayload {
         const nodes: GraphNode[] = [];
         const nameToId = new Map<string, string>();
@@ -440,19 +466,28 @@ export class XStateGraphViewProvider {
         // Each state's parent state node — for XState-style relative target
         // resolution (a bare target is a sibling, not a same-named state elsewhere).
         const parentNodeOf = new Map<MachineNode, MachineNode | undefined>();
+        // Nodes belonging to an inlined invoked machine — visual only. They're
+        // kept out of the simulator/test-path model (that simulates THIS machine,
+        // not the separate invoked actor).
+        const foreignNodes = new Set<MachineNode>();
         const collapsedIds: string[] = [];
         // Parallel structural model for the simulator (same ids as the diagram).
         const simStates: SimState[] = [];
         const simTransitions: SimTransition[] = [];
         let simCounter = 0;
         let counter = 0;
+        // Machines already nested inline (by stable key) — dedups repeat invokes
+        // and breaks cycles (a machine that, directly or transitively, invokes
+        // itself is nested only once).
+        const nestedMachineKeys = new Set<string>();
 
         const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9_]/g, '_');
 
-        const collect = (n: MachineNode, parentId: string | undefined, isRoot: boolean) => {
+        const collect = (n: MachineNode, parentId: string | undefined, isRoot: boolean, foreign = false) => {
             const id = `n${counter++}`;
             idByNode.set(n, id);
             nodeById.set(id, n);
+            if (foreign) { foreignNodes.add(n); }
             const name = sanitize(n.label);
             nameToId.set(name, id);
 
@@ -476,33 +511,35 @@ export class XStateGraphViewProvider {
                 });
             // Invoked services on this state (shown as `invoke <src>` rows).
             const invokes = (n.children ?? []).filter(c => c.type === 'invoke').map(c => c.label);
-            nodes.push({
-                data: {
-                    id, label: n.label, name,
-                    parent: parentId,
-                    compound: childStates.length > 0,
-                    initial: !!n.isInitial,
-                    final: !!n.isFinal,
-                    parallel: !!n.isParallel,
-                    history: n.historyType,
-                    entryActions,
-                    exitActions,
-                    internalTransitions,
-                    invokes,
-                    description: n.description,
-                    nodeType: n.type,
-                },
-            });
+            const nodeData: GraphNode['data'] = {
+                id, label: n.label, name,
+                parent: parentId,
+                compound: childStates.length > 0,
+                initial: !!n.isInitial,
+                final: !!n.isFinal,
+                parallel: !!n.isParallel,
+                history: n.historyType,
+                entryActions,
+                exitActions,
+                internalTransitions,
+                invokes,
+                description: n.description,
+                nodeType: n.type,
+            };
+            nodes.push({ data: nodeData });
 
             // Mirror the state into the simulator model (same id as the diagram).
-            const simType: SimState['type'] = n.isFinal ? 'final'
-                : n.isParallel ? 'parallel'
-                : childStates.length > 0 ? 'compound'
-                : 'atomic';
-            simStates.push({
-                id, label: n.label, parent: parentId, type: simType,
-                initial: !!n.isInitial, historyType: n.historyType,
-            });
+            // Foreign (inlined invoked-machine) nodes are visual only — excluded.
+            if (!foreign) {
+                const simType: SimState['type'] = n.isFinal ? 'final'
+                    : n.isParallel ? 'parallel'
+                    : childStates.length > 0 ? 'compound'
+                    : 'atomic';
+                simStates.push({
+                    id, label: n.label, parent: parentId, type: simType,
+                    initial: !!n.isInitial, historyType: n.historyType,
+                });
+            }
 
             // A compound state renders as a single collapsed block unless it is
             // currently expanded in the tree. Using the live expansion set (not
@@ -513,7 +550,30 @@ export class XStateGraphViewProvider {
                 collapsedIds.push(id);
             }
 
-            for (const c of childStates) { parentNodeOf.set(c, n); collect(c, id, false); }
+            for (const c of childStates) { parentNodeOf.set(c, n); collect(c, id, false, foreign); }
+
+            // Nest each resolvable invoked machine inline as children of this
+            // state: its top-level states become children of `id`, so the state
+            // gets the normal expand/collapse affordance and drills in. A machine
+            // is nested at most once per diagram (dedup also breaks invoke
+            // cycles); nested machines default to collapsed.
+            let nestedHere = false;
+            for (const src of invokes) {
+                const m = this.resolveInvoke?.(src);
+                if (!m) { continue; }
+                const mKey = this.machineKey(m);
+                if (nestedMachineKeys.has(mKey)) { continue; }
+                nestedMachineKeys.add(mKey);
+                invokedRoots.push(m);
+                nestedHere = true;
+                for (const r of childStatesOf(m)) { parentNodeOf.set(r, m); collect(r, id, false, true); }
+            }
+            if (nestedHere) {
+                nodeData.compound = true;
+                if (reflectExpansion && !isRoot && childStates.length === 0 && !this.treeProvider.isNodeExpanded(n)) {
+                    collapsedIds.push(id);
+                }
+            }
         };
 
         // When the diagram is rooted at a single state (a sub-diagram), that
@@ -625,8 +685,9 @@ export class XStateGraphViewProvider {
                         label = label.trim();
                         if (label && !entry.labels.includes(label)) { entry.labels.push(label); }
                         // Simulator transition — only when the target is a real
-                        // diagram state (skip ghost/out-of-diagram stubs).
-                        if (realTarget) {
+                        // diagram state (skip ghost/out-of-diagram stubs) and the
+                        // source isn't a foreign (inlined invoked-machine) node.
+                        if (realTarget && !foreignNodes.has(n)) {
                             simTransitions.push({
                                 id: `st${simCounter++}`, source: sourceId, event: eventLabel ?? '',
                                 guard: guardLabel, target: realTarget, actions: actionLabels,
@@ -656,8 +717,9 @@ export class XStateGraphViewProvider {
                         const actions = (t.children ?? []).filter(c => c.type === 'action').map(a => a.label);
                         if (!target) {
                             // Internal transition (event, no target): no state change,
-                            // but still a fireable event in the simulator.
-                            if (t.label) {
+                            // but still a fireable event in the simulator (unless
+                            // the source is a foreign inlined invoked-machine node).
+                            if (t.label && !foreignNodes.has(n)) {
                                 simTransitions.push({
                                     id: `st${simCounter++}`, source: sourceId,
                                     event: t.label, guard: guard?.label, actions,
@@ -672,6 +734,8 @@ export class XStateGraphViewProvider {
             for (const c of (n.children ?? [])) { addEdges(c); }
         };
         addEdges(machine);
+        // Emit the internal transitions of each inlined invoked machine too.
+        for (const m of invokedRoots) { addEdges(m); }
 
         const edges: GraphEdge[] = [];
         for (const entry of edgeMap.values()) {
