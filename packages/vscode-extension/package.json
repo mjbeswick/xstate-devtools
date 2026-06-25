@@ -333,19 +333,23 @@
       },
       {
         "command": "xstateMachineOutline.toggleFollowCursor",
-        "title": "Cursor: follow"
+        "title": "Cursor: follow",
+        "icon": "$(pin)"
       },
       {
         "command": "xstateMachineOutline.toggleFollowCursorActive",
-        "title": "Cursor: do not follow"
+        "title": "Cursor: do not follow",
+        "icon": "$(pinned)"
       },
       {
         "command": "xstateMachineOutline.setNavDiagram",
-        "title": "Navigate: diagram"
+        "title": "Navigate: diagram",
+        "icon": "$(git-merge)"
       },
       {
         "command": "xstateMachineOutline.setNavCode",
-        "title": "Navigate: code"
+        "title": "Navigate: code",
+        "icon": "$(code)"
       },
       {
         "command": "xstateMachineOutline.toggleGraphSyncExpansion",
@@ -359,19 +363,23 @@
       },
       {
         "command": "xstateMachineOutline.setGroupHandlersOn",
-        "title": "Handlers: group under on"
+        "title": "Handlers: group under on",
+        "icon": "$(group-by-ref-type)"
       },
       {
         "command": "xstateMachineOutline.setGroupHandlersOff",
-        "title": "Handlers: flat"
+        "title": "Handlers: flat",
+        "icon": "$(ungroup-by-ref-type)"
       },
       {
         "command": "xstateMachineOutline.setSortChildrenSorted",
-        "title": "Sort children: A–Z"
+        "title": "Sort children: A–Z",
+        "icon": "$(list-ordered)"
       },
       {
         "command": "xstateMachineOutline.setSortChildrenOriginal",
-        "title": "Sort children: source order"
+        "title": "Sort children: source order",
+        "icon": "$(list-unordered)"
       },
       {
         "command": "xstateMachineOutline.setErrorsGroupingFile",
