@@ -4,7 +4,41 @@ import type { MachineNode } from './parser';
 
 type SetupSection = 'actions' | 'guards' | 'actors' | 'delays';
 
+// A copied/cut outline node, captured as the verbatim source of its defining
+// construct so paste can splice it elsewhere. `text` is also mirrored to the
+// system clipboard so the snippet can be pasted into code directly.
+interface OutlineClipboard {
+    nodeType: string;                       // MachineNode.type of the source node
+    label: string;                          // its key/name, for collision handling
+    form: 'property' | 'arrayElement';      // how it lives in source
+    text: string;                           // construct.getText()
+    baseIndent: string;                     // indent of the construct's first line
+}
+
+/** Replace the leading `oldKey:` of a captured property with `newName:`,
+ *  quoting the key if it isn't a bare identifier. */
+export function renamePropertyKey(text: string, newName: string): string {
+    const key = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(newName) ? newName : `'${newName.replace(/'/g, "\\'")}'`;
+    return text.replace(/^(['"]?)[A-Za-z0-9_$-]+\1\s*:/, `${key}:`);
+}
+
+/** Shift the continuation lines of a multi-line snippet from its original base
+ *  indent to the destination's, preserving relative nesting. */
+export function reindentSnippet(text: string, fromBase: string, toBase: string): string {
+    if (fromBase === toBase || !text.includes('\n')) { return text; }
+    return text
+        .split('\n')
+        .map((line, i) => {
+            if (i === 0) { return line; }
+            const stripped = line.startsWith(fromBase) ? line.slice(fromBase.length) : line.replace(/^[ \t]*/, '');
+            return toBase + stripped;
+        })
+        .join('\n');
+}
+
 export class XStateTreeEditor {
+    private static clipboard: OutlineClipboard | undefined;
+
     static async editNode(node: MachineNode): Promise<void> {
         switch (node.type) {
             case 'state':
@@ -231,20 +265,219 @@ export class XStateTreeEditor {
         const parsed = this.parseDocument(document);
         const offsets = this.toOffsets(document, node.range!);
 
-        const property = this.findDeletableProperty(parsed, offsets.start, offsets.end, node.type);
-        if (property) {
-            await this.applyRangeEdit(document, this.deletionRange(document, property), '');
-            return;
-        }
-
-        const element = this.findArrayElement(parsed, offsets.start, offsets.end);
-        if (element) {
-            await this.applyRangeEdit(document, this.deletionRange(document, element), '');
+        // findConstructForNode resolves state nodes (whose range is the `{...}`
+        // initializer, not the `name: {...}` property) correctly, where the old
+        // exact-range match silently failed.
+        const found = this.findConstructForNode(parsed, offsets, node);
+        if (found) {
+            await this.applyRangeEdit(document, this.deletionRange(document, found.construct), '');
             return;
         }
 
         vscode.window.showInformationMessage(`Could not delete the selected ${node.type} node safely.`);
     }
+
+    // ── Copy / Cut / Paste ──────────────────────────────────────────────────
+
+    static async copyNode(node: MachineNode): Promise<void> {
+        const r = await this.openParseResolve(node);
+        if (!r) {
+            vscode.window.showInformationMessage(`Could not resolve the selected ${node.type} node in source.`);
+            return;
+        }
+        await this.store(node, r.document, r.construct, r.form);
+    }
+
+    static async cutNode(node: MachineNode): Promise<void> {
+        const r = await this.openParseResolve(node);
+        if (!r) {
+            vscode.window.showInformationMessage(`Could not resolve the selected ${node.type} node in source.`);
+            return;
+        }
+        await this.store(node, r.document, r.construct, r.form);
+        await this.applyRangeEdit(r.document, this.deletionRange(r.document, r.construct), '');
+    }
+
+    static async pasteNode(target: MachineNode): Promise<void> {
+        const clip = this.clipboard;
+        if (!clip) {
+            vscode.window.showInformationMessage('Clipboard is empty — copy a node first.');
+            return;
+        }
+        const editor = await this.openEditor(target);
+        const document = editor.document;
+        const parsed = this.parseDocument(document);
+        const offsets = this.toOffsets(document, target.range!);
+
+        // Setup implementations (action/guard/actor/delay/invoke) live in the
+        // machine's setup({}) block, not its config object.
+        if (['action', 'guard', 'actor', 'delay', 'invoke'].includes(clip.nodeType)) {
+            const section = this.inferSetupSection(clip.nodeType);
+            if (target.type !== 'machine' || !section || clip.form !== 'property') {
+                this.pasteUnsupported(clip.nodeType, target.type);
+                return;
+            }
+            const setupConfig = this.findAnySetupConfig(parsed);
+            if (!setupConfig) {
+                vscode.window.showInformationMessage('No setup({}) block found to paste this into.');
+                return;
+            }
+            await this.pasteProperty(document, setupConfig, section, clip);
+            return;
+        }
+
+        // States / transitions / context attach to the target's config object.
+        const targetObj = target.type === 'machine'
+            ? this.findMachineConfigByRange(parsed, offsets.start, offsets.end)
+            : target.type === 'state'
+                ? this.findStateProperty(parsed, offsets.start, offsets.end, target.label)?.initializer
+                : undefined;
+        if (!targetObj || !ts.isObjectLiteralExpression(targetObj)) {
+            vscode.window.showInformationMessage('Could not resolve the paste target in source.');
+            return;
+        }
+
+        switch (clip.nodeType) {
+            case 'state':
+                if (target.type !== 'machine' && target.type !== 'state') { this.pasteUnsupported(clip.nodeType, target.type); return; }
+                await this.pasteProperty(document, targetObj, 'states', clip);
+                return;
+            case 'transition':
+                if (target.type !== 'state') { this.pasteUnsupported(clip.nodeType, target.type); return; }
+                await this.pasteProperty(document, targetObj, 'on', clip);
+                return;
+            case 'contextProperty':
+                if (target.type !== 'machine' && target.type !== 'state') { this.pasteUnsupported(clip.nodeType, target.type); return; }
+                await this.pasteProperty(document, targetObj, 'context', clip);
+                return;
+            default:
+                this.pasteUnsupported(clip.nodeType, target.type);
+        }
+    }
+
+    private static async openParseResolve(
+        node: MachineNode
+    ): Promise<{ document: vscode.TextDocument; construct: ts.PropertyAssignment | ts.Expression; form: 'property' | 'arrayElement' } | undefined> {
+        const editor = await this.openEditor(node);
+        const document = editor.document;
+        const parsed = this.parseDocument(document);
+        const offsets = this.toOffsets(document, node.range!);
+        const found = this.findConstructForNode(parsed, offsets, node);
+        return found ? { document, construct: found.construct, form: found.form } : undefined;
+    }
+
+    private static async store(
+        node: MachineNode,
+        document: vscode.TextDocument,
+        construct: ts.PropertyAssignment | ts.Expression,
+        form: 'property' | 'arrayElement'
+    ): Promise<void> {
+        const text = construct.getText();
+        this.clipboard = { nodeType: node.type, label: node.label, form, text, baseIndent: this.baseIndent(document, construct) };
+        await vscode.env.clipboard.writeText(text);
+        await vscode.commands.executeCommand('setContext', 'xstateOutline.hasClipboard', true);
+    }
+
+    /** Resolve the source construct (a property or array element) backing any
+     *  editable node. States resolve via findStateProperty (their range is the
+     *  `{...}` initializer); everything else mirrors the delete chain. */
+    private static findConstructForNode(
+        parsed: ts.SourceFile,
+        offsets: { start: number; end: number },
+        node: MachineNode
+    ): { construct: ts.PropertyAssignment | ts.Expression; form: 'property' | 'arrayElement' } | undefined {
+        if (node.type === 'state') {
+            const p = this.findStateProperty(parsed, offsets.start, offsets.end, node.label);
+            return p ? { construct: p, form: 'property' } : undefined;
+        }
+        const prop = this.findDeletableProperty(parsed, offsets.start, offsets.end, node.type);
+        if (prop) { return { construct: prop, form: 'property' }; }
+        const el = this.findArrayElement(parsed, offsets.start, offsets.end);
+        if (el) { return { construct: el, form: 'arrayElement' }; }
+        return undefined;
+    }
+
+    /** Splice a copied property into `destConfig`'s `containerProp` object (e.g.
+     *  states/on/context/actions), creating that object if absent, renaming on a
+     *  key collision and re-indenting to the destination depth. */
+    private static async pasteProperty(
+        document: vscode.TextDocument,
+        destConfig: ts.ObjectLiteralExpression,
+        containerProp: string,
+        clip: OutlineClipboard
+    ): Promise<void> {
+        if (clip.form !== 'property') {
+            this.pasteUnsupported(clip.nodeType, containerProp);
+            return;
+        }
+        const container = this.findProperty(destConfig, containerProp);
+        if (container && ts.isObjectLiteralExpression(container.initializer)) {
+            await this.insertCapturedProperty(document, container.initializer, clip);
+            return;
+        }
+        // No container yet — create `containerProp: { <prop> }`.
+        const childIndent = this.childIndent(document, destConfig);
+        const innerIndent = `${childIndent}  `;
+        const reindented = reindentSnippet(clip.text, clip.baseIndent, innerIndent);
+        const body = `{\n${innerIndent}${reindented}\n${childIndent}}`;
+        await this.insertProperty(document, destConfig, `${containerProp}: ${body}`);
+    }
+
+    /** Insert a captured `name: …` property into an existing object literal,
+     *  prompting for a new name if the key already exists. Returns false if the
+     *  user cancelled the rename. */
+    private static async insertCapturedProperty(
+        document: vscode.TextDocument,
+        destObject: ts.ObjectLiteralExpression,
+        clip: OutlineClipboard
+    ): Promise<boolean> {
+        const existing = new Set(
+            destObject.properties
+                .map((p) => (ts.isPropertyAssignment(p) ? this.getPropertyName(p.name) : undefined))
+                .filter((n): n is string => !!n)
+        );
+        let name = clip.label;
+        let text = clip.text;
+        if (existing.has(name)) {
+            const chosen = await vscode.window.showInputBox({
+                prompt: `"${name}" already exists here — enter a new name`,
+                value: this.uniqueName(name, existing),
+                validateInput: (value) => this.validateIdentifier(value),
+            });
+            if (!chosen) { return false; }
+            name = chosen;
+            text = renamePropertyKey(clip.text, name);
+        }
+        const reindented = reindentSnippet(text, clip.baseIndent, this.childIndent(document, destObject));
+        await this.insertProperty(document, destObject, reindented);
+        return true;
+    }
+
+    private static pasteUnsupported(clipType: string, targetType: string): void {
+        vscode.window.showInformationMessage(
+            `Can't paste a ${clipType} onto a ${targetType}. The snippet is on your clipboard to paste into code.`
+        );
+    }
+
+    private static findAnySetupConfig(sourceFile: ts.SourceFile): ts.ObjectLiteralExpression | undefined {
+        let found: ts.ObjectLiteralExpression | undefined;
+        const visit = (node: ts.Node): void => {
+            if (found) { return; }
+            if (ts.isObjectLiteralExpression(node) && this.isSetupConfigObject(node)) { found = node; return; }
+            ts.forEachChild(node, visit);
+        };
+        visit(sourceFile);
+        return found;
+    }
+
+    /** A name not already in `existing` — the base, else base2, base3, … */
+    private static uniqueName(base: string, existing: Set<string>): string {
+        if (!existing.has(base)) { return base; }
+        let i = 2;
+        while (existing.has(`${base}${i}`)) { i++; }
+        return `${base}${i}`;
+    }
+
 
     static async addChildState(node: MachineNode): Promise<void> {
         const editor = await this.openEditor(node);

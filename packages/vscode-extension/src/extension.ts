@@ -255,6 +255,35 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    const copyNodeCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.copyNode',
+        async (treeItem) => {
+            const node = treeItem?.node ?? treeView.selection[0]?.node;
+            if (!node) { return; }
+            await XStateTreeEditor.copyNode(node);
+        }
+    );
+
+    const cutNodeCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.cutNode',
+        async (treeItem) => {
+            const node = treeItem?.node ?? treeView.selection[0]?.node;
+            if (!node) { return; }
+            await XStateTreeEditor.cutNode(node);
+            treeProvider.refresh();
+        }
+    );
+
+    const pasteNodeCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.pasteNode',
+        async (treeItem) => {
+            const node = treeItem?.node ?? treeView.selection[0]?.node;
+            if (!node) { return; }
+            await XStateTreeEditor.pasteNode(node);
+            treeProvider.refresh();
+        }
+    );
+
     // ── Active-state noop commands (provide ✓ prefix via title) ──────────────
 
     const setScopeFileActiveCommand = vscode.commands.registerCommand(
@@ -1321,6 +1350,9 @@ export async function activate(context: vscode.ExtensionContext) {
         addReferenceCommand,
         deleteNodeCommand,
         setDescriptionCommand,
+        copyNodeCommand,
+        cutNodeCommand,
+        pasteNodeCommand,
         openGraphViewCommand,
         openGraphViewAtCursorCommand,
         refreshGraphOnlyCommand,

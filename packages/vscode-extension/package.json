@@ -476,6 +476,18 @@
         "title": "Set Description"
       },
       {
+        "command": "xstateMachineOutline.copyNode",
+        "title": "Copy"
+      },
+      {
+        "command": "xstateMachineOutline.cutNode",
+        "title": "Cut"
+      },
+      {
+        "command": "xstateMachineOutline.pasteNode",
+        "title": "Paste"
+      },
+      {
         "command": "xstateMachineOutline.openGraphView",
         "title": "View State Diagram",
         "icon": "$(git-merge)"
@@ -905,6 +917,21 @@
           "group": "edit@6"
         },
         {
+          "command": "xstateMachineOutline.copyNode",
+          "when": "view == xstateMachineOutline && (viewItem == state || viewItem == transition || viewItem == action || viewItem == guard || viewItem == invoke || viewItem == contextProperty || viewItem == actor || viewItem == delay)",
+          "group": "9_cutcopypaste@1"
+        },
+        {
+          "command": "xstateMachineOutline.cutNode",
+          "when": "view == xstateMachineOutline && (viewItem == state || viewItem == transition || viewItem == action || viewItem == guard || viewItem == invoke || viewItem == contextProperty || viewItem == actor || viewItem == delay)",
+          "group": "9_cutcopypaste@2"
+        },
+        {
+          "command": "xstateMachineOutline.pasteNode",
+          "when": "view == xstateMachineOutline && xstateOutline.hasClipboard && (viewItem == machine || viewItem == state)",
+          "group": "9_cutcopypaste@3"
+        },
+        {
           "command": "xstateErrors.copy",
           "when": "view == xstateMachineErrors && (viewItem == errorIssue || viewItem == errorFileGroup || viewItem == errorSeverityGroup)",
           "group": "9_copy@1"
@@ -1061,6 +1088,24 @@
         "key": "ctrl+c",
         "mac": "cmd+c",
         "when": "focusedView == xstateMachineErrors"
+      },
+      {
+        "command": "xstateMachineOutline.copyNode",
+        "key": "ctrl+c",
+        "mac": "cmd+c",
+        "when": "focusedView == xstateMachineOutline"
+      },
+      {
+        "command": "xstateMachineOutline.cutNode",
+        "key": "ctrl+x",
+        "mac": "cmd+x",
+        "when": "focusedView == xstateMachineOutline"
+      },
+      {
+        "command": "xstateMachineOutline.pasteNode",
+        "key": "ctrl+v",
+        "mac": "cmd+v",
+        "when": "focusedView == xstateMachineOutline && xstateOutline.hasClipboard"
       },
       {
         "command": "xstateDebugger.stepBack",

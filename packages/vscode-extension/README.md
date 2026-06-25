@@ -26,6 +26,7 @@
 ### ✏️ Editing & authoring
 - **Context-aware autocomplete** — suggests valid machine, state, transition, invoke, and setup properties, plus valid target / action / guard / actor references
 - **Tree editing** — add, rename, and delete states, transitions, and references, and set a state's or machine's `description`, straight from the outline
+- **Copy / cut / paste** — right-click (or **Ctrl/Cmd+C/X/V** with the outline focused) any editable node to copy or cut it; paste onto a machine or state to drop it in (a copied state brings its whole subtree). Paste lands a state into `states`, a transition into `on`, a context property into `context`, and an action/guard/actor/delay into the machine's `setup()` — colliding names prompt for a rename. The copied snippet is also placed on the system clipboard, so you can paste it straight into code
 - **Diagram editing** — the same edit actions are available right from the diagram: right-click a state or the machine to edit/add/delete, set its `description`, or add children, transitions, and references; right-click a transition's event to jump to its source, edit it, add an action/guard, or delete it
 - **Invalid property highlighting** — unknown config properties show up in the tree with a red error icon
 
@@ -163,6 +164,7 @@ const machine = setup({
 | Where | Keys | Action |
 | --- | --- | --- |
 | **Outline** (focused) | **F12** | Go to Implementation for the selected action / guard / target |
+| **Outline** (focused) | **Ctrl/Cmd+C / X / V** | Copy / cut / paste the selected node |
 | **Errors** pane (focused) | **Ctrl/Cmd+C** | Copy the selected problem(s) or group |
 | **Events** log (focused) | **Alt+← / Alt+→** | Step back / forward through the event history |
 | **Search** | **↑ / ↓ / Enter** | Move through results and open the selected one |
