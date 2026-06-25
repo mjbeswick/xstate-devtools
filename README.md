@@ -27,7 +27,8 @@ This is an npm-workspaces monorepo:
 | `chrome-extension` | Chrome MV3 DevTools extension — service worker, content scripts, and the **XState** panel. |
 | [`vscode-devtool`](packages/vscode-devtool/README.md) | VS Code extension: **static** analysis — interactive outline, search, navigation, and an editable Harel diagram. |
 | [`vscode-debugger`](packages/vscode-debugger/README.md) | VS Code extension: **live debugger** that attaches to Node/SSR actors over the server adapter, inspects instances/context, time-travels the event log, and overlays running state on its own bundled diagram. Standalone — works without `vscode-devtool`. |
-| `diagram-core` | Internal lib: shared static-analysis + statechart-diagram code (parser, scanner, graph view) bundled by both VS Code extensions. |
+| `diagram-core` | Internal lib: shared static-analysis + statechart-diagram code (parser, scanner, graph view) bundled by both VS Code extensions and the MCP server. |
+| [`@xstate-devtools/mcp`](packages/mcp-server/README.md) | Standalone **MCP server** exposing XState analysis (list/describe/diagram/test-paths/validate) to AI agents over any workspace — no VS Code required. |
 | `example-remix` | Demo Remix app: client machines + a server orchestrator, wired to the adapter. |
 
 > **Runtime, in two places.** The adapter feeds two consumers. The **chrome-extension** inspects browser **and** Node actors in a DevTools panel. The [**vscode-debugger**](packages/vscode-debugger/README.md) attaches to **Node/SSR** actors over the WebSocket server adapter, lighting up the live state on a Harel diagram next to your source. Both share `@xstate-devtools/panel-core`, so the inspection logic is one implementation.
