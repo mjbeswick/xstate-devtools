@@ -6,11 +6,11 @@
   "publisher": "MichaelBeswick",
   "license": "MIT",
   "icon": "images/icon.png",
-  "homepage": "https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension#readme",
+  "homepage": "https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-devtool#readme",
   "repository": {
     "type": "git",
     "url": "https://github.com/mjbeswick/xstate-devtools.git",
-    "directory": "packages/vscode-extension"
+    "directory": "packages/vscode-devtool"
   },
   "bugs": {
     "url": "https://github.com/mjbeswick/xstate-devtools/issues"
@@ -91,17 +91,17 @@
       },
       {
         "view": "xstateDebuggerInstances",
-        "contents": "❌ This workspace uses XState but not @xstate-devtools/adapter.\nInstall it and wire createServerAdapter() into your app — [Setup guide](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension#-live-debugger), or [connect anyway](command:xstateDebugger.connect).\n[Check setup](command:xstateDebugger.recheckSetup)",
+        "contents": "❌ This workspace uses XState but not @xstate-devtools/adapter.\nInstall it and wire createServerAdapter() into your app — [Setup guide](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-devtool#-live-debugger), or [connect anyway](command:xstateDebugger.connect).\n[Check setup](command:xstateDebugger.recheckSetup)",
         "when": "!xstateDebugger.connected && !xstateDebugger.setupChecking && xstateDebugger.setup == no-adapter"
       },
       {
         "view": "xstateDebuggerInstances",
-        "contents": "❌ @xstate-devtools/adapter is installed, but no createServerAdapter() call was found.\nThe debugger attaches to Node/SSR actors — add a createServerAdapter() inspector to your server (browser-only actors use the Chrome extension). [Setup guide](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension#-live-debugger), or [connect anyway](command:xstateDebugger.connect).\n[Check setup](command:xstateDebugger.recheckSetup)",
+        "contents": "❌ @xstate-devtools/adapter is installed, but no createServerAdapter() call was found.\nThe debugger attaches to Node/SSR actors — add a createServerAdapter() inspector to your server (browser-only actors use the Chrome extension). [Setup guide](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-devtool#-live-debugger), or [connect anyway](command:xstateDebugger.connect).\n[Check setup](command:xstateDebugger.recheckSetup)",
         "when": "!xstateDebugger.connected && !xstateDebugger.setupChecking && xstateDebugger.setup == no-server-adapter"
       },
       {
         "view": "xstateDebuggerInstances",
-        "contents": "❌ Found createServerAdapter(), but its inspect isn't passed to any actor.\nPass it to your root actor: createActor(machine, { inspect }). [Setup guide](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension#-live-debugger), or [connect anyway](command:xstateDebugger.connect).\n[Check setup](command:xstateDebugger.recheckSetup)",
+        "contents": "❌ Found createServerAdapter(), but its inspect isn't passed to any actor.\nPass it to your root actor: createActor(machine, { inspect }). [Setup guide](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-devtool#-live-debugger), or [connect anyway](command:xstateDebugger.connect).\n[Check setup](command:xstateDebugger.recheckSetup)",
         "when": "!xstateDebugger.connected && !xstateDebugger.setupChecking && xstateDebugger.setup == inspect-not-wired"
       },
       {

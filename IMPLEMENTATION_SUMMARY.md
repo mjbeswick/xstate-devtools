@@ -213,7 +213,7 @@ export const machine = mySetup.createMachine({ ... })
 
 1. **Start Extension Development Host**
    ```bash
-   cd packages/vscode-extension
+   cd packages/vscode-devtool
    npm run compile
    # Then press F5 in VS Code
    ```

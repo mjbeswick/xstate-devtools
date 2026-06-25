@@ -2,7 +2,7 @@
 
 **Explore, navigate, and visualize your [XState](https://stately.ai/docs) machines without leaving VS Code.** xState Devtools turns your state machines into an interactive **outline** and a live **statechart diagram** you can **simulate** and **generate test paths** from — all by analyzing your source statically, with no need to run your app. Works with XState **v4 and v5**, in JavaScript and TypeScript.
 
-![xState Devtools showing the machine outline, search, and source navigation](https://github.com/mjbeswick/xstate-devtools/raw/main/packages/vscode-extension/images/screenshot.png)
+![xState Devtools showing the machine outline, search, and source navigation](https://github.com/mjbeswick/xstate-devtools/raw/main/packages/vscode-devtool/images/screenshot.png)
 
 ## Quick start
 
@@ -76,7 +76,7 @@ When disconnected, the **Instances** view shows setup-aware guidance — whether
 
 ## Reading the diagram
 
-![A parallel checkout machine rendered as a statechart, with two concurrent regions, entry/exit actions, guarded transitions, and final states](https://github.com/mjbeswick/xstate-devtools/raw/main/packages/vscode-extension/images/checkout.png)
+![A parallel checkout machine rendered as a statechart, with two concurrent regions, entry/exit actions, guarded transitions, and final states](https://github.com/mjbeswick/xstate-devtools/raw/main/packages/vscode-devtool/images/checkout.png)
 
 The diagrams **intentionally follow [Harel statechart](https://en.wikipedia.org/wiki/State_diagram#Harel_statechart) conventions** — the same notation XState itself is based on. Initial-state arrows, nested regions, dashed boundaries for parallel (orthogonal) states, and `EVENT [guard] / action` transition labels are all standard Harel/SCXML notation, so the diagrams read the way a statechart is meant to.
 
@@ -225,7 +225,7 @@ xState Devtools is an **independent, community project** and is not affiliated w
 ## Links
 
 - [Report an issue](https://github.com/mjbeswick/xstate-devtools/issues)
-- [Source on GitHub](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-extension)
+- [Source on GitHub](https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-devtool)
 
 ## License
 
