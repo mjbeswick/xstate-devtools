@@ -21,6 +21,8 @@ There is **no test suite** — verification is manual. Press `F5` (the "Run Exte
 
 ## Architecture
 
+> **Shared code lives in `@xstate-devtools/diagram-core`** (`packages/diagram-core`). The static-analysis + diagram modules — `parser.ts`, `workspaceScanner.ts`, `graphView.ts`, `machineModel.ts`, `treeEditor.ts`, `utils.ts`, `xstateSchema.ts`, `export/mermaid.ts`, `findStaticMachine`, and the `webview/graph.ts` webview — were extracted there so both this extension and the standalone **vscode-debugger** extension can bundle them. They're imported from `@xstate-devtools/diagram-core` (a source-only workspace package, bundled by esbuild). `graphView` takes an optional `reflectsExpansion(node)` callback instead of depending on `treeProvider`. The live debugger itself now lives in `packages/vscode-debugger`.
+
 Everything is wired together in `src/extension.ts` `activate()`. The data flows in one direction:
 
 ```

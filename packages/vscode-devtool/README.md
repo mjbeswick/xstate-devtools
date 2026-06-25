@@ -57,22 +57,9 @@ A dedicated **Errors** view collects every problem the static analyzer finds acr
 - **Generate Setup Stubs** — right-click a machine → scaffold a `setup({ actions, guards, actors, delays })` block with a typed stub for every implementation the machine references, each flagged as already in `setup()` or missing from it (XState built-ins like `assign`/`not` are skipped)
 - **Focus mode** — open the diagram on a compound state to see just that subtree
 
-### 🐞 Live debugger
-- **Attach to a running app** — connect to a Node/SSR app that uses the `@xstate-devtools/adapter` server adapter (`createServerAdapter()`, default `ws://127.0.0.1:9301`) straight from the editor. Connect/disconnect from the **status-bar item** or the **XState Debugger** view; the connection auto-reconnects if the app restarts
-- **Live on the diagram** — the open statechart diagram lights up with the machine's **real** active state as it runs — unlike the static simulator, this is the actual resolved path, with real guard outcomes and context. Toggle **Follow Actor in Diagram** in the Instances title bar to auto-open/reveal the diagram for whichever actor you select; stepping through the event log then follows the actor of the stepped event and moves the highlight to that historical state
-- **Machine-instance tree** — the **Instances** view is a native tree of running actors (parent → child) with each instance's current state shown; expand an instance to see its **live state-node tree with the active configuration highlighted**. Connect/disconnect from the Instances view's title icon. Selecting an instance drives the **Context** view — a native, expandable tree of the actor's **real context**. Right-click an instance or state for **Go to Source**, **Reveal in Diagram**, **Send Event…**, and **Capture / Restore Snapshot**; right-click a state that has child states for **Create Diagram From Here** — a focused diagram rooted at that node, with its live active states highlighted
-- **Event log** — the **Events** view (bottom panel) lists every event each machine receives, with actor, timestamp, and sequence number. Title actions: **Step Back / Forward** through history, **Back to Live**, **Clear log**, and **Export / Import session**. Stepping/selecting an event freezes the Instances + Context trees at that point (the Instances view shows a "⏱ Time travel" banner). Right-click a Context value to **Copy** it
-- **Time travel** — click any event to freeze the diagram and inspector at that point in history; **Back to live** resumes. Pure client-side replay — it never touches the running app
-- **Send events** — fire any of the current state's outgoing transitions with one click, or send a custom event with a JSON payload
-- **Persisted snapshots** — capture an actor's persisted snapshot, and (for actors wired with `useRestorableInspectedMachine`) **restore** it to rewind the live actor
-- **Record & replay** — export the captured session to a JSON file and re-import it later as a read-only replay
-- **Works alongside the VS Code debugger** — the WebSocket attach is independent of the V8 inspector, so you can set breakpoints in an action/guard and inspect state/event flow at the same time (live updates pause while the process is paused at a breakpoint, then flush on resume)
+### 🐞 Live debugger — now a separate extension
 
-When disconnected, the **Instances** view shows setup-aware guidance — whether the workspace uses XState, whether `@xstate-devtools/adapter` is installed, whether a `createServerAdapter()` exists, and whether its `inspect` is wired into a `createActor(machine, { inspect })` — so it tells you exactly what's missing (with a **Check Setup** action).
-
-**Layout.** The live debugger spans dockable surfaces: the **XState Debugger** container (its own activity-bar icon) holds the **Instances** and **Context** native trees (connect from the Instances title bar); the **Events** view sits in the **bottom panel**; and the **statechart diagram** opens in the editor. To dock the debugger on the right, drag its activity-bar icon into the **secondary side bar** (View → Appearance → Secondary Side Bar, or drag-and-drop) — VS Code remembers the placement. (VS Code can't default a view to the right side bar, so this one-time move is expected.)
-
-> Scope: Node/SSR actors over the WebSocket server adapter. The app must run `createServerAdapter()` and that server starts when its module first loads — if the adapter is wired lazily (e.g. inside a route loader), request a page once so the inspector port comes up before connecting. For browser-app inspection, use the companion Chrome DevTools extension.
+The live debugger (attach to a running app, inspect instances/context, time-travel the event log, overlay live state on the diagram) has moved to its own standalone extension, **[XState Debugger](../vscode-debugger/README.md)**. Install it alongside this one for runtime inspection; it bundles its own diagram, so it also works on its own.
 
 ## Reading the diagram
 
@@ -166,7 +153,6 @@ const machine = setup({
 | **Outline** (focused) | **F12** | Go to Implementation for the selected action / guard / target |
 | **Outline** (focused) | **Ctrl/Cmd+C / X / V** | Copy / cut / paste the selected node |
 | **Errors** pane (focused) | **Ctrl/Cmd+C** | Copy the selected problem(s) or group |
-| **Events** log (focused) | **Alt+← / Alt+→** | Step back / forward through the event history |
 | **Search** | **↑ / ↓ / Enter** | Move through results and open the selected one |
 | **Diagram** | **arrow keys** | Move the selection between states |
 | **Diagram** | **Enter** | Expand/collapse the selected compound, or jump a leaf state to its source |
@@ -175,15 +161,12 @@ const machine = setup({
 | **Diagram** | **`0`** or **`.`** | Fit to screen |
 | **Diagram** | **`1`** | Reset to actual size (100%) |
 
-> The **F12**, **Ctrl/Cmd+C**, and **Alt+←/→** bindings are contributed defaults — rebind them in VS Code's *Keyboard Shortcuts* if you prefer.
+> The **F12** and **Ctrl/Cmd+C** bindings are contributed defaults — rebind them in VS Code's *Keyboard Shortcuts* if you prefer.
 
 ## Settings
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `xstateOutline.debuggerUrl` | `ws://127.0.0.1:9301` | WebSocket URL of the running app's XState server adapter (`createServerAdapter`) that the live debugger connects to |
-| `xstateOutline.debuggerShowStopped` | `true` | Show stopped actors in the live debugger's Instances tree (toggle from the Instances title bar) |
-| `xstateOutline.debuggerFollowDiagram` | `false` | Auto-open/reveal the statechart diagram for the selected actor in the live debugger (toggle from the Instances title bar) |
 | `xstateOutline.defaultScope` | `workspace` | Scan the current file only, or the whole workspace |
 | `xstateOutline.defaultViewMode` | `flat` | Flat list of machines, or grouped by file |
 | `xstateOutline.showStateConfigs` | `false` | Include `createStateConfig`/`stateConfig` patterns in the outline |
@@ -209,7 +192,6 @@ const machine = setup({
 - Tree editing focuses on common object/string forms; advanced shapes may still need manual source edits
 - In a focused sub-diagram, transitions whose target lies outside the selected subtree point to a faded stub labelled with that target
 - The **simulator** and **test paths** are structural: guards and `after` delays aren't evaluated (you pick each branch yourself), and history states restore structurally only — a reported path is a *possible* route, not a guard-validated one
-- Actors from an older `@xstate-devtools/adapter` (one without replay-on-connect) still appear with their current state, but — lacking a machine definition until they re-register — show no expandable state-node tree; update the adapter for the full tree
 
 ## Credits & acknowledgements
 

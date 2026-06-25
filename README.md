@@ -25,10 +25,12 @@ This is an npm-workspaces monorepo:
 | `@xstate-devtools/protocol` | The shared wire protocol (serialized machine, snapshots, messages) consumed by every package. |
 | `@xstate-devtools/panel-core` | Framework-agnostic debug-panel logic — the inspector store, active-state computation, and session serialization — shared by the chrome panel and the VS Code debugger. |
 | `chrome-extension` | Chrome MV3 DevTools extension — service worker, content scripts, and the **XState** panel. |
-| [`vscode-extension`](packages/vscode-devtool/README.md) | VS Code extension: **static** analysis (interactive outline + Harel diagram) **and** a **live debugger** that attaches to Node/SSR actors over the server adapter and overlays the running state onto the diagram. |
+| [`vscode-devtool`](packages/vscode-devtool/README.md) | VS Code extension: **static** analysis — interactive outline, search, navigation, and an editable Harel diagram. |
+| [`vscode-debugger`](packages/vscode-debugger/README.md) | VS Code extension: **live debugger** that attaches to Node/SSR actors over the server adapter, inspects instances/context, time-travels the event log, and overlays running state on its own bundled diagram. Standalone — works without `vscode-devtool`. |
+| `diagram-core` | Internal lib: shared static-analysis + statechart-diagram code (parser, scanner, graph view) bundled by both VS Code extensions. |
 | `example-remix` | Demo Remix app: client machines + a server orchestrator, wired to the adapter. |
 
-> **Runtime, in two places.** The adapter feeds two consumers. The **chrome-extension** inspects browser **and** Node actors in a DevTools panel. The [**vscode-extension**](packages/vscode-devtool/README.md) does static outline/diagram work **and** — new — attaches to **Node/SSR** actors over the WebSocket server adapter, lighting up the live state on its Harel diagram next to your source. Both share `@xstate-devtools/panel-core`, so the inspection logic is one implementation.
+> **Runtime, in two places.** The adapter feeds two consumers. The **chrome-extension** inspects browser **and** Node actors in a DevTools panel. The [**vscode-debugger**](packages/vscode-debugger/README.md) attaches to **Node/SSR** actors over the WebSocket server adapter, lighting up the live state on a Harel diagram next to your source. Both share `@xstate-devtools/panel-core`, so the inspection logic is one implementation.
 
 ## Quick start
 
