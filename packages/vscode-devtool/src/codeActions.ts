@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import {
     getInvalidPropertyReplacement,
     XSTATE_DIAGNOSTIC_CODES,
-} from './diagnostics';
+} from '@xstate-devtools/diagram-core';
 
 export class XStateCodeActionProvider implements vscode.CodeActionProvider {
     static readonly providedCodeActionKinds = [vscode.CodeActionKind.QuickFix];

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { XStateMachineParser, MachineNode } from '@xstate-devtools/diagram-core';
-import { XSTATE_DIAGNOSTIC_SOURCE } from './diagnostics';
+import { XSTATE_DIAGNOSTIC_SOURCE } from '@xstate-devtools/diagram-core';
 
 // A CodeLens row above every `createMachine` / `setup().createMachine` call:
 //   ▶ View Diagram · 6 states · 12 transitions · ⚠ 2 problems

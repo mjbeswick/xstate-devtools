@@ -1,4 +1,4 @@
-import type { GraphNode, GraphPayload } from '../graphView';
+import type { GraphNode, GraphPayload } from '../buildGraph';
 
 // Convert a diagram payload (the same nodes/edges the statechart renders from)
 // into Mermaid `stateDiagram-v2` text. Reusing the payload keeps the export in

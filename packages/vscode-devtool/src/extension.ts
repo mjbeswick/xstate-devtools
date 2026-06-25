@@ -7,7 +7,7 @@ import { FilterWebviewViewProvider } from './filterView';
 import { XStateCompletionProvider } from './completionProvider';
 import { XStateTreeEditor } from '@xstate-devtools/diagram-core';
 import { XStateCodeActionProvider } from './codeActions';
-import { isSupportedXStateDocument, validateXStateDocument } from './diagnostics';
+import { isSupportedXStateDocument, validateXStateDocument } from '@xstate-devtools/diagram-core';
 import { WorkspaceScanner } from '@xstate-devtools/diagram-core';
 import { XStateReferenceProvider, XStateRenameProvider } from './providers';
 import { XStateHoverProvider } from './hoverProvider';

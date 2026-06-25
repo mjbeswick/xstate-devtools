@@ -10,6 +10,7 @@
     "./webview/graph": "./src/webview/graph.ts"
   },
   "scripts": {
+    "check": "tsc -p ./ --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {

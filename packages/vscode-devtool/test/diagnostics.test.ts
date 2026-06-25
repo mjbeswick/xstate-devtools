@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as vscode from 'vscode';
-import { validateXStateDocument, XSTATE_DIAGNOSTIC_CODES } from '../src/diagnostics';
+import { validateXStateDocument, XSTATE_DIAGNOSTIC_CODES } from '@xstate-devtools/diagram-core';
 
 // A TextDocument good enough for the validator: getText / fileName / uri /
 // positionAt (offset → line/character via a scanned line-start table).

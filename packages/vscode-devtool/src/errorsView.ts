@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { WorkspaceScanner } from '@xstate-devtools/diagram-core';
-import { isSupportedXStateDocument, validateXStateDocument } from './diagnostics';
+import { isSupportedXStateDocument, validateXStateDocument } from '@xstate-devtools/diagram-core';
 
 export type ErrorsGrouping = 'file' | 'severity' | 'flat';
 
