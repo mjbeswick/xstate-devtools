@@ -1,4 +1,4 @@
-// packages/vscode-extension/src/debugger/debuggerSetup.ts
+// packages/vscode-debugger/src/debugger/debuggerSetup.ts
 //
 // Detects how ready the current workspace is for the live debugger and exposes
 // it via the `xstateDebugger.setup` context key, which drives the tailored

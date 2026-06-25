@@ -1,4 +1,4 @@
-// packages/vscode-extension/src/webview/debuggerPanel.ts
+// packages/vscode-debugger/src/webview/debuggerPanel.ts
 //
 // Browser-side script for the XState Debugger sidebar webview. Bundled to
 // out/webview/debugger.js and loaded via a <script src> (the same proven

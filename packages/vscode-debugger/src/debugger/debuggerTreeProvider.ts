@@ -1,4 +1,4 @@
-// packages/vscode-extension/src/debugger/debuggerTreeProvider.ts
+// packages/vscode-debugger/src/debugger/debuggerTreeProvider.ts
 //
 // Native VS Code TreeView for the live debugger's machine instances — like the
 // xstate outline tree, but driven by the running app. Roots are running actors
@@ -58,7 +58,7 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
         private readonly controller: DebuggerController,
     ) {
         this.iconBase = vscode.Uri.joinPath(extensionUri, 'resources', 'icons');
-        this.showStopped = vscode.workspace.getConfiguration('xstateOutline').get('debuggerShowStopped', true);
+        this.showStopped = vscode.workspace.getConfiguration('xstateDebugger').get('showStopped', true);
         this.unsubscribe = this.controller.getStore().subscribe(() => {
             // Generation bookkeeping runs synchronously on every store change so
             // it reliably observes the count→0 transition on disconnect (and the
@@ -95,7 +95,7 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
 
     setShowStopped(value: boolean): void {
         this.showStopped = value;
-        void vscode.workspace.getConfiguration('xstateOutline').update('debuggerShowStopped', value, true);
+        void vscode.workspace.getConfiguration('xstateDebugger').update('showStopped', value, true);
         this._onDidChangeTreeData.fire();
     }
 

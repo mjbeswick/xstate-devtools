@@ -1,4 +1,4 @@
-// packages/vscode-extension/src/debugger/wsClient.ts
+// packages/vscode-debugger/src/debugger/wsClient.ts
 //
 // WebSocket client that attaches the VS Code extension host to a running app's
 // server adapter (createServerAdapter, default ws://127.0.0.1:9301). The wire

@@ -1,4 +1,4 @@
-// packages/vscode-extension/src/debugger/debuggerDecorationProvider.ts
+// packages/vscode-debugger/src/debugger/debuggerDecorationProvider.ts
 //
 // Colors active state-node labels green in the Instances tree. VS Code has no
 // API to color (or bold) a tree item's label directly, so we tag active items

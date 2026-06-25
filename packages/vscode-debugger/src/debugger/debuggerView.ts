@@ -1,4 +1,4 @@
-// packages/vscode-extension/src/debugger/debuggerView.ts
+// packages/vscode-debugger/src/debugger/debuggerView.ts
 //
 // Webview view provider for the live debugger UI. One class backs two views,
 // selected by `role`:

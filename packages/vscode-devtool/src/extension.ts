@@ -12,13 +12,7 @@ import { WorkspaceScanner } from '@xstate-devtools/diagram-core';
 import { XStateReferenceProvider, XStateRenameProvider } from './providers';
 import { XStateHoverProvider } from './hoverProvider';
 import { XStateGraphViewProvider } from '@xstate-devtools/diagram-core';
-import { DebuggerController } from './debugger/debuggerController';
-import { DebuggerViewProvider } from './debugger/debuggerView';
-import { DebuggerTreeProvider } from './debugger/debuggerTreeProvider';
-import { DebuggerContextTreeProvider, ContextTreeItem } from './debugger/debuggerContextTreeProvider';
-import { registerDebuggerCommands, findStaticMachine } from './debugger/debuggerCommands';
-import { DebuggerActiveDecorationProvider } from './debugger/debuggerDecorationProvider';
-import { DebuggerSetupDetector } from './debugger/debuggerSetup';
+import { findStaticMachine } from '@xstate-devtools/diagram-core';
 import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
 import { ErrorsTreeProvider, ErrorsGrouping, ErrorsFilter } from './errorsView';
 import { XStateCodeLensProvider } from './codeLensProvider';
@@ -806,146 +800,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const graphViewProvider = new XStateGraphViewProvider(context.extensionUri, (n) => treeProvider.isNodeExpanded(n));
 
-    // ── Live debugger ──────────────────────────────────────────────────────────
-    // Attaches to a running app's server adapter (createServerAdapter) over a
-    // WebSocket and overlays each running machine's active state onto its open
-    // statechart diagram.
-    const debuggerController = new DebuggerController(graphViewProvider);
-    // The event log is a webview (bottom panel); instances + context are native
-    // trees; connection is driven from the Instances view's title icon + the
-    // status bar. All share the controller's store.
-    const eventsViewRegistration = vscode.window.registerWebviewViewProvider(
-        DebuggerViewProvider.eventsViewType,
-        new DebuggerViewProvider(context.extensionUri, debuggerController, 'events'),
-    );
-    // Seed the menu/welcome context keys BEFORE the Instances tree view is
-    // created, so the first render shows the correct toggle + welcome variant
-    // (per the "View state & menu conventions" in CLAUDE.md).
-    void vscode.commands.executeCommand('setContext', 'xstateDebugger.showStopped',
-        vscode.workspace.getConfiguration('xstateOutline').get('debuggerShowStopped', true));
-    void vscode.commands.executeCommand('setContext', 'xstateDebugger.setup', 'unknown');
-    void vscode.commands.executeCommand('setContext', 'xstateDebugger.setupChecking', false);
-    void vscode.commands.executeCommand('setContext', 'xstateDebugger.followDiagram',
-        vscode.workspace.getConfiguration('xstateOutline').get('debuggerFollowDiagram', false));
-    // Native instances tree (machine instances + their live state trees).
-    const debuggerTreeProvider = new DebuggerTreeProvider(context.extensionUri, debuggerController);
-    const debuggerTreeView = vscode.window.createTreeView('xstateDebuggerInstances', {
-        treeDataProvider: debuggerTreeProvider,
-    });
-    const debuggerTreeSelectionListener = debuggerTreeView.onDidChangeSelection((e) => {
-        const item = e.selection[0];
-        if (item && item.kind !== 'waiting') { debuggerController.selectActor(item.sessionId); }
-    });
-    // Show a "frozen" indicator on the Instances view while time-travelling / replaying.
-    const debuggerFreezeIndicator = debuggerController.getStore().subscribe(() => {
-        const s = debuggerController.getStore().getState();
-        debuggerTreeView.message = s.timeTravelSeq !== null
-            ? `⏱ Time travel — seq ${s.timeTravelSeq}`
-            : s.replayMode
-                ? `● Replay${s.replayName ? ` — ${s.replayName}` : ''}`
-                : undefined;
-    });
-    // Native context tree for the selected actor (expandable JSON).
-    const debuggerContextTreeProvider = new DebuggerContextTreeProvider(debuggerController);
-    const debuggerContextTreeView = vscode.window.createTreeView('xstateDebuggerContext', {
-        treeDataProvider: debuggerContextTreeProvider,
-    });
-    // Show/hide stopped actors — toggle in the Instances view's "…" menu.
-    const setShowStopped = (value: boolean) => {
-        debuggerTreeProvider.setShowStopped(value);
-        void vscode.commands.executeCommand('setContext', 'xstateDebugger.showStopped', value);
-    };
-    const debuggerShowStoppedCommand = vscode.commands.registerCommand('xstateDebugger.showStopped', () => setShowStopped(true));
-    const debuggerHideStoppedCommand = vscode.commands.registerCommand('xstateDebugger.hideStopped', () => setShowStopped(false));
-    // "Follow actor in diagram" — when on, selecting an actor opens/reveals its
-    // statechart diagram (the live overlay then tracks it, incl. time-travel).
-    let followDiagram = vscode.workspace.getConfiguration('xstateOutline').get('debuggerFollowDiagram', false);
-    let lastFollowedActor: string | null = null;
-    const openDiagramForActor = (sessionId: string | null): void => {
-        if (!sessionId) { return; }
-        const actor = debuggerController.getStore().getState().actors.get(sessionId);
-        if (!actor?.machine) { return; }
-        const machine = findStaticMachine(workspaceScanner, actor.machine.id, actor.machine.sourceLocation, Object.keys(actor.machine.root.states));
-        if (machine) { graphViewProvider.show(machine, machine.label); }
-    };
-    const setFollowDiagram = (value: boolean) => {
-        followDiagram = value;
-        void vscode.workspace.getConfiguration('xstateOutline').update('debuggerFollowDiagram', value, vscode.ConfigurationTarget.Global);
-        void vscode.commands.executeCommand('setContext', 'xstateDebugger.followDiagram', value);
-        if (value) {
-            lastFollowedActor = debuggerController.getStore().getState().selectedActorId;
-            openDiagramForActor(lastFollowedActor);
-        }
-    };
-    const debuggerFollowDiagramCommand = vscode.commands.registerCommand('xstateDebugger.followDiagram', () => setFollowDiagram(true));
-    const debuggerUnfollowDiagramCommand = vscode.commands.registerCommand('xstateDebugger.unfollowDiagram', () => setFollowDiagram(false));
-    // Let the live overlay resolve each actor to its static machine (incl.
-    // anonymous machines, whose runtime id is "(machine)") so it can target the
-    // open diagram by the right label.
-    debuggerController.setStaticLabelResolver((machineId, sourceLocation, rootStateKeys) =>
-        findStaticMachine(workspaceScanner, machineId, sourceLocation, rootStateKeys)?.label);
-    const debuggerFollowSub = debuggerController.getStore().subscribe(() => {
-        if (!followDiagram) { return; }
-        const st = debuggerController.getStore().getState();
-        // While stepping the event log, follow the actor whose event is at the
-        // current step so its diagram opens and the overlay tracks that step;
-        // otherwise follow the selected actor.
-        let target = st.selectedActorId;
-        if (st.timeTravelSeq !== null) {
-            const ev = st.events.find((e) => e.globalSeq === st.timeTravelSeq);
-            if (ev) { target = ev.sessionId; }
-        }
-        if (target === lastFollowedActor) { return; }
-        lastFollowedActor = target;
-        openDiagramForActor(target);
-    });
-    // Right-click actions on the Instances tree.
-    const debuggerItemCommands = registerDebuggerCommands(debuggerController, graphViewProvider, workspaceScanner);
-    // Colour active state labels green in the Instances tree.
-    const debuggerDecorationProvider = new DebuggerActiveDecorationProvider(debuggerController);
-    const debuggerDecorationRegistration = vscode.window.registerFileDecorationProvider(debuggerDecorationProvider);
-    // Detect how ready the workspace is for the debugger → tailored welcome text.
-    const debuggerSetupDetector = new DebuggerSetupDetector(workspaceScanner);
-    const debuggerRecheckCommand = vscode.commands.registerCommand('xstateDebugger.recheckSetup', async () => {
-        // Flip the welcome to a "Checking…" state, then back, so the result
-        // (the ✅/❌ welcome variant for the new setup state) visibly replaces
-        // the button — instead of the command looking like a silent no-op.
-        await vscode.commands.executeCommand('setContext', 'xstateDebugger.setupChecking', true);
-        try {
-            await debuggerSetupDetector.refresh();
-        } finally {
-            await vscode.commands.executeCommand('setContext', 'xstateDebugger.setupChecking', false);
-        }
-    });
-    // Recompute when the Instances view is shown, when package.json/source change.
-    const debuggerSetupOnVisible = debuggerTreeView.onDidChangeVisibility((e) => {
-        if (e.visible) { void debuggerSetupDetector.refresh(); }
-    });
-    const debuggerSetupOnScan = workspaceScanner.onDidChange(() => void debuggerSetupDetector.refresh());
-    const debuggerPkgWatcher = vscode.workspace.createFileSystemWatcher('**/package.json');
-    debuggerPkgWatcher.onDidChange(() => void debuggerSetupDetector.refresh());
-    debuggerPkgWatcher.onDidCreate(() => void debuggerSetupDetector.refresh());
-    debuggerPkgWatcher.onDidDelete(() => void debuggerSetupDetector.refresh());
-    // Events-panel + time-travel commands.
-    const debuggerBackToLiveCommand = vscode.commands.registerCommand('xstateDebugger.backToLive', () => debuggerController.backToLive());
-    const debuggerStepBackCommand = vscode.commands.registerCommand('xstateDebugger.stepBack', () => debuggerController.stepBack());
-    const debuggerStepForwardCommand = vscode.commands.registerCommand('xstateDebugger.stepForward', () => debuggerController.stepForward());
-    const debuggerClearEventsCommand = vscode.commands.registerCommand('xstateDebugger.clearEvents', () => debuggerController.clearEvents());
-    const debuggerCopyContextCommand = vscode.commands.registerCommand(
-        'xstateDebugger.copyContextValue',
-        (item?: ContextTreeItem) => {
-            if (!item) { return; }
-            const v = item.value;
-            const text = typeof v === 'string' ? v : JSON.stringify(v, null, 2);
-            void vscode.env.clipboard.writeText(text ?? String(v));
-        },
-    );
-    const debuggerConnectCommand = vscode.commands.registerCommand('xstateDebugger.connect', () => debuggerController.connect());
-    const debuggerDisconnectCommand = vscode.commands.registerCommand('xstateDebugger.disconnect', () => debuggerController.disconnect());
-    const debuggerToggleCommand = vscode.commands.registerCommand('xstateDebugger.toggle', () => debuggerController.toggle());
-    const debuggerExportSessionCommand = vscode.commands.registerCommand('xstateDebugger.exportSession', () => debuggerController.exportSession());
-    const debuggerImportSessionCommand = vscode.commands.registerCommand('xstateDebugger.importSession', () => debuggerController.importSession());
-
     // "Transitions" view — the selected state's incoming (←) / outgoing (→)
     // transitions.
     const navigatorProvider = new NavigatorTreeProvider(
@@ -1103,21 +957,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // "Open invoked machine" on an invoke state → open that machine's diagram.
     // The invoke src is normally the invoked machine's variable/id name, so a
-    // by-name lookup resolves it; the live overlay then lights up its active
-    // states automatically if the invoked child actor is running. Falls back to
-    // a running actor whose machine id matches (covers differently-named srcs).
+    // by-name lookup resolves it. (The live debugger — its own extension — adds a
+    // running-actor fallback; the static outline resolves purely by name.)
     graphViewProvider.setOpenInvokedHandler((src) => {
-        let machine = findStaticMachine(workspaceScanner, src);
-        if (!machine) {
-            const running = [...debuggerController.getStore().getState().actors.values()]
-                .find((a) => a.machine?.id === src);
-            if (running?.machine) {
-                machine = findStaticMachine(
-                    workspaceScanner, running.machine.id, running.machine.sourceLocation,
-                    Object.keys(running.machine.root.states),
-                );
-            }
-        }
+        const machine = findStaticMachine(workspaceScanner, src);
         if (machine) { graphViewProvider.show(machine, machine.label); }
         else { void vscode.window.showWarningMessage(`No machine named "${src}" found in the workspace to open.`); }
     });
@@ -1373,37 +1216,6 @@ export async function activate(context: vscode.ExtensionContext) {
         documentCloseListener,
         documentChangeListener,
         cursorChangeListener,
-        debuggerController,
-        eventsViewRegistration,
-        debuggerTreeProvider,
-        debuggerTreeView,
-        debuggerTreeSelectionListener,
-        debuggerContextTreeProvider,
-        debuggerContextTreeView,
-        debuggerShowStoppedCommand,
-        debuggerHideStoppedCommand,
-        debuggerFollowDiagramCommand,
-        debuggerUnfollowDiagramCommand,
-        { dispose: debuggerFollowSub },
-        ...debuggerItemCommands,
-        debuggerDecorationProvider,
-        debuggerDecorationRegistration,
-        debuggerSetupDetector,
-        debuggerRecheckCommand,
-        debuggerSetupOnVisible,
-        debuggerSetupOnScan,
-        debuggerPkgWatcher,
-        debuggerBackToLiveCommand,
-        debuggerStepBackCommand,
-        debuggerStepForwardCommand,
-        debuggerClearEventsCommand,
-        debuggerCopyContextCommand,
-        { dispose: debuggerFreezeIndicator },
-        debuggerExportSessionCommand,
-        debuggerImportSessionCommand,
-        debuggerConnectCommand,
-        debuggerDisconnectCommand,
-        debuggerToggleCommand,
         {
             dispose: () => {
                 pendingDiagnosticUpdates.forEach((timeout) => clearTimeout(timeout));

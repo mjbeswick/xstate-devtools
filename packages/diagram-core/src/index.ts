@@ -8,3 +8,4 @@ export * from './treeEditor';
 export * from './workspaceScanner';
 export * from './graphView';
 export * from './export/mermaid';
+export * from './findStaticMachine';

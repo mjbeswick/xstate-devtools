@@ -1,4 +1,4 @@
-// packages/vscode-extension/src/debugger/debuggerController.ts
+// packages/vscode-debugger/src/debugger/debuggerController.ts
 //
 // Owns the live-debugger session in the extension host: the framework-agnostic
 // inspector store (shared with the chrome panel via @xstate-devtools/panel-core),
@@ -256,8 +256,8 @@ export class DebuggerController implements vscode.Disposable {
     /** Current connection URL (from config, falling back to the default). */
     private url(): string {
         const configured = vscode.workspace
-            .getConfiguration('xstateOutline')
-            .get<string>('debuggerUrl');
+            .getConfiguration('xstateDebugger')
+            .get<string>('url');
         return configured && configured.trim() ? configured.trim() : DEFAULT_URL;
     }
 

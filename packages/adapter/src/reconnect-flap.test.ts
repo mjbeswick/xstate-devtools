@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest'
 import { createMachine, createActor } from 'xstate'
 import { createServerAdapter } from './server.js'
 import { createInspectorStore } from '@xstate-devtools/panel-core'
-import { DebuggerWsClient } from '../../vscode-devtool/src/debugger/wsClient.js'
+import { DebuggerWsClient } from '../../vscode-debugger/src/debugger/wsClient.js'
 
 const PORT = 9353
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))

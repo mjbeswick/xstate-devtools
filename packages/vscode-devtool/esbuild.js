@@ -34,20 +34,6 @@ const webviewOptions = {
     logLevel: 'info',
 };
 
-// Browser bundle for the XState Debugger sidebar webview. Loaded from
-// out/webview/debugger.js as a local webview resource.
-const debuggerWebviewOptions = {
-    entryPoints: ['src/webview/debuggerPanel.ts'],
-    bundle: true,
-    outfile: 'out/webview/debugger.js',
-    platform: 'browser',
-    format: 'iife',
-    target: 'es2020',
-    sourcemap: watch,
-    minify: !watch,
-    logLevel: 'info',
-};
-
 async function main() {
     // Start from a clean out/ so stale unbundled tsc output isn't shipped.
     fs.rmSync('out', { recursive: true, force: true });
@@ -55,14 +41,12 @@ async function main() {
     if (watch) {
         const ctx = await esbuild.context(options);
         const webviewCtx = await esbuild.context(webviewOptions);
-        const debuggerCtx = await esbuild.context(debuggerWebviewOptions);
-        await Promise.all([ctx.watch(), webviewCtx.watch(), debuggerCtx.watch()]);
+        await Promise.all([ctx.watch(), webviewCtx.watch()]);
         console.log('esbuild: watching…');
     } else {
         await Promise.all([
             esbuild.build(options),
             esbuild.build(webviewOptions),
-            esbuild.build(debuggerWebviewOptions),
         ]);
         console.log('esbuild: build complete');
     }

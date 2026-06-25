@@ -1,4 +1,4 @@
-// packages/vscode-extension/src/debugger/debuggerContextTreeProvider.ts
+// packages/vscode-debugger/src/debugger/debuggerContextTreeProvider.ts
 //
 // Native VS Code TreeView for the selected actor's context — an expandable JSON
 // tree (objects/arrays expand, primitives are leaves with their value shown).

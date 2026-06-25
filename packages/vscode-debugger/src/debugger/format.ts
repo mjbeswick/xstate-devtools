@@ -1,4 +1,4 @@
-// packages/vscode-extension/src/debugger/format.ts
+// packages/vscode-debugger/src/debugger/format.ts
 //
 // Compact, deduped rendering of a machine's active leaf states. A machine with
 // many parallel regions yields the same leaf name repeatedly (e.g. "idle" per
