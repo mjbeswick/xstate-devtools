@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { WorkspaceScanner } from './workspaceScanner';
-import { findNodeAtPosition, normalizeTargetName, walkNodes } from './utils';
+import { WorkspaceScanner } from '@xstate-devtools/diagram-core';
+import { findNodeAtPosition, normalizeTargetName, walkNodes } from '@xstate-devtools/diagram-core';
 import { ImplementationFinder } from './implementationFinder';
 
 export class XStateHoverProvider implements vscode.HoverProvider {

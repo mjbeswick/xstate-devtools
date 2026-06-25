@@ -7,9 +7,9 @@ import type { SerializedStateNode } from '@xstate-devtools/protocol';
 import { getActivePaths, getDisplaySnapshot } from '@xstate-devtools/panel-core';
 import type { DebuggerController } from './debuggerController';
 import { DebuggerTreeItem } from './debuggerTreeProvider';
-import type { XStateGraphViewProvider } from '../graphView';
-import type { WorkspaceScanner } from '../workspaceScanner';
-import type { MachineNode } from '../parser';
+import type { XStateGraphViewProvider } from '@xstate-devtools/diagram-core';
+import type { WorkspaceScanner } from '@xstate-devtools/diagram-core';
+import type { MachineNode } from '@xstate-devtools/diagram-core';
 
 /** Top-level state labels of a static machine (its root regions/states). */
 function topLevelStateLabels(machine: MachineNode): string[] {

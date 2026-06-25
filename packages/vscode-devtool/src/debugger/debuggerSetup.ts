@@ -7,7 +7,7 @@
 // Ladder: no-xstate → no-adapter → no-server-adapter → inspect-not-wired → ready.
 import * as vscode from 'vscode';
 import * as ts from 'typescript';
-import { WorkspaceScanner, SCAN_EXCLUDE_GLOB } from '../workspaceScanner';
+import { WorkspaceScanner, SCAN_EXCLUDE_GLOB } from '@xstate-devtools/diagram-core';
 
 export type DebuggerSetupState =
     | 'unknown'

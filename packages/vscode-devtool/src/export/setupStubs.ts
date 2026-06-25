@@ -1,4 +1,4 @@
-import type { MachineNode } from '../parser';
+import type { MachineNode } from '@xstate-devtools/diagram-core';
 
 // Scaffold a `setup({ actions, guards, actors, delays })` block from a machine:
 // a typed stub for every action/guard/actor/delay the machine *references*, each

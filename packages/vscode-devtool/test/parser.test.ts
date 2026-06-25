@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { XStateMachineParser, MachineNode } from '../src/parser';
+import { XStateMachineParser, MachineNode } from '@xstate-devtools/diagram-core';
 
 const TESTING_DIR = path.resolve(__dirname, '../testing');
 

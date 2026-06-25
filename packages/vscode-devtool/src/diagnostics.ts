@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import {
     getValidPropertiesForContext,
     type XStateObjectContext,
-} from './xstateSchema';
+} from '@xstate-devtools/diagram-core';
 
 export const XSTATE_DIAGNOSTIC_SOURCE = 'xstate';
 export const XSTATE_DIAGNOSTIC_CODES = {

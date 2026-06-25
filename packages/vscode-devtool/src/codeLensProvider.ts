@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { XStateMachineParser, MachineNode } from './parser';
+import { XStateMachineParser, MachineNode } from '@xstate-devtools/diagram-core';
 import { XSTATE_DIAGNOSTIC_SOURCE } from './diagnostics';
 
 // A CodeLens row above every `createMachine` / `setup().createMachine` call:

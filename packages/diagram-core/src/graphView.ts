@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { MachineNode } from './parser';
-import { XStateMachineTreeProvider } from './treeProvider';
 import { toMermaid } from './export/mermaid';
 import { SimModel, SimState, SimTransition, indexModel, shortestPaths } from './machineModel';
 import { XStateTreeEditor } from './treeEditor';
@@ -92,7 +91,10 @@ export class XStateGraphViewProvider {
 
     constructor(
         private readonly extensionUri: vscode.Uri,
-        private readonly treeProvider: XStateMachineTreeProvider
+        // Optional: report whether a node is currently expanded in an outline
+        // tree, so the diagram can collapse nodes the user has collapsed there.
+        // The debugger has no outline tree and passes nothing (nothing collapses).
+        private readonly reflectsExpansion?: (node: MachineNode) => boolean
     ) {}
 
     /** Register a callback that selects the given node in the tree outline. */
@@ -571,7 +573,7 @@ export class XStateGraphViewProvider {
             // the cached tree item) means this is correct even for nodes whose
             // tree items have never been rendered. Root states are never
             // collapsed — a diagram rooted at a state must always show it open.
-            if (reflectExpansion && !isRoot && childStates.length > 0 && !this.treeProvider.isNodeExpanded(n)) {
+            if (reflectExpansion && !isRoot && childStates.length > 0 && !(this.reflectsExpansion?.(n) ?? false)) {
                 collapsedIds.push(id);
             }
 
@@ -595,7 +597,7 @@ export class XStateGraphViewProvider {
             }
             if (nestedHere) {
                 nodeData.compound = true;
-                if (reflectExpansion && !isRoot && childStates.length === 0 && !this.treeProvider.isNodeExpanded(n)) {
+                if (reflectExpansion && !isRoot && childStates.length === 0 && !(this.reflectsExpansion?.(n) ?? false)) {
                     collapsedIds.push(id);
                 }
             }

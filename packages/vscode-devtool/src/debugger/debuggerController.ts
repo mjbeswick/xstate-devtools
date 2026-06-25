@@ -10,7 +10,7 @@ import { createInspectorStore, exportSession, getActivePaths, getDisplaySnapshot
 import type { StoreApi } from 'zustand/vanilla';
 import type { ExtensionToPageMessage, PageToExtensionMessage, SerializedEvent, SerializedStateNode } from '@xstate-devtools/protocol';
 import { DebuggerWsClient, type ConnectionStatus } from './wsClient';
-import { XStateGraphViewProvider, type LiveStateValue } from '../graphView';
+import { XStateGraphViewProvider, type LiveStateValue } from '@xstate-devtools/diagram-core';
 import { summarizeLeaves, summarizeLeafTokens } from './format';
 
 const DEFAULT_URL = 'ws://127.0.0.1:9301';

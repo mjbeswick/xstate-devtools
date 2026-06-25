@@ -1154,6 +1154,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@xstate-devtools/diagram-core": "*",
     "@xstate-devtools/panel-core": "*",
     "@xstate-devtools/protocol": "*",
     "elkjs": "^0.11.1",

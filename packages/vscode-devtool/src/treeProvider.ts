@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import { XStateMachineParser, MachineNode } from './parser';
-import { WorkspaceScanner, FileMachines } from './workspaceScanner';
-import { findNodeAtPosition, normalizeTargetName, walkNodes } from './utils';
+import { XStateMachineParser, MachineNode } from '@xstate-devtools/diagram-core';
+import { WorkspaceScanner, FileMachines } from '@xstate-devtools/diagram-core';
+import { findNodeAtPosition, normalizeTargetName, walkNodes } from '@xstate-devtools/diagram-core';
 
 export type ViewScope = 'file' | 'workspace';
 export type ViewMode = 'grouped' | 'flat';

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { MachineNode } from './parser';
-import { normalizeTargetName } from './utils';
+import { MachineNode } from '@xstate-devtools/diagram-core';
+import { normalizeTargetName } from '@xstate-devtools/diagram-core';
 
 /** An edge touching the focal state: `in` (←, leads into it) or `out` (→, leaves it). */
 export interface TransitionRef {

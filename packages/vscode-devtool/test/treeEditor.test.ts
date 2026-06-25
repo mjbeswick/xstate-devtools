@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renamePropertyKey, reindentSnippet } from '../src/treeEditor';
+import { renamePropertyKey, reindentSnippet } from '@xstate-devtools/diagram-core';
 
 describe('renamePropertyKey', () => {
     it('renames a bare identifier key', () => {

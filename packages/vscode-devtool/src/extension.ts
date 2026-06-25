@@ -1,17 +1,17 @@
 import * as vscode from 'vscode';
 import { XStateMachineTreeProvider } from './treeProvider';
-import { MachineNode, XStateMachineParser } from './parser';
-import { findNodeAtPosition } from './utils';
+import { MachineNode, XStateMachineParser } from '@xstate-devtools/diagram-core';
+import { findNodeAtPosition } from '@xstate-devtools/diagram-core';
 import { ImplementationFinder } from './implementationFinder';
 import { FilterWebviewViewProvider } from './filterView';
 import { XStateCompletionProvider } from './completionProvider';
-import { XStateTreeEditor } from './treeEditor';
+import { XStateTreeEditor } from '@xstate-devtools/diagram-core';
 import { XStateCodeActionProvider } from './codeActions';
 import { isSupportedXStateDocument, validateXStateDocument } from './diagnostics';
-import { WorkspaceScanner } from './workspaceScanner';
+import { WorkspaceScanner } from '@xstate-devtools/diagram-core';
 import { XStateReferenceProvider, XStateRenameProvider } from './providers';
 import { XStateHoverProvider } from './hoverProvider';
-import { XStateGraphViewProvider } from './graphView';
+import { XStateGraphViewProvider } from '@xstate-devtools/diagram-core';
 import { DebuggerController } from './debugger/debuggerController';
 import { DebuggerViewProvider } from './debugger/debuggerView';
 import { DebuggerTreeProvider } from './debugger/debuggerTreeProvider';
@@ -804,7 +804,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }, 500);
     }
 
-    const graphViewProvider = new XStateGraphViewProvider(context.extensionUri, treeProvider);
+    const graphViewProvider = new XStateGraphViewProvider(context.extensionUri, (n) => treeProvider.isNodeExpanded(n));
 
     // ── Live debugger ──────────────────────────────────────────────────────────
     // Attaches to a running app's server adapter (createServerAdapter) over a

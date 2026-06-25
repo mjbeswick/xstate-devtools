@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import { WorkspaceScanner } from './workspaceScanner';
-import { MachineNode } from './parser';
-import { findNodeAtPosition, normalizeTargetName, walkNodes } from './utils';
+import { WorkspaceScanner } from '@xstate-devtools/diagram-core';
+import { MachineNode } from '@xstate-devtools/diagram-core';
+import { findNodeAtPosition, normalizeTargetName, walkNodes } from '@xstate-devtools/diagram-core';
 
 export class XStateReferenceProvider implements vscode.ReferenceProvider {
     constructor(private workspaceScanner: WorkspaceScanner) {}
