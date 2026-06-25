@@ -61,6 +61,10 @@ A dedicated **Errors** view collects every problem the static analyzer finds acr
 
 The live debugger (attach to a running app, inspect instances/context, time-travel the event log, overlay live state on the diagram) has moved to its own standalone extension, **[XState Debugger](../vscode-debugger/README.md)**. Install it alongside this one for runtime inspection; it bundles its own diagram, so it also works on its own.
 
+### 🤖 AI tools (Language Model Tools)
+
+The extension contributes **Language Model Tools** so VS Code's AI agent can reason about your machines (requires VS Code ≥ 1.95). Reference them in chat or let the agent call them: **list machines**, **describe machine** (states + transitions as JSON), **machine diagram** (Mermaid), **test paths** (shortest path to each state + unreachable states), and **validate** (XState diagnostics). The same analysis is available outside the editor via the standalone [`@xstate-devtools/mcp`](../mcp-server/README.md) server.
+
 ## Reading the diagram
 
 ![A parallel checkout machine rendered as a statechart, with two concurrent regions, entry/exit actions, guarded transitions, and final states](https://github.com/mjbeswick/xstate-devtools/raw/main/packages/vscode-devtool/images/checkout.png)

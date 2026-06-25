@@ -17,6 +17,7 @@ import { NavigatorTreeProvider, TransitionRef } from './navigatorView';
 import { ErrorsTreeProvider, ErrorsGrouping, ErrorsFilter } from './errorsView';
 import { XStateCodeLensProvider } from './codeLensProvider';
 import { toSetupStubs } from './export/setupStubs';
+import { registerLanguageModelTools } from './lmTools';
 
 let selectionTimeout: NodeJS.Timeout | undefined;
 
@@ -799,6 +800,10 @@ export async function activate(context: vscode.ExtensionContext) {
     }
 
     const graphViewProvider = new XStateGraphViewProvider(context.extensionUri, (n) => treeProvider.isNodeExpanded(n));
+
+    // Expose XState analysis to VS Code's AI agent (Copilot / Claude) as
+    // Language Model Tools, backed by the shared diagram-core facade.
+    registerLanguageModelTools(context, workspaceScanner);
 
     // "Transitions" view — the selected state's incoming (←) / outgoing (→)
     // transitions.

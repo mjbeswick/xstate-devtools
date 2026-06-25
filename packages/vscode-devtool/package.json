@@ -23,7 +23,7 @@
     "typescript"
   ],
   "engines": {
-    "vscode": "^1.78.0"
+    "vscode": "^1.95.0"
   },
   "categories": [
     "Programming Languages",
@@ -39,6 +39,83 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "languageModelTools": [
+      {
+        "name": "xstate_list_machines",
+        "displayName": "List XState machines",
+        "modelDescription": "List every XState machine found in the workspace, with its id, source file, line, and state count. Use this first to discover which machines exist.",
+        "toolReferenceName": "xstateMachines",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(list-tree)",
+        "tags": ["xstate"],
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "xstate_describe_machine",
+        "displayName": "Describe XState machine",
+        "modelDescription": "Return the structure of one XState machine as JSON: its states (with hierarchy, initial/final/parallel flags, entry/exit actions, invoked services) and transitions (source, target, event). Identify the machine by its id.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(symbol-structure)",
+        "tags": ["xstate"],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "machine": { "type": "string", "description": "The machine's id (as reported by xstate_list_machines)." },
+            "file": { "type": "string", "description": "Optional source file path to disambiguate machines that share an id." }
+          },
+          "required": ["machine"]
+        }
+      },
+      {
+        "name": "xstate_machine_diagram",
+        "displayName": "XState machine diagram (Mermaid)",
+        "modelDescription": "Return a Mermaid `stateDiagram-v2` for one XState machine, identified by its id. Useful for visualising or documenting the machine.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(git-merge)",
+        "tags": ["xstate"],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "machine": { "type": "string", "description": "The machine's id." },
+            "file": { "type": "string", "description": "Optional source file path to disambiguate." }
+          },
+          "required": ["machine"]
+        }
+      },
+      {
+        "name": "xstate_test_paths",
+        "displayName": "XState test paths",
+        "modelDescription": "Return the shortest event sequence to reach each state of one XState machine (structural — guards assumed takeable), flag unreachable states, and include copy-paste test skeletons. Identify the machine by its id.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(beaker)",
+        "tags": ["xstate"],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "machine": { "type": "string", "description": "The machine's id." },
+            "file": { "type": "string", "description": "Optional source file path to disambiguate." }
+          },
+          "required": ["machine"]
+        }
+      },
+      {
+        "name": "xstate_validate",
+        "displayName": "Validate XState machines",
+        "modelDescription": "Run XState diagnostics over the workspace (or one file): invalid config properties, unknown transition targets, unreachable states, etc. Returns the problems found with file, line, severity, and message.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(checklist)",
+        "tags": ["xstate"],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "file": { "type": "string", "description": "Optional source file path. Omit to validate every XState file in the workspace." }
+          }
+        }
+      }
+    ],
     "views": {
       "xstate-outline": [
         {
@@ -805,7 +882,7 @@
   },
   "devDependencies": {
     "@types/node": "^18.0.0",
-    "@types/vscode": "^1.78.0",
+    "@types/vscode": "^1.95.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "@vscode/codicons": "^0.0.45",
