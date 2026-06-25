@@ -270,4 +270,15 @@ describe('structure', () => {
         const regions = (machine.children ?? []).filter(c => c.type === 'state').map(c => c.label);
         expect(regions).toEqual(expect.arrayContaining(['payment', 'fulfilment']));
     });
+
+    // Follow-cursor's "auto-reveal hidden state configs" stands on this: a
+    // createStateConfig(...) call must be flagged isStateConfig and carry a range
+    // that contains its interior, so positionInHiddenStateConfig can detect it.
+    it('createStateConfig is flagged and its range contains interior positions', () => {
+        const [config] = parseFixture('stateConfigCall.ts');
+        expect(config.isStateConfig).toBe(true);
+        const interior = new vscode.Position(config.range.start.line + 1, 0);
+        expect(config.range.contains(interior)).toBe(true);
+        expect(config.range.contains(new vscode.Position(0, 0))).toBe(false);
+    });
 });

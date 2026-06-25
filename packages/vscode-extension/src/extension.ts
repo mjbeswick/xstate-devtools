@@ -543,12 +543,18 @@ export async function activate(context: vscode.ExtensionContext) {
 
         if (selectionTimeout) { clearTimeout(selectionTimeout); }
 
-        selectionTimeout = setTimeout(() => {
+        selectionTimeout = setTimeout(async () => {
             // Don't fight the user: skip if they just interacted with the tree.
             if (Date.now() - lastTreeInteraction < TREE_INTERACTION_GRACE_MS) { return; }
 
             const position = editor.selection.active;
-            const item = treeProvider.findItemAtPosition(position);
+            let item = treeProvider.findItemAtPosition(position);
+            // Cursor inside a state config that's hidden from the tree: surface it
+            // for this session so the reveal below can land on it.
+            if (!item && treeProvider.positionInHiddenStateConfig(position)) {
+                await treeProvider.revealHiddenStateConfigs();
+                item = treeProvider.findItemAtPosition(position);
+            }
 
             // Only reveal when it would actually change the selection — re-selecting
             // the already-selected item is what yanks the tree out from under the user.

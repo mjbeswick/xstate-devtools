@@ -35,6 +35,10 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
     private viewMode: ViewMode = 'grouped';
     private isLoading: boolean = false;
     private showStateConfigs: boolean = false; // Hidden by default
+    // Session-only override: set when follow-cursor lands inside a hidden state
+    // config, so the tree can reveal it without mutating the user's persisted
+    // preference. Never persisted; resets on reload. See revealHiddenStateConfigs.
+    private tempShowStateConfigs: boolean = false;
     private groupEventHandlers: boolean = false; // Group transitions under an `on` node
     private sortChildren: SortMode = 'original'; // Sort child nodes vs. keep source order
     private workspaceScanner: WorkspaceScanner;
@@ -112,6 +116,39 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
 
     getShowStateConfigs(): boolean {
         return this.showStateConfigs;
+    }
+
+    /** Whether state configs should appear in the tree right now — the persisted
+     *  preference OR the session-only follow-cursor override. */
+    private get effectiveShowStateConfigs(): boolean {
+        return this.showStateConfigs || this.tempShowStateConfigs;
+    }
+
+    /** True if `position` falls inside a state-config definition that's currently
+     *  hidden from the tree (so follow-cursor can choose to surface it). */
+    positionInHiddenStateConfig(position: vscode.Position): boolean {
+        if (this.effectiveShowStateConfigs) { return false; }
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) { return false; }
+        const uriStr = editor.document.uri.toString();
+        const machines = this.currentScope === 'file'
+            ? XStateMachineParser.parseMachines(editor.document)
+            : (this.workspaceScanner.getCached().find(f => f.uri.toString() === uriStr)?.machines ?? []);
+        return machines.some(m => m.isStateConfig && m.uri.toString() === uriStr && m.range.contains(position));
+    }
+
+    /** Surface hidden state configs for this session and rebuild the tree, so a
+     *  follow-cursor reveal into one can succeed. No-op if already shown. */
+    async revealHiddenStateConfigs(): Promise<void> {
+        if (this.effectiveShowStateConfigs) { return; }
+        this.tempShowStateConfigs = true;
+        // Keep the title-bar toggle coherent: configs are now visible, so offer
+        // "Hide" (which clears the override via setStateConfigs).
+        vscode.commands.executeCommand('setContext', 'xstateOutline.showStateConfigs', true);
+        this.refresh();
+        // Repopulate the item cache eagerly so the caller can findItemAtPosition
+        // immediately, rather than waiting for VS Code's lazy render.
+        await this.getChildren();
     }
 
     handleDocumentChange(document: vscode.TextDocument): void {
@@ -365,6 +402,8 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
 
     setStateConfigs(show: boolean): void {
         this.showStateConfigs = show;
+        // An explicit hide must win over a prior follow-cursor auto-reveal.
+        this.tempShowStateConfigs = false;
         const config = vscode.workspace.getConfiguration('xstateOutline');
         config.update('showStateConfigs', show, vscode.ConfigurationTarget.Global);
         vscode.commands.executeCommand('setContext', 'xstateOutline.showStateConfigs', show);
@@ -639,7 +678,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
                 }
 
                 const items = machines
-                    .filter((m: MachineNode) => this.showStateConfigs || !m.isStateConfig)
+                    .filter((m: MachineNode) => this.effectiveShowStateConfigs || !m.isStateConfig)
                     .filter((m: MachineNode) => this.nodeMatchesFilter(m))
                     .map((m: MachineNode) => {
                         const item = this.getOrCreateItem(m, undefined);
@@ -647,7 +686,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
                         return item;
                     });
 
-                if (items.length === 0 && !this.showStateConfigs) {
+                if (items.length === 0 && !this.effectiveShowStateConfigs) {
                     this.setEmptyReason('stateConfigsHidden');
                     return [];
                 }
@@ -689,7 +728,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         // Filter out state configs and apply text filter
         const filteredFileMachines = fileMachines.map(fm => ({
             ...fm,
-            machines: (this.showStateConfigs ? fm.machines : fm.machines.filter(m => !m.isStateConfig))
+            machines: (this.effectiveShowStateConfigs ? fm.machines : fm.machines.filter(m => !m.isStateConfig))
                 .filter(m => this.nodeMatchesFilter(m))
         })).filter(fm => fm.machines.length > 0);
 

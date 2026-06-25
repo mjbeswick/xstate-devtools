@@ -185,7 +185,7 @@ const machine = setup({
 | `xstateOutline.defaultScope` | `workspace` | Scan the current file only, or the whole workspace |
 | `xstateOutline.defaultViewMode` | `flat` | Flat list of machines, or grouped by file |
 | `xstateOutline.showStateConfigs` | `false` | Include `createStateConfig`/`stateConfig` patterns in the outline |
-| `xstateOutline.followCursor` | `true` | Reveal the tree node matching the editor cursor |
+| `xstateOutline.followCursor` | `true` | Reveal the tree node matching the editor cursor (surfaces a hidden state config for the session if the cursor lands inside one) |
 | `xstateOutline.navTarget` | `code` | Where clicking a tree node navigates: `code` (jump to source) or `diagram` (focus the state in the diagram). Toggle from the outline title bar |
 | `xstateOutline.graphReflectsTreeExpansion` | `true` | Make the diagram render only the states expanded in the outline |
 | `xstateOutline.codeLens` | `true` | Show a CodeLens (counts + "View Diagram") above each machine |
