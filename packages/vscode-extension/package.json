@@ -207,6 +207,12 @@
         "icon": "$(type-hierarchy)"
       },
       {
+        "command": "xstateDebugger.diagramFromNode",
+        "title": "Create Diagram From Here",
+        "category": "XState Debugger",
+        "icon": "$(type-hierarchy-sub)"
+      },
+      {
         "command": "xstateDebugger.sendEvent",
         "title": "Send Event…",
         "category": "XState Debugger",
@@ -800,17 +806,22 @@
       "view/item/context": [
         {
           "command": "xstateDebugger.goToSource",
-          "when": "view == xstateDebuggerInstances && (viewItem == xstateDebuggerActor || viewItem == xstateDebuggerState)",
+          "when": "view == xstateDebuggerInstances && (viewItem == xstateDebuggerActor || viewItem =~ /^xstateDebuggerState/)",
           "group": "navigation@0"
         },
         {
           "command": "xstateDebugger.revealInDiagram",
-          "when": "view == xstateDebuggerInstances && (viewItem == xstateDebuggerActor || viewItem == xstateDebuggerState)",
+          "when": "view == xstateDebuggerInstances && (viewItem == xstateDebuggerActor || viewItem =~ /^xstateDebuggerState/)",
           "group": "navigation@1"
         },
         {
+          "command": "xstateDebugger.diagramFromNode",
+          "when": "view == xstateDebuggerInstances && viewItem == xstateDebuggerStateCompound",
+          "group": "navigation@2"
+        },
+        {
           "command": "xstateDebugger.sendEvent",
-          "when": "view == xstateDebuggerInstances && (viewItem == xstateDebuggerActor || viewItem == xstateDebuggerState)",
+          "when": "view == xstateDebuggerInstances && (viewItem == xstateDebuggerActor || viewItem =~ /^xstateDebuggerState/)",
           "group": "1_actor@0"
         },
         {
@@ -929,6 +940,10 @@
         },
         {
           "command": "xstateDebugger.revealInDiagram",
+          "when": "false"
+        },
+        {
+          "command": "xstateDebugger.diagramFromNode",
           "when": "false"
         },
         {

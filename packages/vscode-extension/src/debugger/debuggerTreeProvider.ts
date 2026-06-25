@@ -248,7 +248,11 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
         const item = new DebuggerTreeItem('state', sessionId, node);
         item.id = `state:${this.generation}:${sessionId}:${node.id}`;
         item.label = node.key;
-        item.contextValue = 'xstateDebuggerState';
+        // Compound nodes get their own contextValue so "Create Diagram From Here"
+        // only appears where there's a subtree to draw.
+        item.contextValue = Object.keys(node.states).length > 0
+            ? 'xstateDebuggerStateCompound'
+            : 'xstateDebuggerState';
         // Active states are shown by colouring the label green (via the
         // FileDecorationProvider keyed on this scheme), not a dot/text suffix.
         if (active) {

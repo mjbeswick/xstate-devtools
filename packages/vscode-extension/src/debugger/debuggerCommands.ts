@@ -173,6 +173,33 @@ export function registerDebuggerCommands(
         },
     );
 
+    // Open a focused diagram rooted at a compound state node (rather than the
+    // whole machine). The live overlay still paints active states — show() is
+    // told the owning machine label and the state-key path to this node.
+    const diagramFromNode = vscode.commands.registerCommand(
+        'xstateDebugger.diagramFromNode',
+        (item?: DebuggerTreeItem) => {
+            if (!item || item.kind !== 'state' || !item.node) { return; }
+            const actor = controller.getStore().getState().actors.get(item.sessionId);
+            if (!actor?.machine) { return; }
+            const machine = findStaticMachine(scanner, actor.machine.id, actor.machine.sourceLocation, Object.keys(actor.machine.root.states));
+            if (!machine) {
+                void vscode.window.showWarningMessage(
+                    `No diagram available — "${actor.machine.id}" isn't in the workspace (or its states don't match a machine here).`,
+                );
+                return;
+            }
+            const path = pathToNode(actor.machine.root, item.node.id);
+            const subtree = path ? walkStatic(machine, path) : undefined;
+            if (!subtree || !path) {
+                void vscode.window.showWarningMessage(`Couldn't locate "${item.node.key}" in the workspace diagram.`);
+                return;
+            }
+            controller.selectActor(item.sessionId);
+            graphView.show(subtree, `${machine.label} / ${subtree.label}`, undefined, { label: machine.label, path });
+        },
+    );
+
     const sendEvent = vscode.commands.registerCommand(
         'xstateDebugger.sendEvent',
         async (item?: DebuggerTreeItem) => {
@@ -211,5 +238,5 @@ export function registerDebuggerCommands(
         },
     );
 
-    return [goToSource, revealInDiagram, sendEvent, captureSnapshot, restoreSnapshot];
+    return [goToSource, revealInDiagram, diagramFromNode, sendEvent, captureSnapshot, restoreSnapshot];
 }

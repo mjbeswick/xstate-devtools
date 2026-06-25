@@ -20,6 +20,11 @@ interface PanelEntry {
     // Roots of the invoked machines nested inline into this diagram, so the live
     // overlay can paint a *child actor's* active states onto the nested subtree.
     invokedMachines?: MachineNode[];
+    // Set when this panel is a sub-diagram rooted at a child node (not a whole
+    // machine). The live overlay then looks up the owning machine's config by
+    // `label` and descends `path` (the state-key chain to this node) before
+    // painting, so active states still show. See applyLiveConfigs.
+    liveOverlay?: { label: string; path: string[] };
 }
 
 /** XState StateValue shape from a live snapshot. */
@@ -52,6 +57,19 @@ function collectActiveNodes(
         const child = children.find(c => c.label === key);
         if (child) { collectActiveNodes(sub, child, acc); }
     }
+}
+
+/** Descend a StateValue by a chain of state keys; undefined if the path isn't
+ *  active (so a sub-diagram outside the active configuration gets no overlay). */
+function descend(value: LiveStateValue, path: string[]): LiveStateValue | undefined {
+    let v: LiveStateValue = value;
+    for (const key of path) {
+        if (typeof v !== 'object' || v === null) { return undefined; }
+        const next = v[key];
+        if (next === undefined) { return undefined; }
+        v = next;
+    }
+    return v;
 }
 
 export class XStateGraphViewProvider {
@@ -99,7 +117,7 @@ export class XStateGraphViewProvider {
         return `${path}::${line}::${machine.label}`;
     }
 
-    public show(machineNode: MachineNode, title: string, selectName?: string) {
+    public show(machineNode: MachineNode, title: string, selectName?: string, liveOverlay?: { label: string; path: string[] }) {
         const key = this.machineKey(machineNode);
         const existing = this.panels.get(key);
         if (existing) {
@@ -123,7 +141,7 @@ export class XStateGraphViewProvider {
             }
         );
 
-        const entry: PanelEntry = { panel, machine: machineNode, nodeById: new Map(), title, direction: this.autoDirection(machineNode), selectName };
+        const entry: PanelEntry = { panel, machine: machineNode, nodeById: new Map(), title, direction: this.autoDirection(machineNode), selectName, liveOverlay };
         this.panels.set(key, entry);
         this.activeKey = key;
 
@@ -218,7 +236,14 @@ export class XStateGraphViewProvider {
             // active nodes across all of them so a later push (e.g. the child
             // actor) doesn't overwrite the parent's overlay.
             for (const m of [entry.machine, ...(entry.invokedMachines ?? [])]) {
-                const value = configs.get(m.label);
+                // A sub-diagram's root node isn't a machine, so its config is
+                // reached by descending the owning machine's StateValue.
+                const value = entry.liveOverlay && m === entry.machine
+                    ? (() => {
+                        const root = configs.get(entry.liveOverlay.label);
+                        return root === undefined ? undefined : descend(root, entry.liveOverlay.path);
+                    })()
+                    : configs.get(m.label);
                 if (value === undefined) { continue; }
                 matchedHere = true;
                 matched++;
