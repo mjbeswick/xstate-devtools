@@ -1,0 +1,42 @@
+{
+  "name": "@xstate-devtools/vite-plugin",
+  "version": "0.1.1",
+  "description": "Vite plugin that injects source locations into XState createMachine/state definitions so the XState DevTools can link straight to your editor.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mjbeswick/xstate-devtools.git",
+    "directory": "packages/vite-plugin"
+  },
+  "keywords": ["xstate", "vite", "vite-plugin", "statechart", "devtools"],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "check": "tsc -p ./ --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "vite": ">=4.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0",
+    "vite": "^5.0.0",
+    "vitest": "^2.0.0"
+  }
+}
