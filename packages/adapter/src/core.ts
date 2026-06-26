@@ -4,6 +4,7 @@ import type { AnyActorRef } from 'xstate'
 import type {
   ExtensionToPageMessage,
   PageToExtensionMessage,
+  SerializedEvent,
   SerializedMachine,
   SerializedSnapshot,
 } from '../../extension/src/shared/types.js'
@@ -639,7 +640,9 @@ export function createInspector(
       const message: PageToExtensionMessage = {
         type: 'XSTATE_EVENT',
         sessionId: tag(inspectionEvent.actorRef.sessionId),
-        event: sanitize(inspectionEvent.event),
+        // sanitize() returns unknown; the inspected event keeps its { type, ... }
+        // shape, so it is a SerializedEvent after deep-sanitizing.
+        event: sanitize(inspectionEvent.event) as SerializedEvent,
         snapshotAfter: safeSerializeSnapshot(inspectionEvent.actorRef),
         timestamp: Date.now(),
         globalSeq: nextSeq(),
