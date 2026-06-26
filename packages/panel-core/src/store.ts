@@ -124,6 +124,7 @@ export const inspectorStoreInitializer: StateCreator<InspectorStore> = (set, get
           actors.set(msg.sessionId, {
             sessionId: msg.sessionId,
             parentSessionId: msg.parentSessionId,
+            actorId: msg.actorId,
             machine: msg.machine,
             snapshot: msg.snapshot,
             status: 'active',

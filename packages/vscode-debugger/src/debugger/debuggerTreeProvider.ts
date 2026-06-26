@@ -141,10 +141,14 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
             // stateItem's children). Anything left — spawned actors, or an
             // invoke whose src doesn't match a machine id — stays a direct
             // child so it's never hidden.
-            const invoked = machine ? this.allInvokeSrcs(machine.root) : new Set<string>();
+            const invokedSrcs = machine ? this.allInvokeSrcs(machine.root) : new Set<string>();
+            const invokedIds = machine ? this.allInvokeIds(machine.root) : new Set<string>();
             for (const [sessionId, a] of state.actors) {
-                if (a.parentSessionId === element.sessionId && this.includeActor(a.status)
-                    && !(a.machine && invoked.has(a.machine.id))) {
+                if (a.parentSessionId !== element.sessionId || !this.includeActor(a.status)) { continue; }
+                // Skip actors nested under a state's invoke (by actor id, or by
+                // machine id for older adapters) — they show under that state.
+                const nested = (a.actorId && invokedIds.has(a.actorId)) || (a.machine && invokedSrcs.has(a.machine.id));
+                if (!nested) {
                     items.push(this.actorItem(sessionId));
                 }
             }
@@ -171,15 +175,31 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
         return out;
     }
 
+    /** All invoke `id`s anywhere in a machine's state tree. */
+    private allInvokeIds(root: SerializedStateNode): Set<string> {
+        const out = new Set<string>();
+        const walk = (n: SerializedStateNode) => {
+            for (const i of n.invoke) { out.add(i.id); }
+            for (const c of Object.values(n.states)) { walk(c); }
+        };
+        walk(root);
+        return out;
+    }
+
     /** Live child actors invoked by `node` — matched src→machine.id, the same
      *  contract the diagram's "open invoked machine" uses. */
     private invokedActorsOf(ownerSessionId: string, node: SerializedStateNode): string[] {
         if (node.invoke.length === 0) { return []; }
+        const ids = new Set(node.invoke.map((i) => i.id));
         const srcs = new Set(node.invoke.map((i) => i.src));
         const state = this.controller.getStore().getState();
         const out: string[] = [];
         for (const [sessionId, a] of state.actors) {
-            if (a.parentSessionId === ownerSessionId && a.machine && srcs.has(a.machine.id) && this.includeActor(a.status)) {
+            if (a.parentSessionId !== ownerSessionId || !this.includeActor(a.status)) { continue; }
+            // Match by the actor's id → invoke `id` (works for non-machine
+            // promise/callback actors); fall back to machine.id → invoke `src`
+            // for older adapters that don't send actorId.
+            if ((a.actorId && ids.has(a.actorId)) || (a.machine && srcs.has(a.machine.id))) {
                 out.push(sessionId);
             }
         }

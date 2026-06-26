@@ -150,6 +150,9 @@ export function createInspector(transport: Transport, source: Source) {
         type: 'XSTATE_ACTOR_REGISTERED',
         sessionId: tag(sessionId),
         parentSessionId: tagOptional((actorRef as any)._parent?.sessionId),
+        // actorRef.id is the invoke `id` for invoked actors — lets the debugger
+        // nest non-machine actors (promise/callback) under their state.
+        actorId: (actorRef as any).id,
         machine,
         snapshot: safeSerializeSnapshot(actorRef),
         globalSeq: nextSeq(),

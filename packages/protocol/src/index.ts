@@ -50,6 +50,7 @@ export interface SerializedSnapshot {
 export interface ActorRecord {
   sessionId: string
   parentSessionId?: string
+  actorId?: string                     // actorRef.id — for invoked actors this is the invoke `id`, used to nest non-machine actors under their state
   machine: SerializedMachine | null    // null for non-machine actors (promise, callback)
   snapshot: SerializedSnapshot
   status: 'active' | 'done' | 'error' | 'stopped'
@@ -106,6 +107,7 @@ export type PageToExtensionMessage =
       type: 'XSTATE_ACTOR_REGISTERED'
       sessionId: string
       parentSessionId?: string
+      actorId?: string
       machine: SerializedMachine | null
       snapshot: SerializedSnapshot
       globalSeq: number
