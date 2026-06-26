@@ -47,7 +47,7 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('setContext', 'xstateOutline.viewModeIsFlat', initialViewMode === 'flat'),
         vscode.commands.executeCommand('setContext', 'xstateOutline.showStateConfigs', initialShowStateConfigs),
         vscode.commands.executeCommand('setContext', 'xstateOutline.groupEventHandlers', initialGroupEventHandlers),
-        vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenIsSorted', initialSortChildren === 'sorted'),
+        vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenMode', initialSortChildren),
         vscode.commands.executeCommand('setContext', 'xstateErrors.grouping', initialErrorsGrouping),
         vscode.commands.executeCommand('setContext', 'xstateErrors.filter', initialErrorsFilter),
         vscode.commands.executeCommand('setContext', 'xstateOutline.followCursor', followCursor),
@@ -153,6 +153,11 @@ export async function activate(context: vscode.ExtensionContext) {
     const setSortChildrenSortedCommand = vscode.commands.registerCommand(
         'xstateMachineOutline.setSortChildrenSorted',
         () => treeProvider.setSortChildren('sorted')
+    );
+
+    const setSortChildrenByTypeCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.setSortChildrenByType',
+        () => treeProvider.setSortChildren('type-name')
     );
 
     const setSortChildrenOriginalCommand = vscode.commands.registerCommand(
@@ -1183,6 +1188,7 @@ export async function activate(context: vscode.ExtensionContext) {
         setGroupHandlersOnCommand,
         setGroupHandlersOffCommand,
         setSortChildrenSortedCommand,
+        setSortChildrenByTypeCommand,
         setSortChildrenOriginalCommand,
         toggleFollowCursorCommand,
         toggleFollowCursorActiveCommand,

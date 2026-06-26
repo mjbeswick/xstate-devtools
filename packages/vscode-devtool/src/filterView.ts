@@ -105,11 +105,12 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
   }
   .icon-btn:hover { background: var(--vscode-toolbar-hoverBackground); }
   .icon-btn:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+  .icon-btn:disabled { opacity: 0.4; cursor: default; }
+  .icon-btn:disabled:hover { background: none; }
   .icon-btn.active {
     color: var(--vscode-inputOption-activeForeground, var(--vscode-foreground));
     background: var(--vscode-inputOption-activeBackground);
   }
-  .icon-btn.hidden { display: none; }
 
   /* ── Type filter toggles (faceted, by type present in results) ─ */
   .type-filters {
@@ -178,10 +179,10 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
 <div class="search-bar">
   <span class="codicon codicon-search search-icon"></span>
   <input id="filterInput" type="text" placeholder="Search states, machines, actions…" autocomplete="off" spellcheck="false"/>
-  <button class="icon-btn hidden" id="clearBtn" title="Clear search (Esc)">
+  <button class="icon-btn" id="clearBtn" title="Clear search (Esc)" disabled>
     <span class="codicon codicon-close"></span>
   </button>
-  <button class="icon-btn hidden" id="filterBtn" title="Filter by type" aria-pressed="false">
+  <button class="icon-btn" id="filterBtn" title="Filter by type" aria-pressed="false">
     <span class="codicon codicon-filter" id="filterIcon"></span>
   </button>
 </div>
@@ -212,6 +213,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
     { id: 'exit',       icon: 'debug-step-out',   label: 'Exit',       color: 'var(--vscode-symbolIcon-methodForeground)' },
     { id: 'guard',      icon: 'shield',           label: 'Guard',      color: 'var(--vscode-terminal-ansiCyan)' },
     { id: 'invoke',     icon: 'circuit-board',    label: 'Invoke',     color: 'var(--vscode-charts-yellow)' },
+    { id: 'actor',      icon: 'account',          label: 'Actor',      color: 'var(--vscode-charts-yellow)' },
     { id: 'context',    icon: 'symbol-variable',  label: 'Context',    color: 'var(--vscode-symbolIcon-variableForeground)' },
     { id: 'target',     icon: 'target',           label: 'Target',     color: 'var(--vscode-terminal-ansiBrightMagenta)' },
   ];
@@ -271,8 +273,8 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
   }
 
   function syncFilterBtn(canFilter) {
-    // The funnel is only shown when there's something to filter.
-    filterBtn.classList.toggle('hidden', !canFilter);
+    // The funnel is always visible, but only enabled when there's something to filter.
+    filterBtn.disabled = !canFilter;
     const active = showChips || activeTypes.size > 0;
     filterBtn.classList.toggle('active', active);
     filterBtn.setAttribute('aria-pressed', showChips ? 'true' : 'false');
@@ -288,7 +290,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
   // ── Search input ─────────────────────────────────────────────
   filterInput.addEventListener('input', () => {
     const text = filterInput.value;
-    clearBtn.classList.toggle('hidden', text.length === 0);
+    clearBtn.disabled = text.length === 0;
     clearTimeout(debounceTimer);
     if (!text.trim()) {
       allResults = [];
@@ -303,7 +305,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
 
   function clearSearch() {
     filterInput.value = '';
-    clearBtn.classList.add('hidden');
+    clearBtn.disabled = true;
     allResults = [];
     activeTypes.clear();
     showChips = false;
@@ -431,7 +433,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
       filterInput.focus(); filterInput.select();
     } else if (msg.type === 'clear') {
       filterInput.value = '';
-      clearBtn.classList.add('hidden');
+      clearBtn.disabled = true;
       allResults = [];
       activeTypes.clear();
       showChips = false;

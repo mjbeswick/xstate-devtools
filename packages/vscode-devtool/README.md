@@ -180,7 +180,7 @@ const machine = setup({
 | `xstateOutline.codeLens` | `true` | Show a CodeLens (counts + "View Diagram") above each machine |
 | `xstateOutline.showInternalTransitions` | `true` | Show internal (action-only) transitions inside state boxes in the diagram (toggle live from the diagram toolbar) |
 | `xstateOutline.groupEventHandlers` | `false` | Group a state's event-handler transitions under an `on` node |
-| `xstateOutline.sortChildren` | `original` | Order child nodes by source order (`original`) or alphabetically (`sorted`) |
+| `xstateOutline.sortChildren` | `original` | Order child nodes by source order (`original`), alphabetically (`sorted`), or grouped by type then name (`type-name`) |
 | `xstateOutline.errorsGrouping` | `file` | How the Errors pane groups problems: `file`, `severity`, or `flat` |
 | `xstateOutline.errorsFilter` | `warning` | Minimum severity shown in the Errors pane: `all`, `warning` (warnings & errors), or `error` |
 

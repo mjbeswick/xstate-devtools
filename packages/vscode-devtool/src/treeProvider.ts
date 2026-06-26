@@ -5,7 +5,15 @@ import { findNodeAtPosition, normalizeTargetName, walkNodes } from '@xstate-devt
 
 export type ViewScope = 'file' | 'workspace';
 export type ViewMode = 'grouped' | 'flat';
-export type SortMode = 'original' | 'sorted';
+export type SortMode = 'original' | 'sorted' | 'type-name';
+
+// Type ordering for the 'type-name' sort: groups children by kind, then name.
+// Mirrors the reading order of a statechart (structure first, then implementations).
+const SORT_TYPE_ORDER = [
+    'machine', 'state', 'on', 'transition', 'target',
+    'entry', 'exit', 'action', 'guard', 'invoke', 'actor', 'delay',
+    'context', 'contextProperty', 'setup', 'invalid',
+];
 
 export interface SearchResultData {
     label: string;
@@ -66,7 +74,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         vscode.commands.executeCommand('setContext', 'xstateOutline.viewModeIsFlat', this.viewMode === 'flat');
         vscode.commands.executeCommand('setContext', 'xstateOutline.showStateConfigs', this.showStateConfigs);
         vscode.commands.executeCommand('setContext', 'xstateOutline.groupEventHandlers', this.groupEventHandlers);
-        vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenIsSorted', this.sortChildren === 'sorted');
+        vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenMode', this.sortChildren);
         
         // Trigger initial refresh
         this.refresh();
@@ -423,7 +431,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         this.sortChildren = mode;
         const config = vscode.workspace.getConfiguration('xstateOutline');
         config.update('sortChildren', mode, vscode.ConfigurationTarget.Global);
-        vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenIsSorted', mode === 'sorted');
+        vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenMode', mode);
         this.refresh();
     }
 
@@ -444,6 +452,10 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
 
         if (this.sortChildren === 'sorted') {
             children = [...children].sort((a, b) => a.label.localeCompare(b.label));
+        } else if (this.sortChildren === 'type-name') {
+            children = [...children].sort((a, b) =>
+                (SORT_TYPE_ORDER.indexOf(a.type) - SORT_TYPE_ORDER.indexOf(b.type))
+                || a.label.localeCompare(b.label));
         }
 
         return children;

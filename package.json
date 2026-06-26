@@ -4,7 +4,7 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "dev:chrome": "npm run dev --workspace=packages/chrome-extension",
-    "dev:vscode": "npm run dev --workspace=packages/vscode-devtool",
+    "dev:devtool": "npm run dev --workspace=packages/vscode-devtool",
     "dev:debugger": "npm run dev --workspace=packages/vscode-debugger",
     "dev:example": "npm run dev --workspace=packages/example-remix",
     "test": "npm run test --workspaces --if-present",
