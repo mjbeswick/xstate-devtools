@@ -598,32 +598,32 @@
         {
           "command": "xstateMachineOutline.toggleFollowCursor",
           "when": "view == xstateMachineOutline && !xstateOutline.followCursor",
-          "group": "navigation@2"
+          "group": "0_cursor@1"
         },
         {
           "command": "xstateMachineOutline.toggleFollowCursorActive",
           "when": "view == xstateMachineOutline && xstateOutline.followCursor",
-          "group": "navigation@2"
+          "group": "0_cursor@1"
         },
         {
           "command": "xstateMachineOutline.setNavDiagram",
           "when": "view == xstateMachineOutline && !xstateOutline.navIsDiagram",
-          "group": "navigation@3"
+          "group": "0_nav@1"
         },
         {
           "command": "xstateMachineOutline.setNavCode",
           "when": "view == xstateMachineOutline && xstateOutline.navIsDiagram",
-          "group": "navigation@3"
+          "group": "0_nav@1"
         },
         {
           "command": "xstateMachineOutline.setScopeFile",
           "when": "view == xstateMachineOutline && xstateOutline.scopeIsWorkspace",
-          "group": "navigation@4"
+          "group": "1_scope@1"
         },
         {
           "command": "xstateMachineOutline.setScopeWorkspace",
           "when": "view == xstateMachineOutline && !xstateOutline.scopeIsWorkspace",
-          "group": "navigation@4"
+          "group": "1_scope@1"
         },
         {
           "command": "xstateMachineOutline.setViewGrouped",
