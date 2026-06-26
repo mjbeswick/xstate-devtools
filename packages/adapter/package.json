@@ -1,25 +1,60 @@
 {
   "name": "@xstate-devtools/adapter",
   "version": "0.1.0",
-  "private": true,
+  "description": "Inspect XState v5 actors from a running app (browser, Node/SSR, or React) and stream them to the XState DevTools / VS Code live debugger.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mjbeswick/xstate-devtools.git",
+    "directory": "packages/adapter"
+  },
+  "keywords": ["xstate", "statechart", "devtools", "inspector", "debugger"],
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./server": "./src/server.ts",
-    "./react": "./src/react.tsx"
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./server": {
+      "development": "./src/server.ts",
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js",
+      "require": "./dist/server.cjs"
+    },
+    "./react": {
+      "development": "./src/react.tsx",
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js",
+      "require": "./dist/react.cjs"
+    }
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=18"
   },
   "scripts": {
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "@xstate-devtools/protocol": "*"
+    "build": "tsup",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
+    "@xstate/react": "^4.0.0",
+    "react": "^18.0.0 || ^19.0.0",
     "ws": "^8.0.0",
     "xstate": "^5.0.0"
   },
   "peerDependenciesMeta": {
+    "@xstate/react": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
     "ws": {
       "optional": true
     }
@@ -27,8 +62,10 @@
   "devDependencies": {
     "@types/react": "^18.3.0",
     "@types/ws": "^8.18.1",
+    "@xstate-devtools/protocol": "*",
     "@xstate/react": "^4.1.0",
     "react": "^18.3.0",
+    "tsup": "^8.0.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0",
     "ws": "^8.20.0",

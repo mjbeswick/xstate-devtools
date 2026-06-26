@@ -14,6 +14,9 @@ const options = {
     format: 'cjs',
     target: 'node16',
     external: ['vscode'],
+    // Resolve @xstate-devtools/adapter to its .ts source (its published exports
+    // point at dist; the `development` condition keeps us bundling source).
+    conditions: ['development'],
     sourcemap: watch,
     minify: !watch,
     logLevel: 'info',

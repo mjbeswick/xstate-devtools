@@ -29,4 +29,7 @@ function eagerInspector() {
 export default defineConfig({
   plugins: [remix(), eagerInspector()],
   server: { port: 5273 },
+  // ponytail: no resolve.conditions override — Vite auto-activates the
+  // `development` condition in dev/serve mode, so the adapter resolves to its
+  // .ts source. (Overriding the array would drop Vite's defaults.)
 })
