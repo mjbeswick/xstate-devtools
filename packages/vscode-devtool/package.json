@@ -2,7 +2,7 @@
   "name": "xstate-devtools",
   "displayName": "xState Devtools",
   "description": "XState developer tools: interactive outline, search, and navigation",
-  "version": "1.16.0",
+  "version": "1.17.0",
   "publisher": "MichaelBeswick",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -47,7 +47,9 @@
         "toolReferenceName": "xstateMachines",
         "canBeReferencedInPrompt": true,
         "icon": "$(list-tree)",
-        "tags": ["xstate"],
+        "tags": [
+          "xstate"
+        ],
         "inputSchema": {
           "type": "object",
           "properties": {}
@@ -59,14 +61,24 @@
         "modelDescription": "Return the structure of one XState machine as JSON: its states (with hierarchy, initial/final/parallel flags, entry/exit actions, invoked services) and transitions (source, target, event). Identify the machine by its id.",
         "canBeReferencedInPrompt": true,
         "icon": "$(symbol-structure)",
-        "tags": ["xstate"],
+        "tags": [
+          "xstate"
+        ],
         "inputSchema": {
           "type": "object",
           "properties": {
-            "machine": { "type": "string", "description": "The machine's id (as reported by xstate_list_machines)." },
-            "file": { "type": "string", "description": "Optional source file path to disambiguate machines that share an id." }
+            "machine": {
+              "type": "string",
+              "description": "The machine's id (as reported by xstate_list_machines)."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to disambiguate machines that share an id."
+            }
           },
-          "required": ["machine"]
+          "required": [
+            "machine"
+          ]
         }
       },
       {
@@ -75,14 +87,24 @@
         "modelDescription": "Return a Mermaid `stateDiagram-v2` for one XState machine, identified by its id. Useful for visualising or documenting the machine.",
         "canBeReferencedInPrompt": true,
         "icon": "$(git-merge)",
-        "tags": ["xstate"],
+        "tags": [
+          "xstate"
+        ],
         "inputSchema": {
           "type": "object",
           "properties": {
-            "machine": { "type": "string", "description": "The machine's id." },
-            "file": { "type": "string", "description": "Optional source file path to disambiguate." }
+            "machine": {
+              "type": "string",
+              "description": "The machine's id."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to disambiguate."
+            }
           },
-          "required": ["machine"]
+          "required": [
+            "machine"
+          ]
         }
       },
       {
@@ -91,14 +113,24 @@
         "modelDescription": "Return the shortest event sequence to reach each state of one XState machine (structural — guards assumed takeable), flag unreachable states, and include copy-paste test skeletons. Identify the machine by its id.",
         "canBeReferencedInPrompt": true,
         "icon": "$(beaker)",
-        "tags": ["xstate"],
+        "tags": [
+          "xstate"
+        ],
         "inputSchema": {
           "type": "object",
           "properties": {
-            "machine": { "type": "string", "description": "The machine's id." },
-            "file": { "type": "string", "description": "Optional source file path to disambiguate." }
+            "machine": {
+              "type": "string",
+              "description": "The machine's id."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to disambiguate."
+            }
           },
-          "required": ["machine"]
+          "required": [
+            "machine"
+          ]
         }
       },
       {
@@ -107,11 +139,16 @@
         "modelDescription": "Run XState diagnostics over the workspace (or one file): invalid config properties, unknown transition targets, unreachable states, etc. Returns the problems found with file, line, severity, and message.",
         "canBeReferencedInPrompt": true,
         "icon": "$(checklist)",
-        "tags": ["xstate"],
+        "tags": [
+          "xstate"
+        ],
         "inputSchema": {
           "type": "object",
           "properties": {
-            "file": { "type": "string", "description": "Optional source file path. Omit to validate every XState file in the workspace." }
+            "file": {
+              "type": "string",
+              "description": "Optional source file path. Omit to validate every XState file in the workspace."
+            }
           }
         }
       }
@@ -275,6 +312,11 @@
         "command": "xstateMachineOutline.setSortChildrenSorted",
         "title": "Sort children: A–Z",
         "icon": "$(list-ordered)"
+      },
+      {
+        "command": "xstateMachineOutline.setSortChildrenByType",
+        "title": "Sort children: by type, then name",
+        "icon": "$(type-hierarchy)"
       },
       {
         "command": "xstateMachineOutline.setSortChildrenOriginal",
@@ -498,10 +540,16 @@
           "type": "string",
           "enum": [
             "original",
-            "sorted"
+            "sorted",
+            "type-name"
+          ],
+          "enumDescriptions": [
+            "Source order",
+            "Alphabetical by name",
+            "Grouped by type, then alphabetical by name"
           ],
           "default": "original",
-          "description": "Order of child nodes in the outline: source order (original) or alphabetical (sorted)"
+          "description": "Order of child nodes in the outline: source order, alphabetical (sorted), or grouped by type then name (type-name)"
         },
         "xstateOutline.errorsGrouping": {
           "type": "string",
@@ -540,12 +588,12 @@
         {
           "command": "xstateMachineOutline.toggleGraphSyncExpansion",
           "when": "view == xstateMachineOutline && !xstateOutline.graphReflectsTreeExpansion",
-          "group": "navigation@1"
+          "group": "1_visibility@1"
         },
         {
           "command": "xstateMachineOutline.toggleGraphSyncExpansionActive",
           "when": "view == xstateMachineOutline && xstateOutline.graphReflectsTreeExpansion",
-          "group": "navigation@1"
+          "group": "1_visibility@1"
         },
         {
           "command": "xstateMachineOutline.toggleFollowCursor",
@@ -580,42 +628,47 @@
         {
           "command": "xstateMachineOutline.setViewGrouped",
           "when": "view == xstateMachineOutline && xstateOutline.viewModeIsFlat",
-          "group": "navigation@5"
+          "group": "2_view@1"
         },
         {
           "command": "xstateMachineOutline.setViewFlat",
           "when": "view == xstateMachineOutline && !xstateOutline.viewModeIsFlat",
-          "group": "navigation@5"
+          "group": "2_view@1"
         },
         {
           "command": "xstateMachineOutline.setStateConfigsShow",
           "when": "view == xstateMachineOutline && !xstateOutline.showStateConfigs",
-          "group": "navigation@6"
+          "group": "3_configs@1"
         },
         {
           "command": "xstateMachineOutline.setStateConfigsHide",
           "when": "view == xstateMachineOutline && xstateOutline.showStateConfigs",
-          "group": "navigation@6"
+          "group": "3_configs@1"
         },
         {
           "command": "xstateMachineOutline.setGroupHandlersOn",
           "when": "view == xstateMachineOutline && !xstateOutline.groupEventHandlers",
-          "group": "navigation@7"
+          "group": "4_handlers@1"
         },
         {
           "command": "xstateMachineOutline.setGroupHandlersOff",
           "when": "view == xstateMachineOutline && xstateOutline.groupEventHandlers",
-          "group": "navigation@7"
+          "group": "4_handlers@1"
         },
         {
           "command": "xstateMachineOutline.setSortChildrenSorted",
-          "when": "view == xstateMachineOutline && !xstateOutline.sortChildrenIsSorted",
-          "group": "navigation@8"
+          "when": "view == xstateMachineOutline && xstateOutline.sortChildrenMode == original",
+          "group": "5_sort@1"
+        },
+        {
+          "command": "xstateMachineOutline.setSortChildrenByType",
+          "when": "view == xstateMachineOutline && xstateOutline.sortChildrenMode == sorted",
+          "group": "5_sort@1"
         },
         {
           "command": "xstateMachineOutline.setSortChildrenOriginal",
-          "when": "view == xstateMachineOutline && xstateOutline.sortChildrenIsSorted",
-          "group": "navigation@8"
+          "when": "view == xstateMachineOutline && xstateOutline.sortChildrenMode == type-name",
+          "group": "5_sort@1"
         },
         {
           "command": "xstateMachineOutline.setErrorsFilterAll",
