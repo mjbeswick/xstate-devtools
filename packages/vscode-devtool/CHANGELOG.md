@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.19.0] - 2026-06-26
+
+### Fixed
+- **Invoke-only states no longer show a misleading expand `+`** — a state with no child states but a single invoked actor (e.g. `invoke tickActor`) rendered an expandable `+` even when the actor was a promise/callback with nothing to open; clicking it only produced a "No machine named …" warning. The expand affordance now appears only when the invoke resolves to a real machine in the workspace (nested inline or openable).
+
 ## [1.16.0] - 2026-06-19
 
 ### Added
