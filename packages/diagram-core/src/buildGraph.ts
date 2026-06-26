@@ -11,6 +11,9 @@ export interface GraphNode {
         history?: 'shallow' | 'deep'; ghost?: boolean;
         entryActions?: string[]; exitActions?: string[]; internalTransitions?: string[];
         invokes?: string[]; description?: string;
+        /** True when a single invoke resolves to a real, openable machine but
+         * isn't nested inline (e.g. deduped) — gates the drill-to-open '+'. */
+        invokeOpenable?: boolean;
         nodeType?: string;
     };
 }
@@ -158,6 +161,7 @@ export function buildGraphPayload(
             for (const src of invokes) {
                 const m = opts.resolveInvoke?.(src);
                 if (!m) { continue; }
+                nodeData.invokeOpenable = true;
                 const mKey = machineKey(m);
                 if (nestedMachineKeys.has(mKey)) { continue; }
                 nestedMachineKeys.add(mKey);

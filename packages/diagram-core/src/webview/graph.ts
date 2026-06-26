@@ -14,6 +14,7 @@ interface NodeData {
     history?: 'shallow' | 'deep'; ghost?: boolean;
     entryActions?: string[]; exitActions?: string[]; internalTransitions?: string[];
     invokes?: string[]; description?: string;
+    invokeOpenable?: boolean;
     nodeType?: string;
 }
 interface GraphPayload {
@@ -735,8 +736,10 @@ async function render(opts: { fit?: boolean } = {}): Promise<void> {
                 const invokes = d.invokes ?? [];
                 const collapsedToggle = isCollapsed && hasChildren;
                 // A state that only invokes one machine has no inline children to
-                // expand — its '+' drills into the invoked machine instead.
-                const drillToggle = !hasChildren && invokes.length === 1;
+                // expand — its '+' drills into the invoked machine instead. Only
+                // when that invoke resolves to a real, openable machine; a
+                // promise/callback actor has nothing to drill into.
+                const drillToggle = !hasChildren && invokes.length === 1 && !!d.invokeOpenable;
                 const leftToggle = collapsedToggle || drillToggle;
                 const label = d.label;
                 const titleW = leftToggle ? w - 40 : w - 16;  // leave room for the left toggle
