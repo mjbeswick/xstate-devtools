@@ -12,6 +12,11 @@ It is the runtime companion to the **xState Devtools** extension (static outline
 - **Reveal in Diagram / Follow Actor** — open the statechart for a running actor and watch its live state light up (including while time-travelling). Right-click a compound state for **Create Diagram From Here**.
 - **Send Event…**, **Capture / Restore Snapshot** from the Instances right-click menu.
 
+## Requirements
+
+- VS Code 1.78 or newer.
+- An app running XState **v5** actors instrumented with `@xstate-devtools/adapter` (see Setup). The adapter exposes the WebSocket the debugger connects to.
+
 ## Setup
 
 1. In your app, wire `createServerAdapter()` from `@xstate-devtools/adapter` and pass its `inspect` to your root actor: `createActor(machine, { inspect })`.

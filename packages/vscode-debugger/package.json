@@ -5,6 +5,7 @@
   "version": "0.1.0",
   "publisher": "MichaelBeswick",
   "license": "MIT",
+  "icon": "images/icon.png",
   "homepage": "https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-debugger#readme",
   "repository": {
     "type": "git",

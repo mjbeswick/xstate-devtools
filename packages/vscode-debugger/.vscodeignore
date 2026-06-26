@@ -12,3 +12,4 @@ esbuild.js
 node_modules/**
 **/.DS_Store
 .claude/**
+images/icon-source.svg
