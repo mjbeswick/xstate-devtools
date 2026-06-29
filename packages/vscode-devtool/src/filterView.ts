@@ -241,16 +241,35 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
   // picked before (or without) typing. The host replies with 'availableTypes'.
   function requestTypes() { vscode.postMessage({ type: 'requestTypes' }); }
 
-  // Run the current query + type filter through the host. A type filter with an
-  // empty query lists every node of those types; empty query + no filter clears.
+  // Run the current query through the host. With a query we fetch every label
+  // match across all types (types: []) so the chips can facet over the results
+  // and the type filter is applied client-side. With an empty box a type filter
+  // lists every node of those types (server-side); empty + no filter clears.
   function runSearch() {
     const text = filterInput.value;
-    if (!text.trim() && activeTypes.size === 0) {
+    const querying = !!text.trim();
+    if (!querying && activeTypes.size === 0) {
       allResults = [];
-      renderResults([]);
+      renderResults();
       return;
     }
-    vscode.postMessage({ type: 'search', text, types: Array.from(activeTypes) });
+    vscode.postMessage({ type: 'search', text, types: querying ? [] : Array.from(activeTypes) });
+  }
+
+  // Counts shown on the chips: facet over the matching results while querying,
+  // scope-wide totals when just browsing (so a filter can be picked first).
+  function chipCounts() {
+    if (!filterInput.value.trim()) { return availableCounts; }
+    const counts = {};
+    for (const r of allResults) { counts[r.type] = (counts[r.type] || 0) + 1; }
+    return counts;
+  }
+
+  // The displayed results: host already type-filtered when browsing; filter
+  // client-side over the full label-match set while querying.
+  function displayResults() {
+    if (!filterInput.value.trim() || activeTypes.size === 0) { return allResults; }
+    return allResults.filter(r => activeTypes.has(r.type));
   }
 
   function codicon(name) {
@@ -259,23 +278,28 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
     return el;
   }
 
-  // ── Type filter toggles (scope-wide: one per type present in the project,
-  //    so a filter can be applied before/without typing) ───────────────
+  // ── Type filter toggles. While browsing these are scope-wide (one per type
+  //    in the project, so a filter can be applied before typing); while querying
+  //    they facet over the matching results. ─────────────────────────────
   function renderTypeFilters() {
     typeFilters.innerHTML = '';
 
-    const present = TYPES.filter(t => availableCounts[t.id]);
-    const canFilter = present.length > 0;
+    const counts = chipCounts();
+    // Show a chip per type with a count, plus any active type (even at 0, so a
+    // filter that matches nothing while querying stays deselectable).
+    const present = TYPES.filter(t => counts[t.id] || activeTypes.has(t.id));
+    const canFilter = TYPES.some(t => availableCounts[t.id]);
     syncFilterBtn(canFilter);
 
     if (!canFilter || !showChips) { typeFilters.style.display = 'none'; return; }
     typeFilters.style.display = 'flex';
 
     for (const t of present) {
+      const count = counts[t.id] || 0;
       const on = activeTypes.has(t.id);
       const btn = document.createElement('button');
       btn.className = 'type-toggle' + (on ? ' active' : '');
-      btn.title = (on ? 'Stop filtering by ' : 'Show only ') + t.label + ' (' + availableCounts[t.id] + ')';
+      btn.title = (on ? 'Stop filtering by ' : 'Show only ') + t.label + ' (' + count + ')';
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
 
       const ic = codicon(t.icon);
@@ -283,14 +307,16 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
       if (t.color) { ic.style.color = t.color; }
       const cnt = document.createElement('span');
       cnt.className = 'type-toggle-count';
-      cnt.textContent = availableCounts[t.id];
+      cnt.textContent = count;
 
       btn.appendChild(ic);
       btn.appendChild(cnt);
       btn.addEventListener('click', () => {
         if (activeTypes.has(t.id)) { activeTypes.delete(t.id); } else { activeTypes.add(t.id); }
-        renderTypeFilters();
-        runSearch();
+        // While querying, allResults already holds every type — just re-filter
+        // locally. While browsing, the server filter changes, so re-query.
+        if (filterInput.value.trim()) { renderResults(); }
+        else { renderTypeFilters(); runSearch(); }
       });
       typeFilters.appendChild(btn);
     }
@@ -328,8 +354,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
     allResults = [];
     activeTypes.clear();
     showChips = false;
-    renderResults([]);
-    renderTypeFilters();
+    renderResults();
     filterInput.focus();
   }
 
@@ -361,8 +386,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
   }
 
   // ── Render ───────────────────────────────────────────────────
-  // The host already applies the type filter, so results are the visible set.
-  function visibleResults() { return allResults; }
+  function visibleResults() { return displayResults(); }
 
   function highlightLabel(label) {
     const query = filterInput.value.trim();
@@ -379,8 +403,11 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
     return span;
   }
 
-  function renderResults(items) {
-    const visible = items || [];
+  function renderResults() {
+    // Chip counts depend on the current results (when querying), so refresh them
+    // whenever results change.
+    renderTypeFilters();
+    const visible = displayResults();
     focusedIndex = -1;
     resultsMeta.textContent = '';
     resultsList.innerHTML = '';
@@ -438,7 +465,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
     const msg = event.data;
     if (msg.type === 'results') {
       allResults = msg.items || [];
-      renderResults(allResults);
+      renderResults();
     } else if (msg.type === 'availableTypes') {
       availableCounts = {};
       for (const c of (msg.counts || [])) { availableCounts[c.type] = c.count; }
@@ -453,8 +480,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
       allResults = [];
       activeTypes.clear();
       showChips = false;
-      renderResults([]);
-      renderTypeFilters();
+      renderResults();
     }
   });
 
