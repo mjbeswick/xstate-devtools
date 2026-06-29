@@ -520,29 +520,35 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         return children;
     }
 
-    /** Replace the run of `transition` children with a single `on` node containing them. */
+    /** Replace the run of event-triggered `transition` children with a single
+     *  `on` node. Eventless (`always`) and delayed (`after …`) transitions are
+     *  NOT `on` handlers, so they stay as siblings. */
+    private isOnEventTransition(c: MachineNode): boolean {
+        return c.type === 'transition' && c.label !== 'always' && !c.label.startsWith('after ');
+    }
+
     private groupTransitions(children: MachineNode[]): MachineNode[] {
-        const transitions = children.filter(c => c.type === 'transition');
-        if (transitions.length === 0) { return children; }
+        const events = children.filter(c => this.isOnEventTransition(c));
+        if (events.length === 0) { return children; }
 
         const onNode: MachineNode = {
             type: 'on',
             label: 'on',
             range: new vscode.Range(
-                transitions[0].range.start,
-                transitions[transitions.length - 1].range.end
+                events[0].range.start,
+                events[events.length - 1].range.end
             ),
-            uri: transitions[0].uri,
-            children: transitions,
+            uri: events[0].uri,
+            children: events,
         };
 
         const result: MachineNode[] = [];
         let inserted = false;
         for (const c of children) {
-            if (c.type === 'transition') {
+            if (this.isOnEventTransition(c)) {
                 if (!inserted) { result.push(onNode); inserted = true; }
             } else {
-                result.push(c);
+                result.push(c);   // always / after / non-transitions stay put
             }
         }
         return result;
