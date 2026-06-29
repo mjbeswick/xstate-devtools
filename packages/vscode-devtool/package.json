@@ -299,13 +299,13 @@
         "icon": "$(list-tree)"
       },
       {
-        "command": "xstateMachineOutline.setGroupHandlersOn",
-        "title": "Handlers: group under on",
+        "command": "xstateMachineOutline.setChildGroupingByType",
+        "title": "Group children: by type",
         "icon": "$(group-by-ref-type)"
       },
       {
-        "command": "xstateMachineOutline.setGroupHandlersOff",
-        "title": "Handlers: flat",
+        "command": "xstateMachineOutline.setChildGroupingFlat",
+        "title": "Group children: flat",
         "icon": "$(ungroup-by-ref-type)"
       },
       {
@@ -563,10 +563,18 @@
           "default": true,
           "description": "Show internal (action-only) transitions inside state boxes in the diagram (toggle live from the diagram toolbar)"
         },
-        "xstateOutline.groupEventHandlers": {
-          "type": "boolean",
-          "default": false,
-          "description": "Group a state's event-handler transitions under an `on` node in the outline"
+        "xstateOutline.childGrouping": {
+          "type": "string",
+          "enum": [
+            "flat",
+            "by-type"
+          ],
+          "enumDescriptions": [
+            "Show a node's children as a flat list",
+            "Nest children under collapsible category nodes (States, Events, Actions, Guards, Invoked, Context…)"
+          ],
+          "default": "flat",
+          "description": "How a state/machine's children are arranged in the outline"
         },
         "xstateOutline.sortChildren": {
           "type": "string",
@@ -738,13 +746,13 @@
           "group": "3_configs@1"
         },
         {
-          "command": "xstateMachineOutline.setGroupHandlersOn",
-          "when": "view == xstateMachineOutline && !xstateOutline.groupEventHandlers",
+          "command": "xstateMachineOutline.setChildGroupingByType",
+          "when": "view == xstateMachineOutline && xstateOutline.childGroupingMode == flat",
           "group": "4_handlers@1"
         },
         {
-          "command": "xstateMachineOutline.setGroupHandlersOff",
-          "when": "view == xstateMachineOutline && xstateOutline.groupEventHandlers",
+          "command": "xstateMachineOutline.setChildGroupingFlat",
+          "when": "view == xstateMachineOutline && xstateOutline.childGroupingMode == by-type",
           "group": "4_handlers@1"
         },
         {

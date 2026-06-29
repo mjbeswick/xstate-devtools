@@ -7,6 +7,28 @@ import { fuzzyMatch } from '@xstate-devtools/diagram-core';
 export type ViewScope = 'file' | 'workspace';
 export type ViewMode = 'grouped' | 'flat';
 export type SortMode = 'original' | 'sorted' | 'type-name';
+export type ChildGrouping = 'flat' | 'by-type';
+
+// By-type grouping: each category becomes a collapsible node holding its members.
+// Order here is the order categories appear under a state/machine.
+interface ChildCategory {
+    key: string;
+    label: string;
+    icon: string;
+    color: string;            // ThemeColor id
+    test: (n: MachineNode) => boolean;
+}
+const CHILD_CATEGORIES: ChildCategory[] = [
+    { key: 'states',  label: 'States',  icon: 'circle-outline',  color: 'symbolIcon.fieldForeground', test: n => n.type === 'state' },
+    { key: 'events',  label: 'Events',  icon: 'inbox',           color: 'charts.orange',              test: n => n.type === 'transition' && n.label !== 'always' && !n.label.startsWith('after ') },
+    { key: 'entry',   label: 'Entry',   icon: 'debug-step-into', color: 'symbolIcon.methodForeground', test: n => n.type === 'entry' },
+    { key: 'exit',    label: 'Exit',    icon: 'debug-step-out',  color: 'symbolIcon.methodForeground', test: n => n.type === 'exit' },
+    { key: 'actions', label: 'Actions', icon: 'rocket',          color: 'symbolIcon.methodForeground', test: n => n.type === 'action' },
+    { key: 'guards',  label: 'Guards',  icon: 'shield',          color: 'terminal.ansiCyan',          test: n => n.type === 'guard' },
+    { key: 'invoked', label: 'Invoked', icon: 'circuit-board',   color: 'charts.yellow',              test: n => n.type === 'invoke' || n.type === 'actor' },
+    { key: 'context', label: 'Context', icon: 'symbol-variable', color: 'symbolIcon.variableForeground', test: n => n.type === 'context' || n.type === 'contextProperty' },
+];
+const CATEGORY_BY_LABEL = new Map(CHILD_CATEGORIES.map(c => [c.label, c]));
 
 // Type ordering for the 'type-name' sort: groups children by kind, then name.
 // Mirrors the reading order of a statechart (structure first, then implementations).
@@ -52,7 +74,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
     // config, so the tree can reveal it without mutating the user's persisted
     // preference. Never persisted; resets on reload. See revealHiddenStateConfigs.
     private tempShowStateConfigs: boolean = false;
-    private groupEventHandlers: boolean = false; // Group transitions under an `on` node
+    private childGrouping: ChildGrouping = 'flat'; // Group children under type-category nodes vs flat
     private sortChildren: SortMode = 'original'; // Sort child nodes vs. keep source order
     private workspaceScanner: WorkspaceScanner;
     private outputChannel: vscode.OutputChannel;
@@ -71,14 +93,20 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         this.currentScope = config.get('defaultScope', 'workspace');
         this.viewMode = config.get('defaultViewMode', 'flat');
         this.showStateConfigs = config.get('showStateConfigs', false);
-        this.groupEventHandlers = config.get('groupEventHandlers', false);
+        this.childGrouping = config.get<ChildGrouping>('childGrouping', 'flat');
+        // Migration: users who had the old on-grouping on (and haven't set the
+        // new mode) get the equivalent by-type grouping.
+        if (config.inspect('childGrouping')?.globalValue === undefined
+            && config.inspect('groupEventHandlers')?.globalValue === true) {
+            this.childGrouping = 'by-type';
+        }
         this.sortChildren = config.get<SortMode>('sortChildren', 'original');
 
         // Set initial context for menu checkmarks
         vscode.commands.executeCommand('setContext', 'xstateOutline.scopeIsWorkspace', this.currentScope === 'workspace');
         vscode.commands.executeCommand('setContext', 'xstateOutline.viewModeIsFlat', this.viewMode === 'flat');
         vscode.commands.executeCommand('setContext', 'xstateOutline.showStateConfigs', this.showStateConfigs);
-        vscode.commands.executeCommand('setContext', 'xstateOutline.groupEventHandlers', this.groupEventHandlers);
+        vscode.commands.executeCommand('setContext', 'xstateOutline.childGroupingMode', this.childGrouping);
         vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenMode', this.sortChildren);
         
         // Trigger initial refresh
@@ -478,11 +506,11 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         this.refresh();
     }
 
-    setGroupEventHandlers(group: boolean): void {
-        this.groupEventHandlers = group;
+    setChildGrouping(mode: ChildGrouping): void {
+        this.childGrouping = mode;
         const config = vscode.workspace.getConfiguration('xstateOutline');
-        config.update('groupEventHandlers', group, vscode.ConfigurationTarget.Global);
-        vscode.commands.executeCommand('setContext', 'xstateOutline.groupEventHandlers', group);
+        config.update('childGrouping', mode, vscode.ConfigurationTarget.Global);
+        vscode.commands.executeCommand('setContext', 'xstateOutline.childGroupingMode', mode);
         this.refresh();
     }
 
@@ -495,18 +523,18 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
     }
 
     /**
-     * Transform a node's raw children for display: optionally group event-handler
-     * transitions under a synthetic `on` node, then optionally sort alphabetically.
-     * Pure with respect to the parser's `MachineNode` tree — the underlying data
-     * (used by search, graph, and target resolution) is left untouched.
+     * Transform a node's raw children for display: in 'by-type' mode, nest a
+     * state/machine's children under collapsible category nodes; otherwise sort
+     * the flat list. Pure with respect to the parser's `MachineNode` tree — the
+     * underlying data (used by search, graph, target resolution) is untouched.
      */
     private displayChildren(node: MachineNode): MachineNode[] {
         let children = node.children ?? [];
 
-        // Only group the `on: {}` handlers of states/machines — not the onDone/onError
-        // transitions that live under an invoke, nor the transitions inside an `on` node.
-        if (this.groupEventHandlers && (node.type === 'state' || node.type === 'machine')) {
-            children = this.groupTransitions(children);
+        if (this.childGrouping === 'by-type' && (node.type === 'state' || node.type === 'machine')) {
+            // Group nodes appear in fixed category order; their members are
+            // sorted when the group is expanded (this same path, flat branch).
+            return this.groupByType(children);
         }
 
         if (this.sortChildren === 'sorted') {
@@ -520,38 +548,29 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         return children;
     }
 
-    /** Replace the run of event-triggered `transition` children with a single
-     *  `on` node. Eventless (`always`) and delayed (`after …`) transitions are
-     *  NOT `on` handlers, so they stay as siblings. */
-    private isOnEventTransition(c: MachineNode): boolean {
-        return c.type === 'transition' && c.label !== 'always' && !c.label.startsWith('after ');
-    }
+    /** Nest children under one synthetic `group` node per non-empty category (in
+     *  CHILD_CATEGORIES order), with anything uncategorised (always/after, delay,
+     *  target, setup, invalid) left as flat siblings after the groups. */
+    private groupByType(children: MachineNode[]): MachineNode[] {
+        const groups: MachineNode[] = [];
+        const leftovers: MachineNode[] = [];
+        const claimed = new Set<MachineNode>();
 
-    private groupTransitions(children: MachineNode[]): MachineNode[] {
-        const events = children.filter(c => this.isOnEventTransition(c));
-        if (events.length === 0) { return children; }
-
-        const onNode: MachineNode = {
-            type: 'on',
-            label: 'on',
-            range: new vscode.Range(
-                events[0].range.start,
-                events[events.length - 1].range.end
-            ),
-            uri: events[0].uri,
-            children: events,
-        };
-
-        const result: MachineNode[] = [];
-        let inserted = false;
-        for (const c of children) {
-            if (this.isOnEventTransition(c)) {
-                if (!inserted) { result.push(onNode); inserted = true; }
-            } else {
-                result.push(c);   // always / after / non-transitions stay put
-            }
+        for (const cat of CHILD_CATEGORIES) {
+            const members = children.filter(c => cat.test(c));
+            if (members.length === 0) { continue; }
+            members.forEach(m => claimed.add(m));
+            groups.push({
+                type: 'group',
+                label: cat.label,
+                range: new vscode.Range(members[0].range.start, members[members.length - 1].range.end),
+                uri: members[0].uri,
+                children: members,
+            });
         }
-        return result;
+        for (const c of children) { if (!claimed.has(c)) { leftovers.push(c); } }
+
+        return [...groups, ...leftovers];
     }
 
     toggleViewMode(): void {
@@ -1013,6 +1032,7 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
         // so initial/final/parallel/history stay legible without relying on icon
         // color (which fails colorblind users and at-a-glance scanning).
         const node = this.node;
+        if (node.type === 'group') { return String(node.children?.length ?? 0); }
         if (node.isTypeMarker) { return undefined; }
         const markers: string[] = [];
         if (node.historyType) { markers.push(`${node.historyType} history`); }
@@ -1036,6 +1056,9 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
         if (node.type === 'on') {
             const count = node.children?.length ?? 0;
             return `Event handlers (${count} ${count === 1 ? 'event' : 'events'})`;
+        }
+        if (node.type === 'group') {
+            return `${node.label} (${node.children?.length ?? 0})`;
         }
         if (node.description) {
             const md = new vscode.MarkdownString();
@@ -1116,6 +1139,12 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
                 iconName = 'inbox';
                 iconColor = new vscode.ThemeColor('charts.orange');
                 break;
+            case 'group': {
+                const cat = CATEGORY_BY_LABEL.get(this.node.label);
+                iconName = cat?.icon ?? 'symbol-namespace';
+                iconColor = cat ? new vscode.ThemeColor(cat.color) : undefined;
+                break;
+            }
             case 'transition':
                 if (this.node.label === 'onDone' || this.node.label === 'onError') {
                     iconName = 'circle-filled';

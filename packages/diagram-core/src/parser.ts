@@ -9,7 +9,9 @@ import {
 } from './xstateSchema';
 
 export interface MachineNode {
-    type: 'machine' | 'state' | 'transition' | 'target' | 'action' | 'guard' | 'invoke' | 'entry' | 'exit' | 'context' | 'contextProperty' | 'actor' | 'delay' | 'setup' | 'on' | 'invalid';
+    // 'on' and 'group' are synthetic, created only by the outline tree
+    // (event-handler / by-type grouping) — never emitted by the parser.
+    type: 'machine' | 'state' | 'transition' | 'target' | 'action' | 'guard' | 'invoke' | 'entry' | 'exit' | 'context' | 'contextProperty' | 'actor' | 'delay' | 'setup' | 'on' | 'group' | 'invalid';
     label: string;
     range: vscode.Range;
     uri: vscode.Uri;

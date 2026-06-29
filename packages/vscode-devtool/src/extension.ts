@@ -30,7 +30,6 @@ export async function activate(context: vscode.ExtensionContext) {
     const initialScope = config.get<string>('defaultScope', 'workspace');
     const initialViewMode = config.get<string>('defaultViewMode', 'flat');
     const initialShowStateConfigs = config.get<boolean>('showStateConfigs', false);
-    const initialGroupEventHandlers = config.get<boolean>('groupEventHandlers', false);
     const initialSortChildren = config.get<string>('sortChildren', 'original');
     const initialErrorsGrouping = config.get<ErrorsGrouping>('errorsGrouping', 'file');
     const initialErrorsFilter = config.get<ErrorsFilter>('errorsFilter', 'warning');
@@ -46,7 +45,6 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('setContext', 'xstateOutline.scopeIsWorkspace', initialScope === 'workspace'),
         vscode.commands.executeCommand('setContext', 'xstateOutline.viewModeIsFlat', initialViewMode === 'flat'),
         vscode.commands.executeCommand('setContext', 'xstateOutline.showStateConfigs', initialShowStateConfigs),
-        vscode.commands.executeCommand('setContext', 'xstateOutline.groupEventHandlers', initialGroupEventHandlers),
         vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenMode', initialSortChildren),
         vscode.commands.executeCommand('setContext', 'xstateOutline.searchSortMode', config.get<string>('searchSort', 'relevance')),
         vscode.commands.executeCommand('setContext', 'xstateOutline.searchFuzzy', config.get<boolean>('searchFuzzy', false)),
@@ -148,14 +146,14 @@ export async function activate(context: vscode.ExtensionContext) {
         () => treeProvider.setStateConfigs(false)
     );
 
-    const setGroupHandlersOnCommand = vscode.commands.registerCommand(
-        'xstateMachineOutline.setGroupHandlersOn',
-        () => treeProvider.setGroupEventHandlers(true)
+    const setChildGroupingFlatCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.setChildGroupingFlat',
+        () => treeProvider.setChildGrouping('flat')
     );
 
-    const setGroupHandlersOffCommand = vscode.commands.registerCommand(
-        'xstateMachineOutline.setGroupHandlersOff',
-        () => treeProvider.setGroupEventHandlers(false)
+    const setChildGroupingByTypeCommand = vscode.commands.registerCommand(
+        'xstateMachineOutline.setChildGroupingByType',
+        () => treeProvider.setChildGrouping('by-type')
     );
 
     const setSortChildrenSortedCommand = vscode.commands.registerCommand(
@@ -1221,8 +1219,8 @@ export async function activate(context: vscode.ExtensionContext) {
         setStateConfigsShowActiveCommand,
         setStateConfigsHideCommand,
         setStateConfigsHideActiveCommand,
-        setGroupHandlersOnCommand,
-        setGroupHandlersOffCommand,
+        setChildGroupingFlatCommand,
+        setChildGroupingByTypeCommand,
         setSortChildrenSortedCommand,
         setSortChildrenByTypeCommand,
         setSortChildrenOriginalCommand,
