@@ -104,6 +104,9 @@ export async function activate(context: vscode.ExtensionContext) {
             const item = treeProvider.findItemAtPosition(pos);
             if (item) {
                 treeView.reveal(item, { select: true, focus: false, expand: true });
+                // reveal({select}) does not fire onDidChangeSelection, so update
+                // the Transitions panel directly (as a real tree click would).
+                navigatorProvider.setFocus(item.node);
             }
         }, 400);
     });
