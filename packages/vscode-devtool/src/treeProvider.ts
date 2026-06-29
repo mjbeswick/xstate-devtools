@@ -178,17 +178,36 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
      * lists every node of those types, so a filter can be applied before — or
      * without — typing. An empty query with no type filter returns nothing.
      */
+    /** The machines to search/count, mirroring exactly what the tree renders:
+     *  the active document (live-parsed) in file scope, the scanner cache in
+     *  workspace scope, with state configs gated on `effectiveShowStateConfigs`
+     *  (so a follow-cursor reveal is searchable too). Keeping search and the
+     *  tree on one source stops them diverging — a node shown is a node found. */
+    private scopedMachines(): { machines: MachineNode[]; breadcrumb: string }[] {
+        const keep = (ms: MachineNode[]) =>
+            this.effectiveShowStateConfigs ? ms : ms.filter(m => !m.isStateConfig);
+        if (this.currentScope === 'file') {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) { return []; }
+            return [{
+                machines: keep(XStateMachineParser.parseMachines(editor.document)),
+                breadcrumb: vscode.workspace.asRelativePath(editor.document.uri),
+            }];
+        }
+        return this.workspaceScanner.getCached().map(fm => ({
+            machines: keep(fm.machines),
+            breadcrumb: fm.relativePath,
+        }));
+    }
+
     search(text: string, types: readonly string[] = []): SearchResultData[] {
         const filter = text.trim().toLowerCase();
         const typeSet = new Set(types);
         if (!filter && typeSet.size === 0) { return []; }
         const results: SearchResultData[] = [];
-        for (const fm of this.workspaceScanner.getCached()) {
-            const machines = this.showStateConfigs
-                ? fm.machines
-                : fm.machines.filter(m => !m.isStateConfig);
+        for (const { machines, breadcrumb } of this.scopedMachines()) {
             for (const machine of machines) {
-                this.collectSearchMatches(machine, filter, typeSet, fm.relativePath, results);
+                this.collectSearchMatches(machine, filter, typeSet, breadcrumb, results);
             }
         }
         return results;
@@ -202,10 +221,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
             counts.set(node.type, (counts.get(node.type) ?? 0) + 1);
             node.children?.forEach(tally);
         };
-        for (const fm of this.workspaceScanner.getCached()) {
-            const machines = this.showStateConfigs
-                ? fm.machines
-                : fm.machines.filter(m => !m.isStateConfig);
+        for (const { machines } of this.scopedMachines()) {
             machines.forEach(tally);
         }
         return [...counts].map(([type, count]) => ({ type, count }));
