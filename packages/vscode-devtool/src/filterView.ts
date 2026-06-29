@@ -279,12 +279,15 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
   function runSearch() {
     const text = filterInput.value;
     const querying = !!text.trim();
-    if (!querying && activeTypes.size === 0) {
+    // A collapsed filter is ignored — only apply the selected types while the
+    // chip row is visible.
+    const types = showChips ? Array.from(activeTypes) : [];
+    if (!querying && types.length === 0) {
       allResults = [];
       renderResults();
       return;
     }
-    vscode.postMessage({ type: 'search', text, types: querying ? [] : Array.from(activeTypes), fuzzy });
+    vscode.postMessage({ type: 'search', text, types: querying ? [] : types, fuzzy });
   }
 
   // Counts shown on the chips: facet over the matching results while querying,
@@ -299,7 +302,8 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
   // The displayed results: host already type-filtered when browsing; filter
   // client-side over the full label-match set while querying.
   function displayResults() {
-    if (!filterInput.value.trim() || activeTypes.size === 0) { return allResults; }
+    // Hidden filter (chips collapsed) is ignored.
+    if (!filterInput.value.trim() || !showChips || activeTypes.size === 0) { return allResults; }
     return allResults.filter(r => activeTypes.has(r.type));
   }
 
@@ -356,18 +360,20 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
   function syncFilterBtn(canFilter) {
     // The funnel is always visible, but only enabled when the scope has types.
     filterBtn.disabled = !canFilter;
-    const active = showChips || activeTypes.size > 0;
-    filterBtn.classList.toggle('active', active);
+    // Active only while open — a collapsed filter is ignored, so it shouldn't
+    // look like it's still filtering.
+    filterBtn.classList.toggle('active', showChips);
     filterBtn.setAttribute('aria-pressed', showChips ? 'true' : 'false');
-    filterIcon.className = 'codicon codicon-' + (active ? 'filter-filled' : 'filter');
+    filterIcon.className = 'codicon codicon-' + (showChips ? 'filter-filled' : 'filter');
   }
 
   // The funnel reveals/hides the type-filter chips. Refresh the scope's type
-  // list each time it's opened so counts reflect the current files.
+  // list when opening; re-evaluate results since hiding ignores the filter.
   filterBtn.addEventListener('click', () => {
     showChips = !showChips;
     if (showChips) { requestTypes(); }
     renderTypeFilters();
+    if (filterInput.value.trim()) { renderResults(); } else { runSearch(); }
   });
 
   // ── Search input ─────────────────────────────────────────────
