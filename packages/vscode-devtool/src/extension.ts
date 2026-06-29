@@ -48,6 +48,7 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('setContext', 'xstateOutline.showStateConfigs', initialShowStateConfigs),
         vscode.commands.executeCommand('setContext', 'xstateOutline.groupEventHandlers', initialGroupEventHandlers),
         vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenMode', initialSortChildren),
+        vscode.commands.executeCommand('setContext', 'xstateOutline.searchSortMode', config.get<string>('searchSort', 'relevance')),
         vscode.commands.executeCommand('setContext', 'xstateErrors.grouping', initialErrorsGrouping),
         vscode.commands.executeCommand('setContext', 'xstateErrors.filter', initialErrorsFilter),
         vscode.commands.executeCommand('setContext', 'xstateOutline.followCursor', followCursor),
@@ -167,6 +168,22 @@ export async function activate(context: vscode.ExtensionContext) {
         'xstateMachineOutline.setSortChildrenOriginal',
         () => treeProvider.setSortChildren('original')
     );
+
+    // Search results sort (the search view's ⋯ menu). Each mode has a plain and
+    // a checkmarked "Active" command, toggled by the searchSortMode context key.
+    const setSearchSort = (mode: 'relevance' | 'name' | 'type') => {
+        vscode.workspace.getConfiguration('xstateOutline')
+            .update('searchSort', mode, vscode.ConfigurationTarget.Global);
+        vscode.commands.executeCommand('setContext', 'xstateOutline.searchSortMode', mode);
+        filterViewProvider.setSort(mode);
+    };
+    const searchSortCommands = (['relevance', 'name', 'type'] as const).flatMap(mode => {
+        const cap = mode[0].toUpperCase() + mode.slice(1);
+        return [
+            vscode.commands.registerCommand(`xstateMachineOutlineSearch.setSort${cap}`, () => setSearchSort(mode)),
+            vscode.commands.registerCommand(`xstateMachineOutlineSearch.setSort${cap}Active`, () => setSearchSort(mode)),
+        ];
+    });
 
     const toggleFollowCursorCommand = vscode.commands.registerCommand(
         'xstateMachineOutline.toggleFollowCursor',
@@ -1193,6 +1210,7 @@ export async function activate(context: vscode.ExtensionContext) {
         setSortChildrenSortedCommand,
         setSortChildrenByTypeCommand,
         setSortChildrenOriginalCommand,
+        ...searchSortCommands,
         toggleFollowCursorCommand,
         toggleFollowCursorActiveCommand,
         setNavCodeCommand,

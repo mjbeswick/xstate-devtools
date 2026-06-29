@@ -37,7 +37,8 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
             vscode.Uri.joinPath(this._extensionUri, 'resources', 'codicons', 'codicon.css')
         );
 
-        webviewView.webview.html = this.getHtml(codiconsUri.toString());
+        const sort = vscode.workspace.getConfiguration('xstateOutline').get<string>('searchSort', 'relevance');
+        webviewView.webview.html = this.getHtml(codiconsUri.toString(), sort);
 
         webviewView.webview.onDidReceiveMessage(msg => {
             if (msg.type === 'search') {
@@ -62,11 +63,15 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
         this._view?.webview.postMessage({ type: 'results', items });
     }
 
+    setSort(mode: string): void {
+        this._view?.webview.postMessage({ type: 'sort', mode });
+    }
+
     showTypes(counts: { type: string; count: number }[]): void {
         this._view?.webview.postMessage({ type: 'availableTypes', counts });
     }
 
-    private getHtml(codiconsUri: string): string {
+    private getHtml(codiconsUri: string, initialSort: string): string {
         return /* html */`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -236,6 +241,25 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
   let focusedIndex = -1;
   let showChips = false;
   let debounceTimer;
+  let sortMode = ${JSON.stringify(initialSort)};   // 'relevance' | 'name' | 'type'
+
+  // TYPES is already in statechart reading order, so its index is the 'type' sort key.
+  const TYPE_ORDER = {};
+  TYPES.forEach((t, i) => { TYPE_ORDER[t.id] = i; });
+
+  // Order results for display. 'relevance' keeps the host's source order.
+  function sortResults(items) {
+    if (sortMode === 'name') {
+      return [...items].sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+    }
+    if (sortMode === 'type') {
+      return [...items].sort((a, b) => {
+        const ta = TYPE_ORDER[a.type] ?? 99, tb = TYPE_ORDER[b.type] ?? 99;
+        return ta - tb || a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
+      });
+    }
+    return items;
+  }
 
   // Ask the host for the types present in scope so the filter chips can be
   // picked before (or without) typing. The host replies with 'availableTypes'.
@@ -386,7 +410,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
   }
 
   // ── Render ───────────────────────────────────────────────────
-  function visibleResults() { return displayResults(); }
+  function visibleResults() { return sortResults(displayResults()); }
 
   function highlightLabel(label) {
     const query = filterInput.value.trim();
@@ -407,7 +431,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
     // Chip counts depend on the current results (when querying), so refresh them
     // whenever results change.
     renderTypeFilters();
-    const visible = displayResults();
+    const visible = sortResults(displayResults());
     focusedIndex = -1;
     resultsMeta.textContent = '';
     resultsList.innerHTML = '';
@@ -472,6 +496,9 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
       // A previously-active filter for a type no longer in scope is dropped.
       for (const t of Array.from(activeTypes)) { if (!availableCounts[t]) { activeTypes.delete(t); } }
       renderTypeFilters();
+    } else if (msg.type === 'sort') {
+      sortMode = msg.mode;
+      renderResults();
     } else if (msg.type === 'focus') {
       filterInput.focus(); filterInput.select();
     } else if (msg.type === 'clear') {

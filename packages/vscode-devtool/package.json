@@ -324,6 +324,30 @@
         "icon": "$(list-unordered)"
       },
       {
+        "command": "xstateMachineOutlineSearch.setSortRelevance",
+        "title": "Sort results by: Relevance"
+      },
+      {
+        "command": "xstateMachineOutlineSearch.setSortRelevanceActive",
+        "title": "Sort results by: $(check) Relevance"
+      },
+      {
+        "command": "xstateMachineOutlineSearch.setSortName",
+        "title": "Sort results by: Name"
+      },
+      {
+        "command": "xstateMachineOutlineSearch.setSortNameActive",
+        "title": "Sort results by: $(check) Name"
+      },
+      {
+        "command": "xstateMachineOutlineSearch.setSortType",
+        "title": "Sort results by: Type"
+      },
+      {
+        "command": "xstateMachineOutlineSearch.setSortTypeActive",
+        "title": "Sort results by: $(check) Type"
+      },
+      {
         "command": "xstateMachineOutline.setErrorsGroupingFile",
         "title": "Group: by file",
         "icon": "$(list-tree)"
@@ -551,6 +575,21 @@
           "default": "original",
           "description": "Order of child nodes in the outline: source order, alphabetical (sorted), or grouped by type then name (type-name)"
         },
+        "xstateOutline.searchSort": {
+          "type": "string",
+          "enum": [
+            "relevance",
+            "name",
+            "type"
+          ],
+          "enumDescriptions": [
+            "Source order (as found)",
+            "Alphabetical by name",
+            "Grouped by type, then alphabetical by name"
+          ],
+          "default": "relevance",
+          "description": "Default ordering for search results"
+        },
         "xstateOutline.errorsGrouping": {
           "type": "string",
           "enum": [
@@ -580,6 +619,36 @@
     },
     "menus": {
       "view/title": [
+        {
+          "command": "xstateMachineOutlineSearch.setSortRelevance",
+          "when": "view == xstateMachineOutlineSearch && xstateOutline.searchSortMode != relevance",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "xstateMachineOutlineSearch.setSortRelevanceActive",
+          "when": "view == xstateMachineOutlineSearch && xstateOutline.searchSortMode == relevance",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "xstateMachineOutlineSearch.setSortName",
+          "when": "view == xstateMachineOutlineSearch && xstateOutline.searchSortMode != name",
+          "group": "1_sort@2"
+        },
+        {
+          "command": "xstateMachineOutlineSearch.setSortNameActive",
+          "when": "view == xstateMachineOutlineSearch && xstateOutline.searchSortMode == name",
+          "group": "1_sort@2"
+        },
+        {
+          "command": "xstateMachineOutlineSearch.setSortType",
+          "when": "view == xstateMachineOutlineSearch && xstateOutline.searchSortMode != type",
+          "group": "1_sort@3"
+        },
+        {
+          "command": "xstateMachineOutlineSearch.setSortTypeActive",
+          "when": "view == xstateMachineOutlineSearch && xstateOutline.searchSortMode == type",
+          "group": "1_sort@3"
+        },
         {
           "command": "xstateMachineOutline.refresh",
           "when": "view == xstateMachineOutline",
