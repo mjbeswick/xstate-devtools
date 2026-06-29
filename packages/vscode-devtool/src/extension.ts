@@ -109,6 +109,16 @@ export async function activate(context: vscode.ExtensionContext) {
         }, 400);
     });
 
+    // Keep search results live with the outline: when the tree's data changes
+    // (file edit/save, editor switch in file scope, workspace rescan), re-run the
+    // active query. Debounced; the webview no-ops when the box is empty.
+    let searchRerunTimer: ReturnType<typeof setTimeout> | undefined;
+    const searchRerunListener = treeProvider.onDidChangeTreeData(() => {
+        if (searchRerunTimer) { clearTimeout(searchRerunTimer); }
+        searchRerunTimer = setTimeout(() => filterViewProvider.rerun(), 250);
+    });
+    context.subscriptions.push(searchRerunListener);
+
     // ── Commands ─────────────────────────────────────────────────────────────
 
     const refreshCommand = vscode.commands.registerCommand(

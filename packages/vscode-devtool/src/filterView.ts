@@ -73,6 +73,12 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
         this._view?.webview.postMessage({ type: 'setFuzzy', on });
     }
 
+    /** Re-run the current query (e.g. after the outline's data changed). The
+     *  webview no-ops if there's nothing to search. */
+    rerun(): void {
+        this._view?.webview.postMessage({ type: 'rerun' });
+    }
+
     showTypes(counts: { type: string; count: number }[]): void {
         this._view?.webview.postMessage({ type: 'availableTypes', counts });
     }
@@ -519,6 +525,8 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
     } else if (msg.type === 'setFuzzy') {
       fuzzy = msg.on;
       runSearch();   // matching changes host-side, so re-issue the query
+    } else if (msg.type === 'rerun') {
+      runSearch();   // outline data changed; refresh results (no-op if box empty)
     } else if (msg.type === 'focus') {
       filterInput.focus(); filterInput.select();
     } else if (msg.type === 'clear') {

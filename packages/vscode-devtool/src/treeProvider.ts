@@ -627,15 +627,19 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         if (this.workspaceScanner.getCached().length === 0) {
             this.isLoading = true;
             this.refresh();
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Window,
-                title: "Scanning workspace for XState machines..."
-            }, async () => {
-                await this.workspaceScanner.scanWorkspace();
-            });
+            await this.scanWithProgress();
             this.isLoading = false;
         }
         this.refresh();
+    }
+
+    /** Scan the workspace, showing a progress spinner in the outline view's
+     *  title bar (where the user is looking) rather than the status bar. */
+    private async scanWithProgress(): Promise<void> {
+        await vscode.window.withProgress({
+            location: { viewId: 'xstateMachineOutline' },
+            title: 'Scanning workspace for XState machines…',
+        }, async () => { await this.workspaceScanner.scanWorkspace(); });
     }
 
     private updateTreeViewDescription(): void {
@@ -647,9 +651,9 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
     private async scanWorkspaceAndRefresh(): Promise<void> {
         this.isLoading = true;
         this.refresh();
-        
+
         try {
-            await this.workspaceScanner.scanWorkspace();
+            await this.scanWithProgress();
         } finally {
             this.isLoading = false;
             this.refresh();
