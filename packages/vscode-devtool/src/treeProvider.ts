@@ -105,9 +105,11 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
             }
         });
         
-        // If starting in workspace scope, trigger initial scan
+        // If starting in workspace scope, scan AND start watching so the tree
+        // auto-refreshes on file changes from the start (not only after a
+        // runtime scope toggle).
         if (this.currentScope === 'workspace') {
-            this.scanWorkspaceAndRefresh();
+            this.enterWorkspaceScope();
         } else {
             // Trigger another refresh now that we have the tree view
             this.refresh();
@@ -565,35 +567,35 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         
         // Update UI
         this.updateTreeViewDescription();
-        
-        // If switching to workspace mode, start scanning
+
         if (this.currentScope === 'workspace') {
-            this.workspaceScanner.startWatching(() => this.refresh());
-            
-            // Scan if not already cached
-            const cached = this.workspaceScanner.getCached();
-            if (cached.length === 0) {
-                // Show loading state
-                this.isLoading = true;
-                this.refresh();
-
-                await vscode.window.withProgress({
-                    location: vscode.ProgressLocation.Window,
-                    title: "Scanning workspace for XState machines..."
-                }, async () => {
-                    await this.workspaceScanner.scanWorkspace();
-                });
-
-                this.isLoading = false;
-                this.refresh();
-            } else {
-                this.refresh();
-            }
+            await this.enterWorkspaceScope();
         } else {
-            // File mode - stop watching
+            // File mode - stop watching; the tree live-parses the active doc.
             this.workspaceScanner.stopWatching();
             this.refresh();
         }
+    }
+
+    /** Start watching the workspace and ensure it's scanned. Shared by initial
+     *  activation (`setTreeView`) and the runtime scope toggle, so the file
+     *  watcher runs from startup — not only after a manual file→workspace
+     *  toggle — and external edits/new files auto-refresh the tree. */
+    private async enterWorkspaceScope(): Promise<void> {
+        this.workspaceScanner.startWatching(() => this.refresh());
+
+        if (this.workspaceScanner.getCached().length === 0) {
+            this.isLoading = true;
+            this.refresh();
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Window,
+                title: "Scanning workspace for XState machines..."
+            }, async () => {
+                await this.workspaceScanner.scanWorkspace();
+            });
+            this.isLoading = false;
+        }
+        this.refresh();
     }
 
     private updateTreeViewDescription(): void {
@@ -676,6 +678,19 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         this.parentMap.clear();
         this._onDidChangeTreeData.fire();
         this.updateTreeViewDescription();
+    }
+
+    /** User-facing manual refresh (the title-bar button). In workspace scope
+     *  this re-scans the workspace from disk — a real recovery after bulk or
+     *  external changes the watcher may have missed — not just a re-render of
+     *  the cache. File scope already live-parses on every render, so a plain
+     *  refresh suffices there. */
+    rescan(): void {
+        if (this.currentScope === 'workspace') {
+            void this.scanWorkspaceAndRefresh();
+        } else {
+            this.refresh();
+        }
     }
 
     private isSupportedDocument(document: vscode.TextDocument): boolean {

@@ -110,7 +110,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const refreshCommand = vscode.commands.registerCommand(
         'xstateMachineOutline.refresh',
-        () => treeProvider.refresh()
+        () => treeProvider.rescan()
     );
 
     const setScopeFileCommand = vscode.commands.registerCommand(
