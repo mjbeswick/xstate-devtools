@@ -173,28 +173,54 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
 
     // ── Search ────────────────────────────────────────────────────────────────
 
-    search(text: string): SearchResultData[] {
+    /**
+     * Search by label text and/or node type. A type filter alone (empty `text`)
+     * lists every node of those types, so a filter can be applied before — or
+     * without — typing. An empty query with no type filter returns nothing.
+     */
+    search(text: string, types: readonly string[] = []): SearchResultData[] {
         const filter = text.trim().toLowerCase();
-        if (!filter) { return []; }
+        const typeSet = new Set(types);
+        if (!filter && typeSet.size === 0) { return []; }
         const results: SearchResultData[] = [];
         for (const fm of this.workspaceScanner.getCached()) {
             const machines = this.showStateConfigs
                 ? fm.machines
                 : fm.machines.filter(m => !m.isStateConfig);
             for (const machine of machines) {
-                this.collectSearchMatches(machine, filter, fm.relativePath, results);
+                this.collectSearchMatches(machine, filter, typeSet, fm.relativePath, results);
             }
         }
         return results;
     }
 
+    /** Distinct node types present in the current scope, with counts — drives
+     *  the search view's type-filter chips so they can be picked pre-search. */
+    typeCounts(): { type: string; count: number }[] {
+        const counts = new Map<string, number>();
+        const tally = (node: MachineNode) => {
+            counts.set(node.type, (counts.get(node.type) ?? 0) + 1);
+            node.children?.forEach(tally);
+        };
+        for (const fm of this.workspaceScanner.getCached()) {
+            const machines = this.showStateConfigs
+                ? fm.machines
+                : fm.machines.filter(m => !m.isStateConfig);
+            machines.forEach(tally);
+        }
+        return [...counts].map(([type, count]) => ({ type, count }));
+    }
+
     private collectSearchMatches(
         node: MachineNode,
         filter: string,
+        typeSet: Set<string>,
         breadcrumb: string,
         results: SearchResultData[]
     ): void {
-        if (node.label.toLowerCase().includes(filter)) {
+        const labelOk = !filter || node.label.toLowerCase().includes(filter);
+        const typeOk = typeSet.size === 0 || typeSet.has(node.type);
+        if (labelOk && typeOk) {
             results.push({
                 label: node.label,
                 type: node.type,
@@ -207,7 +233,7 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         if (node.children) {
             const childBreadcrumb = `${breadcrumb} › ${node.label}`;
             for (const child of node.children) {
-                this.collectSearchMatches(child, filter, childBreadcrumb, results);
+                this.collectSearchMatches(child, filter, typeSet, childBreadcrumb, results);
             }
         }
     }

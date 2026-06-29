@@ -11,8 +11,11 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
         this._extensionUri = extensionUri;
     }
 
-    private _onDidSearch = new vscode.EventEmitter<string>();
+    private _onDidSearch = new vscode.EventEmitter<{ text: string; types: string[] }>();
     readonly onDidSearch = this._onDidSearch.event;
+
+    private _onDidRequestTypes = new vscode.EventEmitter<void>();
+    readonly onDidRequestTypes = this._onDidRequestTypes.event;
 
     private _onDidSelectItem = new vscode.EventEmitter<{ uriStr: string; line: number; char: number }>();
     readonly onDidSelectItem = this._onDidSelectItem.event;
@@ -38,7 +41,9 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.onDidReceiveMessage(msg => {
             if (msg.type === 'search') {
-                this._onDidSearch.fire(msg.text);
+                this._onDidSearch.fire({ text: msg.text, types: msg.types ?? [] });
+            } else if (msg.type === 'requestTypes') {
+                this._onDidRequestTypes.fire();
             } else if (msg.type === 'selectItem') {
                 this._onDidSelectItem.fire({ uriStr: msg.uriStr, line: msg.line, char: msg.char });
             }
@@ -55,6 +60,10 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
 
     showResults(items: SearchResultData[]): void {
         this._view?.webview.postMessage({ type: 'results', items });
+    }
+
+    showTypes(counts: { type: string; count: number }[]): void {
+        this._view?.webview.postMessage({ type: 'availableTypes', counts });
     }
 
     private getHtml(codiconsUri: string): string {
@@ -223,9 +232,26 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
 
   let activeTypes = new Set();
   let allResults  = [];
+  let availableCounts = {};   // { type: count } across the current scope
   let focusedIndex = -1;
   let showChips = false;
   let debounceTimer;
+
+  // Ask the host for the types present in scope so the filter chips can be
+  // picked before (or without) typing. The host replies with 'availableTypes'.
+  function requestTypes() { vscode.postMessage({ type: 'requestTypes' }); }
+
+  // Run the current query + type filter through the host. A type filter with an
+  // empty query lists every node of those types; empty query + no filter clears.
+  function runSearch() {
+    const text = filterInput.value;
+    if (!text.trim() && activeTypes.size === 0) {
+      allResults = [];
+      renderResults([]);
+      return;
+    }
+    vscode.postMessage({ type: 'search', text, types: Array.from(activeTypes) });
+  }
 
   function codicon(name) {
     const el = document.createElement('span');
@@ -233,16 +259,13 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
     return el;
   }
 
-  // ── Type filter toggles (faceted: one per type present in results) ─
+  // ── Type filter toggles (scope-wide: one per type present in the project,
+  //    so a filter can be applied before/without typing) ───────────────
   function renderTypeFilters() {
     typeFilters.innerHTML = '';
 
-    const counts = {};
-    for (const r of allResults) { counts[r.type] = (counts[r.type] || 0) + 1; }
-    const present = TYPES.filter(t => counts[t.id]);
-
-    // Filtering is only meaningful when results span more than one type.
-    const canFilter = present.length > 1;
+    const present = TYPES.filter(t => availableCounts[t.id]);
+    const canFilter = present.length > 0;
     syncFilterBtn(canFilter);
 
     if (!canFilter || !showChips) { typeFilters.style.display = 'none'; return; }
@@ -252,7 +275,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
       const on = activeTypes.has(t.id);
       const btn = document.createElement('button');
       btn.className = 'type-toggle' + (on ? ' active' : '');
-      btn.title = (on ? 'Hide ' : 'Show only ') + t.label + ' (' + counts[t.id] + ')';
+      btn.title = (on ? 'Stop filtering by ' : 'Show only ') + t.label + ' (' + availableCounts[t.id] + ')';
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
 
       const ic = codicon(t.icon);
@@ -260,20 +283,21 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
       if (t.color) { ic.style.color = t.color; }
       const cnt = document.createElement('span');
       cnt.className = 'type-toggle-count';
-      cnt.textContent = counts[t.id];
+      cnt.textContent = availableCounts[t.id];
 
       btn.appendChild(ic);
       btn.appendChild(cnt);
       btn.addEventListener('click', () => {
         if (activeTypes.has(t.id)) { activeTypes.delete(t.id); } else { activeTypes.add(t.id); }
-        renderResults(allResults);
+        renderTypeFilters();
+        runSearch();
       });
       typeFilters.appendChild(btn);
     }
   }
 
   function syncFilterBtn(canFilter) {
-    // The funnel is always visible, but only enabled when there's something to filter.
+    // The funnel is always visible, but only enabled when the scope has types.
     filterBtn.disabled = !canFilter;
     const active = showChips || activeTypes.size > 0;
     filterBtn.classList.toggle('active', active);
@@ -281,24 +305,19 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
     filterIcon.className = 'codicon codicon-' + (active ? 'filter-filled' : 'filter');
   }
 
-  // The funnel reveals/hides the type-filter chips.
+  // The funnel reveals/hides the type-filter chips. Refresh the scope's type
+  // list each time it's opened so counts reflect the current files.
   filterBtn.addEventListener('click', () => {
     showChips = !showChips;
+    if (showChips) { requestTypes(); }
     renderTypeFilters();
   });
 
   // ── Search input ─────────────────────────────────────────────
   filterInput.addEventListener('input', () => {
-    const text = filterInput.value;
-    clearBtn.disabled = text.length === 0;
+    clearBtn.disabled = filterInput.value.length === 0;
     clearTimeout(debounceTimer);
-    if (!text.trim()) {
-      allResults = [];
-      renderResults([]);
-      vscode.postMessage({ type: 'search', text: '' });
-      return;
-    }
-    debounceTimer = setTimeout(() => vscode.postMessage({ type: 'search', text }), 200);
+    debounceTimer = setTimeout(runSearch, 200);
   });
 
   clearBtn.addEventListener('click', () => clearSearch());
@@ -310,7 +329,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
     activeTypes.clear();
     showChips = false;
     renderResults([]);
-    vscode.postMessage({ type: 'search', text: '' });
+    renderTypeFilters();
     filterInput.focus();
   }
 
@@ -342,9 +361,8 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
   }
 
   // ── Render ───────────────────────────────────────────────────
-  function visibleResults() {
-    return activeTypes.size === 0 ? allResults : allResults.filter(r => activeTypes.has(r.type));
-  }
+  // The host already applies the type filter, so results are the visible set.
+  function visibleResults() { return allResults; }
 
   function highlightLabel(label) {
     const query = filterInput.value.trim();
@@ -362,21 +380,15 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
   }
 
   function renderResults(items) {
-    // Drop active filters whose type is no longer present, so a stale filter
-    // can never hide everything with no toggle left to clear it.
-    if (activeTypes.size) {
-      const present = new Set(items.map(r => r.type));
-      for (const t of Array.from(activeTypes)) { if (!present.has(t)) { activeTypes.delete(t); } }
-    }
-    renderTypeFilters();
-
-    const visible = activeTypes.size === 0 ? items : items.filter(r => activeTypes.has(r.type));
+    const visible = items || [];
     focusedIndex = -1;
     resultsMeta.textContent = '';
     resultsList.innerHTML = '';
 
-    if (!visible || visible.length === 0) {
-      if (filterInput.value.trim()) {
+    if (visible.length === 0) {
+      // Only show the "no results" hint when something is actually being asked
+      // for (a query and/or a type filter) — not on a clean, empty box.
+      if (filterInput.value.trim() || activeTypes.size > 0) {
         const div = document.createElement('div');
         div.className = 'empty-state';
         div.textContent = 'No results found.';
@@ -385,9 +397,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    resultsMeta.textContent = visible.length === allResults.length
-      ? visible.length + ' result' + (visible.length === 1 ? '' : 's')
-      : visible.length + ' of ' + allResults.length + ' results';
+    resultsMeta.textContent = visible.length + ' result' + (visible.length === 1 ? '' : 's');
 
     visible.forEach((item, i) => {
       const typeInfo = TYPE_MAP[item.type] || { icon: 'symbol-misc', label: item.type };
@@ -429,6 +439,12 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
     if (msg.type === 'results') {
       allResults = msg.items || [];
       renderResults(allResults);
+    } else if (msg.type === 'availableTypes') {
+      availableCounts = {};
+      for (const c of (msg.counts || [])) { availableCounts[c.type] = c.count; }
+      // A previously-active filter for a type no longer in scope is dropped.
+      for (const t of Array.from(activeTypes)) { if (!availableCounts[t]) { activeTypes.delete(t); } }
+      renderTypeFilters();
     } else if (msg.type === 'focus') {
       filterInput.focus(); filterInput.select();
     } else if (msg.type === 'clear') {
@@ -438,8 +454,12 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
       activeTypes.clear();
       showChips = false;
       renderResults([]);
+      renderTypeFilters();
     }
   });
+
+  // Prime the funnel state (enabled iff the scope has types) on load.
+  requestTypes();
 </script>
 </body>
 </html>`;

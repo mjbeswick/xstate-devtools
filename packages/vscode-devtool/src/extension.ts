@@ -82,8 +82,11 @@ export async function activate(context: vscode.ExtensionContext) {
         FilterWebviewViewProvider.viewId,
         filterViewProvider
     );
-    filterViewProvider.onDidSearch(text => {
-        filterViewProvider.showResults(treeProvider.search(text));
+    filterViewProvider.onDidSearch(({ text, types }) => {
+        filterViewProvider.showResults(treeProvider.search(text, types));
+    });
+    filterViewProvider.onDidRequestTypes(() => {
+        filterViewProvider.showTypes(treeProvider.typeCounts());
     });
 
     filterViewProvider.onDidSelectItem(async ({ uriStr, line, char }) => {

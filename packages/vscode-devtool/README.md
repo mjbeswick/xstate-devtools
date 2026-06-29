@@ -20,7 +20,7 @@
 - **Smart navigation** — click to jump to source; double-click an action or guard to jump to its implementation, or a transition target to jump to the destination state (or press **F12**)
 - **Cursor sync** — the tree highlights the node matching your editor cursor
 - **Transitions panel** — select a state to see every edge touching it, the icon showing direction: **`←`** incoming (a transition that leads in) and **`→`** outgoing (a transition out). Click any row to jump to the other state — it becomes the selected state and the panel updates to show _its_ transitions, so you can walk the machine edge by edge
-- **Search** — a dedicated search box (styled like the Extensions view) with type filtering and keyboard navigation
+- **Search** — a dedicated search box (styled like the Extensions view) with keyboard navigation and a **type filter** (the funnel button): pick one or more node types (states, actions, guards, actors…) to list every node of that type across the scope — even before you type — then narrow with a query
 - **CodeLens** — each `createMachine` gets an inline `▶ View Diagram` action plus live state / transition / problem counts, right above the code (toggle with `xstateOutline.codeLens`)
 
 ### ✏️ Editing & authoring
@@ -148,7 +148,7 @@ const machine = setup({
 
 - The Outline title bar has toggles for **scope** (file/workspace), **view mode** (grouped/flat), **state configs**, **cursor following**, **navigation target** (clicking a node jumps to **code** or focuses it in the **diagram**), whether the **diagram reflects tree expansion**, **grouping event handlers** under `on`, and **child sort order**.
 - **Right-click** any tree node for editing actions and **Go to Implementation**.
-- In **Search**, use ↑/↓/Enter to move through results and the funnel button to filter by node type.
+- In **Search**, use ↑/↓/Enter to move through results. Click the **funnel** button to pick node types — selecting a type lists all of those nodes immediately (no query needed); typing then narrows within the selected types.
 
 ## Keyboard shortcuts
 
