@@ -11,6 +11,7 @@
 ### Fixed
 - **Search now finds everything the outline shows** — search read only the workspace cache and applied a stricter state-config rule than the tree, so nodes visible in the outline (e.g. an event inside a `createStateConfig`, or a follow-cursor-revealed config) could be unfindable. Search now uses the same source and visibility rules as the tree, in both file and workspace scope.
 - **Outline refresh** — the file watcher now runs from activation (previously only after a manual file→workspace scope toggle), so external edits, new/deleted files, and branch switches update the outline automatically. The Refresh button now performs a real workspace rescan instead of re-rendering the cache.
+- **Transitions panel follows search results** — clicking a search result now updates the Transitions panel to the selected state, not just the outline tree selection.
 
 ## [1.19.0] - 2026-06-26
 
