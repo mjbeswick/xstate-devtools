@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.21.0] - 2026-06-29
+
+### Added
+- **Group outline children by type** — a new Flat / By type toggle (the outline title bar, `xstateOutline.childGrouping`). "By type" nests a state/machine's children under collapsible category nodes — States, Events, Entry, Exit, Actions, Guards, Invoked, Context — each with a count. Replaces (and migrates from) the old "group event handlers under `on`" toggle, which is now just the Events category.
+- **Live search** — search results now refresh automatically when the outline's data changes (you edit/save a file, switch the active editor in file scope, or the workspace re-scans), so they no longer go stale until you retype.
+- **Scan progress in the outline** — workspace scanning now shows a progress bar under the outline view title instead of the status bar.
+
+### Fixed
+- **`always`/`after` transitions are no longer grouped under `on`** — only real event handlers are; eventless (`always`) and delayed (`after …`) transitions stay as siblings.
+- **A hidden type filter is ignored** — collapsing the search funnel now shows unfiltered results instead of silently keeping the selected types applied; re-opening re-applies them.
+
 ## [1.20.0] - 2026-06-29
 
 ### Added
