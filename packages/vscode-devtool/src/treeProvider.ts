@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { XStateMachineParser, MachineNode } from '@xstate-devtools/diagram-core';
 import { WorkspaceScanner, FileMachines } from '@xstate-devtools/diagram-core';
 import { findNodeAtPosition, normalizeTargetName, walkNodes } from '@xstate-devtools/diagram-core';
+import { fuzzyMatch } from '@xstate-devtools/diagram-core';
 
 export type ViewScope = 'file' | 'workspace';
 export type ViewMode = 'grouped' | 'flat';
@@ -22,6 +23,10 @@ export interface SearchResultData {
     uriStr: string;
     line: number;
     char: number;
+    /** Matched character spans [start, end) in `label`, for highlighting. */
+    ranges?: [number, number][];
+    /** Match quality (higher = better); used to rank fuzzy results. */
+    score?: number;
 }
 
 export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XStateMachineTreeItem> {
@@ -202,16 +207,18 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         }));
     }
 
-    search(text: string, types: readonly string[] = []): SearchResultData[] {
+    search(text: string, types: readonly string[] = [], fuzzy = false): SearchResultData[] {
         const filter = text.trim().toLowerCase();
         const typeSet = new Set(types);
         if (!filter && typeSet.size === 0) { return []; }
         const results: SearchResultData[] = [];
         for (const { machines, breadcrumb } of this.scopedMachines()) {
             for (const machine of machines) {
-                this.collectSearchMatches(machine, filter, typeSet, breadcrumb, results);
+                this.collectSearchMatches(machine, filter, typeSet, fuzzy, breadcrumb, results);
             }
         }
+        // Fuzzy results are ranked by match quality, so the best matches lead.
+        if (fuzzy && filter) { results.sort((a, b) => (b.score ?? 0) - (a.score ?? 0)); }
         return results;
     }
 
@@ -233,25 +240,33 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         node: MachineNode,
         filter: string,
         typeSet: Set<string>,
+        fuzzy: boolean,
         breadcrumb: string,
         results: SearchResultData[]
     ): void {
-        const labelOk = !filter || node.label.toLowerCase().includes(filter);
-        const typeOk = typeSet.size === 0 || typeSet.has(node.type);
-        if (labelOk && typeOk) {
-            results.push({
+        if (typeSet.size === 0 || typeSet.has(node.type)) {
+            const base = {
                 label: node.label,
                 type: node.type,
                 breadcrumb,
                 uriStr: node.uri.toString(),
                 line: node.range.start.line,
                 char: node.range.start.character,
-            });
+            };
+            if (!filter) {
+                results.push(base); // type-only (browse): no text to match/highlight
+            } else if (fuzzy) {
+                const m = fuzzyMatch(filter, node.label);
+                if (m) { results.push({ ...base, ranges: m.ranges, score: m.score }); }
+            } else {
+                const idx = node.label.toLowerCase().indexOf(filter);
+                if (idx !== -1) { results.push({ ...base, ranges: [[idx, idx + filter.length]] }); }
+            }
         }
         if (node.children) {
             const childBreadcrumb = `${breadcrumb} › ${node.label}`;
             for (const child of node.children) {
-                this.collectSearchMatches(child, filter, typeSet, childBreadcrumb, results);
+                this.collectSearchMatches(child, filter, typeSet, fuzzy, childBreadcrumb, results);
             }
         }
     }

@@ -49,6 +49,7 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('setContext', 'xstateOutline.groupEventHandlers', initialGroupEventHandlers),
         vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenMode', initialSortChildren),
         vscode.commands.executeCommand('setContext', 'xstateOutline.searchSortMode', config.get<string>('searchSort', 'relevance')),
+        vscode.commands.executeCommand('setContext', 'xstateOutline.searchFuzzy', config.get<boolean>('searchFuzzy', false)),
         vscode.commands.executeCommand('setContext', 'xstateErrors.grouping', initialErrorsGrouping),
         vscode.commands.executeCommand('setContext', 'xstateErrors.filter', initialErrorsFilter),
         vscode.commands.executeCommand('setContext', 'xstateOutline.followCursor', followCursor),
@@ -83,8 +84,8 @@ export async function activate(context: vscode.ExtensionContext) {
         FilterWebviewViewProvider.viewId,
         filterViewProvider
     );
-    filterViewProvider.onDidSearch(({ text, types }) => {
-        filterViewProvider.showResults(treeProvider.search(text, types));
+    filterViewProvider.onDidSearch(({ text, types, fuzzy }) => {
+        filterViewProvider.showResults(treeProvider.search(text, types, fuzzy));
     });
     filterViewProvider.onDidRequestTypes(() => {
         filterViewProvider.showTypes(treeProvider.typeCounts());
@@ -184,6 +185,18 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.commands.registerCommand(`xstateMachineOutlineSearch.setSort${cap}Active`, () => setSearchSort(mode)),
         ];
     });
+
+    // Fuzzy-match toggle (the search view's ⋯ menu).
+    const setSearchFuzzy = (on: boolean) => {
+        vscode.workspace.getConfiguration('xstateOutline')
+            .update('searchFuzzy', on, vscode.ConfigurationTarget.Global);
+        vscode.commands.executeCommand('setContext', 'xstateOutline.searchFuzzy', on);
+        filterViewProvider.setFuzzy(on);
+    };
+    const searchFuzzyCommands = [
+        vscode.commands.registerCommand('xstateMachineOutlineSearch.setFuzzyOn', () => setSearchFuzzy(true)),
+        vscode.commands.registerCommand('xstateMachineOutlineSearch.setFuzzyOff', () => setSearchFuzzy(false)),
+    ];
 
     const toggleFollowCursorCommand = vscode.commands.registerCommand(
         'xstateMachineOutline.toggleFollowCursor',
@@ -1211,6 +1224,7 @@ export async function activate(context: vscode.ExtensionContext) {
         setSortChildrenByTypeCommand,
         setSortChildrenOriginalCommand,
         ...searchSortCommands,
+        ...searchFuzzyCommands,
         toggleFollowCursorCommand,
         toggleFollowCursorActiveCommand,
         setNavCodeCommand,

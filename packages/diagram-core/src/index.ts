@@ -10,6 +10,7 @@ export * from './buildGraph';
 export * from './graphView';
 export * from './export/mermaid';
 export * from './findStaticMachine';
+export * from './fuzzyMatch';
 export * from './diagnostics';
 export * from './analysis';
 export * from './headless';

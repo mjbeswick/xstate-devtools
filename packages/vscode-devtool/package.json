@@ -348,6 +348,14 @@
         "title": "Sort results by: $(check) Type"
       },
       {
+        "command": "xstateMachineOutlineSearch.setFuzzyOn",
+        "title": "Fuzzy match"
+      },
+      {
+        "command": "xstateMachineOutlineSearch.setFuzzyOff",
+        "title": "$(check) Fuzzy match"
+      },
+      {
         "command": "xstateMachineOutline.setErrorsGroupingFile",
         "title": "Group: by file",
         "icon": "$(list-tree)"
@@ -590,6 +598,11 @@
           "default": "relevance",
           "description": "Default ordering for search results"
         },
+        "xstateOutline.searchFuzzy": {
+          "type": "boolean",
+          "default": false,
+          "description": "Match search by fuzzy subsequence (e.g. \"kp\" matches \"keep\") instead of substring, ranking the best matches first"
+        },
         "xstateOutline.errorsGrouping": {
           "type": "string",
           "enum": [
@@ -648,6 +661,16 @@
           "command": "xstateMachineOutlineSearch.setSortTypeActive",
           "when": "view == xstateMachineOutlineSearch && xstateOutline.searchSortMode == type",
           "group": "1_sort@3"
+        },
+        {
+          "command": "xstateMachineOutlineSearch.setFuzzyOn",
+          "when": "view == xstateMachineOutlineSearch && !xstateOutline.searchFuzzy",
+          "group": "2_match@1"
+        },
+        {
+          "command": "xstateMachineOutlineSearch.setFuzzyOff",
+          "when": "view == xstateMachineOutlineSearch && xstateOutline.searchFuzzy",
+          "group": "2_match@1"
         },
         {
           "command": "xstateMachineOutline.refresh",

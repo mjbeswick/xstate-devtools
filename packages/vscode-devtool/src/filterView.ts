@@ -11,7 +11,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
         this._extensionUri = extensionUri;
     }
 
-    private _onDidSearch = new vscode.EventEmitter<{ text: string; types: string[] }>();
+    private _onDidSearch = new vscode.EventEmitter<{ text: string; types: string[]; fuzzy: boolean }>();
     readonly onDidSearch = this._onDidSearch.event;
 
     private _onDidRequestTypes = new vscode.EventEmitter<void>();
@@ -37,12 +37,14 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
             vscode.Uri.joinPath(this._extensionUri, 'resources', 'codicons', 'codicon.css')
         );
 
-        const sort = vscode.workspace.getConfiguration('xstateOutline').get<string>('searchSort', 'relevance');
-        webviewView.webview.html = this.getHtml(codiconsUri.toString(), sort);
+        const cfg = vscode.workspace.getConfiguration('xstateOutline');
+        const sort = cfg.get<string>('searchSort', 'relevance');
+        const fuzzy = cfg.get<boolean>('searchFuzzy', false);
+        webviewView.webview.html = this.getHtml(codiconsUri.toString(), sort, fuzzy);
 
         webviewView.webview.onDidReceiveMessage(msg => {
             if (msg.type === 'search') {
-                this._onDidSearch.fire({ text: msg.text, types: msg.types ?? [] });
+                this._onDidSearch.fire({ text: msg.text, types: msg.types ?? [], fuzzy: !!msg.fuzzy });
             } else if (msg.type === 'requestTypes') {
                 this._onDidRequestTypes.fire();
             } else if (msg.type === 'selectItem') {
@@ -67,11 +69,15 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
         this._view?.webview.postMessage({ type: 'sort', mode });
     }
 
+    setFuzzy(on: boolean): void {
+        this._view?.webview.postMessage({ type: 'setFuzzy', on });
+    }
+
     showTypes(counts: { type: string; count: number }[]): void {
         this._view?.webview.postMessage({ type: 'availableTypes', counts });
     }
 
-    private getHtml(codiconsUri: string, initialSort: string): string {
+    private getHtml(codiconsUri: string, initialSort: string, initialFuzzy: boolean): string {
         return /* html */`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -242,6 +248,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
   let showChips = false;
   let debounceTimer;
   let sortMode = ${JSON.stringify(initialSort)};   // 'relevance' | 'name' | 'type'
+  let fuzzy = ${JSON.stringify(initialFuzzy)};      // fuzzy (subsequence) match vs substring
 
   // TYPES is already in statechart reading order, so its index is the 'type' sort key.
   const TYPE_ORDER = {};
@@ -277,7 +284,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
       renderResults();
       return;
     }
-    vscode.postMessage({ type: 'search', text, types: querying ? [] : Array.from(activeTypes) });
+    vscode.postMessage({ type: 'search', text, types: querying ? [] : Array.from(activeTypes), fuzzy });
   }
 
   // Counts shown on the chips: facet over the matching results while querying,
@@ -412,18 +419,22 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
   // ── Render ───────────────────────────────────────────────────
   function visibleResults() { return sortResults(displayResults()); }
 
-  function highlightLabel(label) {
-    const query = filterInput.value.trim();
+  // Highlight the matched character spans the host computed (works for both
+  // substring — one span — and fuzzy — several spans).
+  function highlightLabel(label, ranges) {
     const span = document.createElement('span');
     span.className = 'result-label';
-    const idx = query ? label.toLowerCase().indexOf(query.toLowerCase()) : -1;
-    if (idx === -1) { span.textContent = label; return span; }
-    span.appendChild(document.createTextNode(label.slice(0, idx)));
-    const m = document.createElement('span');
-    m.className = 'match';
-    m.textContent = label.slice(idx, idx + query.length);
-    span.appendChild(m);
-    span.appendChild(document.createTextNode(label.slice(idx + query.length)));
+    if (!ranges || ranges.length === 0) { span.textContent = label; return span; }
+    let pos = 0;
+    for (const [start, end] of ranges) {
+      if (start > pos) { span.appendChild(document.createTextNode(label.slice(pos, start))); }
+      const m = document.createElement('span');
+      m.className = 'match';
+      m.textContent = label.slice(start, end);
+      span.appendChild(m);
+      pos = end;
+    }
+    if (pos < label.length) { span.appendChild(document.createTextNode(label.slice(pos))); }
     return span;
   }
 
@@ -467,7 +478,7 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
       iconEl.classList.add('result-icon');
       if (typeInfo.color) { iconEl.style.color = typeInfo.color; }
 
-      const labelEl = highlightLabel(item.label);
+      const labelEl = highlightLabel(item.label, item.ranges);
 
       const desc = document.createElement('span');
       desc.className = 'result-desc';
@@ -499,6 +510,9 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
     } else if (msg.type === 'sort') {
       sortMode = msg.mode;
       renderResults();
+    } else if (msg.type === 'setFuzzy') {
+      fuzzy = msg.on;
+      runSearch();   // matching changes host-side, so re-issue the query
     } else if (msg.type === 'focus') {
       filterInput.focus(); filterInput.select();
     } else if (msg.type === 'clear') {
