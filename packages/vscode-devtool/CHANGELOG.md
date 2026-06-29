@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.20.0] - 2026-06-29
+
+### Added
+- **Filter search by node type before you type** — the search funnel now lists every node type present in the scope (states, actions, guards, actors…) with counts; pick one and it lists *all* of those nodes immediately, no query needed, then type to narrow within the selected types.
+- **Type chips facet over the results while searching** — once you type a query, the chip counts reflect how many matches are of each type (not the whole-project totals); the browse totals return when the box is empty.
+- **Sort search results** — a new ⋯ menu on the Search view orders results by Relevance, Name (A–Z), or Type (grouped, then name). Persisted as `xstateOutline.searchSort`.
+- **Fuzzy search (optional)** — toggle **Fuzzy match** in the ⋯ menu to match by subsequence (`kp` → `keep`), ranked best-first with the matched characters highlighted. Off by default (`xstateOutline.searchFuzzy`); substring stays the default.
+
+### Fixed
+- **Search now finds everything the outline shows** — search read only the workspace cache and applied a stricter state-config rule than the tree, so nodes visible in the outline (e.g. an event inside a `createStateConfig`, or a follow-cursor-revealed config) could be unfindable. Search now uses the same source and visibility rules as the tree, in both file and workspace scope.
+- **Outline refresh** — the file watcher now runs from activation (previously only after a manual file→workspace scope toggle), so external edits, new/deleted files, and branch switches update the outline automatically. The Refresh button now performs a real workspace rescan instead of re-rendering the cache.
+
 ## [1.19.0] - 2026-06-26
 
 ### Fixed
