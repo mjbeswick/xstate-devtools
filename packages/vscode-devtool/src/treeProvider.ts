@@ -28,12 +28,21 @@ const CHILD_CATEGORIES: ChildCategory[] = [
     { key: 'invoked', label: 'Invoked', icon: 'circuit-board',   color: 'charts.yellow',              test: n => n.type === 'invoke' || n.type === 'actor' },
     { key: 'context', label: 'Context', icon: 'symbol-variable', color: 'symbolIcon.variableForeground', test: n => n.type === 'context' || n.type === 'contextProperty' },
 ];
-const CATEGORY_BY_LABEL = new Map(CHILD_CATEGORIES.map(c => [c.label, c]));
+// Categories for a setup() node's implementations. Kept separate from the state
+// categories because setup holds definitions (one Actors/Delays split), not the
+// state-level usage shape (Events/Entry/Exit).
+const SETUP_CATEGORIES: ChildCategory[] = [
+    { key: 'actions', label: 'Actions', icon: 'rocket',        color: 'symbolIcon.methodForeground', test: n => n.type === 'action' },
+    { key: 'guards',  label: 'Guards',  icon: 'shield',        color: 'terminal.ansiCyan',          test: n => n.type === 'guard' },
+    { key: 'actors',  label: 'Actors',  icon: 'circuit-board', color: 'charts.yellow',              test: n => n.type === 'actor' },
+    { key: 'delays',  label: 'Delays',  icon: 'clock',         color: 'charts.purple',              test: n => n.type === 'delay' },
+];
+const CATEGORY_BY_LABEL = new Map([...CHILD_CATEGORIES, ...SETUP_CATEGORIES].map(c => [c.label, c]));
 
 // Type ordering for the 'type-name' sort: groups children by kind, then name.
 // Mirrors the reading order of a statechart (structure first, then implementations).
 const SORT_TYPE_ORDER = [
-    'machine', 'state', 'on', 'transition', 'target',
+    'machine', 'state', 'transition', 'target',
     'entry', 'exit', 'action', 'guard', 'invoke', 'actor', 'delay',
     'context', 'contextProperty', 'setup', 'invalid',
 ];
@@ -94,12 +103,6 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         this.viewMode = config.get('defaultViewMode', 'flat');
         this.showStateConfigs = config.get('showStateConfigs', false);
         this.childGrouping = config.get<ChildGrouping>('childGrouping', 'flat');
-        // Migration: users who had the old on-grouping on (and haven't set the
-        // new mode) get the equivalent by-type grouping.
-        if (config.inspect('childGrouping')?.globalValue === undefined
-            && config.inspect('groupEventHandlers')?.globalValue === true) {
-            this.childGrouping = 'by-type';
-        }
         this.sortChildren = config.get<SortMode>('sortChildren', 'original');
 
         // Set initial context for menu checkmarks
@@ -531,10 +534,15 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
     private displayChildren(node: MachineNode): MachineNode[] {
         let children = node.children ?? [];
 
-        if (this.childGrouping === 'by-type' && (node.type === 'state' || node.type === 'machine')) {
+        if (this.childGrouping === 'by-type') {
             // Group nodes appear in fixed category order; their members are
             // sorted when the group is expanded (this same path, flat branch).
-            return this.groupByType(children);
+            if (node.type === 'state' || node.type === 'machine') {
+                return this.groupByType(children, CHILD_CATEGORIES);
+            }
+            if (node.type === 'setup') {
+                return this.groupByType(children, SETUP_CATEGORIES);
+            }
         }
 
         if (this.sortChildren === 'sorted') {
@@ -549,14 +557,14 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
     }
 
     /** Nest children under one synthetic `group` node per non-empty category (in
-     *  CHILD_CATEGORIES order), with anything uncategorised (always/after, delay,
-     *  target, setup, invalid) left as flat siblings after the groups. */
-    private groupByType(children: MachineNode[]): MachineNode[] {
+     *  the given category order), with anything uncategorised left as flat
+     *  siblings after the groups. */
+    private groupByType(children: MachineNode[], categories: ChildCategory[]): MachineNode[] {
         const groups: MachineNode[] = [];
         const leftovers: MachineNode[] = [];
         const claimed = new Set<MachineNode>();
 
-        for (const cat of CHILD_CATEGORIES) {
+        for (const cat of categories) {
             const members = children.filter(c => cat.test(c));
             if (members.length === 0) { continue; }
             members.forEach(m => claimed.add(m));
@@ -1057,10 +1065,6 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
         if (node.type === 'invalid') {
             return `Invalid XState property: ${node.label.replace(/^invalid:\s*/, '')}`;
         }
-        if (node.type === 'on') {
-            const count = node.children?.length ?? 0;
-            return `Event handlers (${count} ${count === 1 ? 'event' : 'events'})`;
-        }
         if (node.type === 'group') {
             return `${node.label} (${node.children?.length ?? 0})`;
         }
@@ -1084,7 +1088,7 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
         machine: 'Machine', state: 'State', transition: 'Transition', target: 'Target',
         action: 'Action', guard: 'Guard', entry: 'Entry action', exit: 'Exit action',
         invoke: 'Invoke', context: 'Context', contextProperty: 'Context property',
-        actor: 'Actor', delay: 'Delay', setup: 'Setup', on: 'Events'
+        actor: 'Actor', delay: 'Delay', setup: 'Setup'
     };
 
     // Custom Harel-shape icon file for a state node, or undefined for non-states
@@ -1138,10 +1142,6 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
                     iconName = 'circle-filled';
                     iconColor = new vscode.ThemeColor('symbolIcon.fieldForeground');
                 }
-                break;
-            case 'on':
-                iconName = 'inbox';
-                iconColor = new vscode.ThemeColor('charts.orange');
                 break;
             case 'group': {
                 const cat = CATEGORY_BY_LABEL.get(this.node.label);

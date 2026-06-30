@@ -748,12 +748,12 @@
         {
           "command": "xstateMachineOutline.setChildGroupingByType",
           "when": "view == xstateMachineOutline && xstateOutline.childGroupingMode == flat",
-          "group": "4_handlers@1"
+          "group": "4_grouping@1"
         },
         {
           "command": "xstateMachineOutline.setChildGroupingFlat",
           "when": "view == xstateMachineOutline && xstateOutline.childGroupingMode == by-type",
-          "group": "4_handlers@1"
+          "group": "4_grouping@1"
         },
         {
           "command": "xstateMachineOutline.setSortChildrenSorted",

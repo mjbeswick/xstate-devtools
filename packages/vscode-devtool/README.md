@@ -179,7 +179,7 @@ const machine = setup({
 | `xstateOutline.graphReflectsTreeExpansion` | `true` | Make the diagram render only the states expanded in the outline |
 | `xstateOutline.codeLens` | `true` | Show a CodeLens (counts + "View Diagram") above each machine |
 | `xstateOutline.showInternalTransitions` | `true` | Show internal (action-only) transitions inside state boxes in the diagram (toggle live from the diagram toolbar) |
-| `xstateOutline.childGrouping` | `flat` | How a state/machine's children are arranged: `flat`, or `by-type` (nested under collapsible category nodes — States, Events, Actions, Guards, Invoked, Context…) |
+| `xstateOutline.childGrouping` | `flat` | How a state/machine's children are arranged: `flat`, or `by-type` (nested under collapsible category nodes — States, Events, Actions, Guards, Invoked, Context…). In `by-type`, a `setup()` node's implementations also split into Actions / Guards / Actors / Delays |
 | `xstateOutline.sortChildren` | `original` | Order child nodes by source order (`original`), alphabetically (`sorted`), or grouped by type then name (`type-name`) |
 | `xstateOutline.errorsGrouping` | `file` | How the Errors pane groups problems: `file`, `severity`, or `flat` |
 | `xstateOutline.errorsFilter` | `warning` | Minimum severity shown in the Errors pane: `all`, `warning` (warnings & errors), or `error` |
