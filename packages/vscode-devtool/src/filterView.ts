@@ -332,7 +332,10 @@ export class FilterWebviewViewProvider implements vscode.WebviewViewProvider {
     const canFilter = TYPES.some(t => availableCounts[t.id]);
     syncFilterBtn(canFilter);
 
-    if (!canFilter || !showChips) { typeFilters.style.display = 'none'; return; }
+    // Nothing to show (no matching types and no active filter) → keep the row
+    // collapsed. An empty flex row still has top margin and would shift the
+    // "No results found." message down when the funnel is opened on a no-hit search.
+    if (!canFilter || !showChips || present.length === 0) { typeFilters.style.display = 'none'; return; }
     typeFilters.style.display = 'flex';
 
     for (const t of present) {
