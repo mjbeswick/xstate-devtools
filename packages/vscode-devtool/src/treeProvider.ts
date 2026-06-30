@@ -991,9 +991,17 @@ export class XStateMachineTreeItem extends vscode.TreeItem {
         } else {
             // Machine/state/action node
             
-            // Check if there are diagnostics for this node's range
+            // Check if there are diagnostics for this node's *own* range. A
+            // state's range spans its whole subtree, so a diagnostic on a child
+            // (entry action, transition, nested state — or an unrelated TS/lint
+            // error in a param body) must not bubble up and recolour the parent:
+            // the child renders its own item carrying that tint. Only count
+            // diagnostics that fall outside every child node's range.
             const diagnostics = vscode.languages.getDiagnostics(node.uri);
-            const nodeDiagnostics = diagnostics.filter(d => d.range.intersection(node.range));
+            const childRanges = (node.children ?? []).map(c => c.range);
+            const nodeDiagnostics = diagnostics.filter(d =>
+                d.range.intersection(node.range) &&
+                !childRanges.some(cr => cr.contains(d.range.start)));
             
             let hasError = false;
             let hasWarning = false;
