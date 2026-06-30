@@ -30,7 +30,7 @@ function getSourceLocation(): string | undefined {
 
 function serializeSnapshot(snapshot: any): SerializedSnapshot {
   return {
-    value: snapshot?.value ?? null,
+    value: sanitize(snapshot?.value ?? null) as SerializedSnapshot['value'],
     context: sanitize(snapshot?.context),
     status: snapshot?.status ?? 'active',
     error: snapshot?.error ? sanitize(snapshot.error) : undefined,
@@ -135,6 +135,7 @@ export function createInspector(transport: Transport, source: Source) {
   })
 
   const inspect = (inspectionEvent: any) => {
+   try {
     if (inspectionEvent.type === '@xstate.actor') {
       const actorRef: AnyActorRef = inspectionEvent.actorRef
       const sessionId: string = actorRef.sessionId
@@ -178,6 +179,12 @@ export function createInspector(transport: Transport, source: Source) {
       })
       checkAndNotifyStop(inspectionEvent.actorRef)
     }
+   } catch (e) {
+     // Never let an inspection failure (e.g. an un-serializable snapshot too large
+     // for JSON.stringify) propagate back into XState's synchronous inspection
+     // callback — that would crash the host actor's start(). Drop the event.
+     console.warn('[xstate-devtools] inspection failed, dropping event:', (e as Error).message)
+   }
   }
 
   /**

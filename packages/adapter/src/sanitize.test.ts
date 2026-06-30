@@ -38,7 +38,20 @@ describe('sanitize', () => {
     const a: any = {}
     a.self = a
     expect(() => sanitize(a)).not.toThrow()
-    expect(JSON.stringify(sanitize(a))).toContain('[MaxDepth]')
+    expect(JSON.stringify(sanitize(a))).toContain('[Circular]')
+  })
+
+  it('bounds output for wide+deep cross-linked objects (no oversized string)', () => {
+    // A shared node referenced from many places at every level would expand
+    // multiplicatively without a global budget / shared-ref guard.
+    const shared: any = {}
+    for (let i = 0; i < 200; i++) shared['k' + i] = { a: 1, b: 2, c: 3 }
+    const root: any = {}
+    for (let i = 0; i < 200; i++) root['n' + i] = { x: shared, y: shared, z: shared }
+    const out = sanitize(root)
+    const json = JSON.stringify(out) // must not throw RangeError
+    expect(json.length).toBeLessThan(2_000_000)
+    expect(json).toContain('[Circular]')
   })
 
   it('handles deep linear nesting', () => {
