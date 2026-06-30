@@ -1,6 +1,6 @@
 {
   "name": "@xstate-devtools/adapter",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Inspect XState v5 actors from a running app (browser, Node/SSR, or React) and stream them to the XState DevTools / VS Code live debugger.",
   "license": "MIT",
   "repository": {
@@ -8,7 +8,13 @@
     "url": "https://github.com/mjbeswick/xstate-devtools.git",
     "directory": "packages/adapter"
   },
-  "keywords": ["xstate", "statechart", "devtools", "inspector", "debugger"],
+  "keywords": [
+    "xstate",
+    "statechart",
+    "devtools",
+    "inspector",
+    "debugger"
+  ],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -33,7 +39,9 @@
       "require": "./dist/react.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=18"
   },
