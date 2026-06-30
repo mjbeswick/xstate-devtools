@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.22.0] - 2026-06-30
+
+### Added
+- **Find-implementation AI tool** — a new `#xstateFindImpl` Language Model Tool locates where an action, guard, service/actor, or delay is defined and returns the file, line, and a short snippet.
+- **All AI tools are now `#`-referenceable** — `#xstateMachines`, `#xstateDescribe`, `#xstateDiagram`, `#xstateTestPaths`, and `#xstateValidate` (previously only "list machines" could be referenced by name in chat).
+
+### Changed
+- **Leaner AI-tool output to cut agent token usage** — `list machines` returns terse lines with relative paths instead of pretty-printed JSON with absolute paths; `describe machine` returns compact JSON.
+- **Ambiguous machine ids no longer resolve silently** — when several machines share an id, the tools return the candidates (with file:line) and ask for a `file` to disambiguate, and a wrong id now suggests the closest match.
+
 ## [1.21.0] - 2026-06-29
 
 ### Added
