@@ -2,11 +2,23 @@
 import type { AnyStateMachine } from 'xstate'
 import type { SerializedMachine, SerializedStateNode, SerializedTransition, SerializedInvoke } from '@xstate-devtools/protocol'
 
+// XState v5 higher-order guards (`and`/`or`/`not`) resolve to a named function
+// carrying `.check` and `.guards` (an array of the inner guards). Flattening
+// them to the bare combinator name drops the actual conditions, so recurse and
+// compose a readable label — e.g. `or(not(hasNegativeBasketValue), and(a, b))` —
+// mirroring the static parser's guard labels.
 function serializeGuard(guard: unknown): string | undefined {
   if (!guard) return undefined
   if (typeof guard === 'string') return guard
-  if (typeof guard === 'function') return (guard as Function).name || '(inline)'
-  if (typeof guard === 'object' && guard !== null) {
+  if (typeof guard === 'function') {
+    const fn = guard as any
+    if (Array.isArray(fn.guards) && typeof fn.check === 'function') {
+      const parts = (fn.guards as unknown[]).map(g => serializeGuard(g) ?? '(inline)')
+      return `${fn.name || '(combinator)'}(${parts.join(', ')})`
+    }
+    return fn.name || '(inline)'
+  }
+  if (typeof guard === 'object') {
     const g = guard as any
     return g.type ?? g.name ?? '(inline)'
   }

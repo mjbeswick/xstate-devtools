@@ -1,6 +1,6 @@
 // packages/adapter/src/serialize.test.ts
 import { describe, it, expect } from 'vitest'
-import { createMachine, setup, fromPromise } from 'xstate'
+import { createMachine, setup, fromPromise, and, or, not } from 'xstate'
 import { serializeMachine } from './serialize.js'
 
 describe('serializeMachine', () => {
@@ -61,6 +61,34 @@ describe('serializeMachine', () => {
     const transition = result.root.states.idle.on[0]
     expect(transition.guard).toBe('isReady')
     expect(transition.actions).toEqual(['doSomething'])
+  })
+
+  it('serializes higher-order guard combinators recursively', () => {
+    const machine = setup({
+      guards: {
+        hasNegativeBasketValue: () => false,
+        isAttended: () => true,
+        isCashEnabled: () => true,
+      },
+    }).createMachine({
+      id: 'combo',
+      initial: 'idle',
+      states: {
+        idle: {
+          on: {
+            GO: {
+              target: 'active',
+              guard: or([not('hasNegativeBasketValue'), and(['isAttended', 'isCashEnabled'])]),
+            },
+          },
+        },
+        active: {},
+      },
+    })
+    const result = serializeMachine(machine)
+    expect(result.root.states.idle.on[0].guard).toBe(
+      'or(not(hasNegativeBasketValue), and(isAttended, isCashEnabled))',
+    )
   })
 
   it('serializes always transitions', () => {
