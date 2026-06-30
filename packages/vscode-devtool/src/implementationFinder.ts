@@ -78,11 +78,17 @@ export class ImplementationFinder {
     ): Promise<{ range: vscode.Range; document: vscode.TextDocument } | null> {
         const escaped = functionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         // Matches the name as a property key (with or without quotes) followed by a colon,
-        // or as a function/const declaration — but NOT a plain usage/import
+        // a function/const declaration, or an object-literal shorthand method `name(`
+        // — but NOT a plain usage/import. XState v5 `setup({ actions: { foo(...) {} } })`
+        // defines actions/guards as shorthand methods, which the colon form misses.
+        // ponytail: the method form `(?:^|[{,])\s*name\(` is anchored at property
+        // position to skip most calls; a call alone on its own line could still
+        // match, but this is the last-resort finder and results are proximity-sorted.
         const pattern = new RegExp(
             `(?:^|[\\s{,])(?:['"]?${escaped}['"]?\\s*:|` +
             `(?:function\\s+${escaped}\\s*\\()|` +
-            `(?:(?:const|let|var)\\s+${escaped}\\s*=))`,
+            `(?:(?:const|let|var)\\s+${escaped}\\s*=))` +
+            `|(?:^|[{,])\\s*${escaped}\\s*\\(`,
             'm'
         );
 
