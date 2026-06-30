@@ -146,7 +146,7 @@ const machine = setup({
 
 ## Tips
 
-- The Outline title bar has toggles for **scope** (file/workspace), **view mode** (grouped/flat), **state configs**, **cursor following**, **navigation target** (clicking a node jumps to **code** or focuses it in the **diagram**), whether the **diagram reflects tree expansion**, **child grouping** (flat, or nested under type categories — States, Events, Actions, Guards, Invoked, Context…), and **child sort order**.
+- The Outline title bar has toggles for **scope** (file/workspace), **view mode** (grouped/flat), **state configs**, **cursor following**, **navigation target** (clicking a node jumps to **code** or focuses it in the **diagram**), whether the **diagram reflects tree expansion**, and **child grouping** (flat, or nested under type categories — States, Events, Actions, Guards, Invoked, Context…).
 - **Right-click** any tree node for editing actions and **Go to Implementation**.
 - In **Search**, use ↑/↓/Enter to move through results. Click the **funnel** button to pick node types — selecting a type lists all of those nodes immediately (no query needed); typing then narrows within the selected types. The **⋯ menu** orders results by relevance, name, or type, and toggles fuzzy matching.
 
@@ -180,7 +180,6 @@ const machine = setup({
 | `xstateOutline.codeLens` | `true` | Show a CodeLens (counts + "View Diagram") above each machine |
 | `xstateOutline.showInternalTransitions` | `true` | Show internal (action-only) transitions inside state boxes in the diagram (toggle live from the diagram toolbar) |
 | `xstateOutline.childGrouping` | `flat` | How a state/machine's children are arranged: `flat`, or `by-type` (nested under collapsible category nodes — States, Events, Actions, Guards, Invoked, Context…). In `by-type`, a `setup()` node's implementations also split into Actions / Guards / Actors / Delays |
-| `xstateOutline.sortChildren` | `original` | Order child nodes by source order (`original`), alphabetically (`sorted`), or grouped by type then name (`type-name`) |
 | `xstateOutline.errorsGrouping` | `file` | How the Errors pane groups problems: `file`, `severity`, or `flat` |
 | `xstateOutline.errorsFilter` | `warning` | Minimum severity shown in the Errors pane: `all`, `warning` (warnings & errors), or `error` |
 

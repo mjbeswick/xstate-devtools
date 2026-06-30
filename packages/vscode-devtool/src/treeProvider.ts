@@ -6,7 +6,6 @@ import { fuzzyMatch } from '@xstate-devtools/diagram-core';
 
 export type ViewScope = 'file' | 'workspace';
 export type ViewMode = 'grouped' | 'flat';
-export type SortMode = 'original' | 'sorted' | 'type-name';
 export type ChildGrouping = 'flat' | 'by-type';
 
 // By-type grouping: each category becomes a collapsible node holding its members.
@@ -38,14 +37,6 @@ const SETUP_CATEGORIES: ChildCategory[] = [
     { key: 'delays',  label: 'Delays',  icon: 'clock',         color: 'charts.purple',              test: n => n.type === 'delay' },
 ];
 const CATEGORY_BY_LABEL = new Map([...CHILD_CATEGORIES, ...SETUP_CATEGORIES].map(c => [c.label, c]));
-
-// Type ordering for the 'type-name' sort: groups children by kind, then name.
-// Mirrors the reading order of a statechart (structure first, then implementations).
-const SORT_TYPE_ORDER = [
-    'machine', 'state', 'transition', 'target',
-    'entry', 'exit', 'action', 'guard', 'invoke', 'actor', 'delay',
-    'context', 'contextProperty', 'setup', 'invalid',
-];
 
 export interface SearchResultData {
     label: string;
@@ -84,7 +75,6 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
     // preference. Never persisted; resets on reload. See revealHiddenStateConfigs.
     private tempShowStateConfigs: boolean = false;
     private childGrouping: ChildGrouping = 'flat'; // Group children under type-category nodes vs flat
-    private sortChildren: SortMode = 'original'; // Sort child nodes vs. keep source order
     private workspaceScanner: WorkspaceScanner;
     private outputChannel: vscode.OutputChannel;
 
@@ -103,15 +93,13 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         this.viewMode = config.get('defaultViewMode', 'flat');
         this.showStateConfigs = config.get('showStateConfigs', false);
         this.childGrouping = config.get<ChildGrouping>('childGrouping', 'flat');
-        this.sortChildren = config.get<SortMode>('sortChildren', 'original');
 
         // Set initial context for menu checkmarks
         vscode.commands.executeCommand('setContext', 'xstateOutline.scopeIsWorkspace', this.currentScope === 'workspace');
         vscode.commands.executeCommand('setContext', 'xstateOutline.viewModeIsFlat', this.viewMode === 'flat');
         vscode.commands.executeCommand('setContext', 'xstateOutline.showStateConfigs', this.showStateConfigs);
         vscode.commands.executeCommand('setContext', 'xstateOutline.childGroupingMode', this.childGrouping);
-        vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenMode', this.sortChildren);
-        
+
         // Trigger initial refresh
         this.refresh();
     }
@@ -517,40 +505,25 @@ export class XStateMachineTreeProvider implements vscode.TreeDataProvider<XState
         this.refresh();
     }
 
-    setSortChildren(mode: SortMode): void {
-        this.sortChildren = mode;
-        const config = vscode.workspace.getConfiguration('xstateOutline');
-        config.update('sortChildren', mode, vscode.ConfigurationTarget.Global);
-        vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenMode', mode);
-        this.refresh();
-    }
-
     /**
      * Transform a node's raw children for display: in 'by-type' mode, nest a
-     * state/machine's children under collapsible category nodes; otherwise sort
-     * the flat list. Pure with respect to the parser's `MachineNode` tree — the
-     * underlying data (used by search, graph, target resolution) is untouched.
+     * state/machine's (or setup's) children under collapsible category nodes;
+     * otherwise return them in source order. Source order is preserved on
+     * purpose — entry/exit actions and transition/guard branches are evaluated
+     * in order, so re-sorting siblings would misrepresent behaviour. Pure with
+     * respect to the parser's `MachineNode` tree (search/graph/target resolution
+     * see the untouched data).
      */
     private displayChildren(node: MachineNode): MachineNode[] {
-        let children = node.children ?? [];
+        const children = node.children ?? [];
 
         if (this.childGrouping === 'by-type') {
-            // Group nodes appear in fixed category order; their members are
-            // sorted when the group is expanded (this same path, flat branch).
             if (node.type === 'state' || node.type === 'machine') {
                 return this.groupByType(children, CHILD_CATEGORIES);
             }
             if (node.type === 'setup') {
                 return this.groupByType(children, SETUP_CATEGORIES);
             }
-        }
-
-        if (this.sortChildren === 'sorted') {
-            children = [...children].sort((a, b) => a.label.localeCompare(b.label));
-        } else if (this.sortChildren === 'type-name') {
-            children = [...children].sort((a, b) =>
-                (SORT_TYPE_ORDER.indexOf(a.type) - SORT_TYPE_ORDER.indexOf(b.type))
-                || a.label.localeCompare(b.label));
         }
 
         return children;

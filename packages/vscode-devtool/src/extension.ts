@@ -30,7 +30,6 @@ export async function activate(context: vscode.ExtensionContext) {
     const initialScope = config.get<string>('defaultScope', 'workspace');
     const initialViewMode = config.get<string>('defaultViewMode', 'flat');
     const initialShowStateConfigs = config.get<boolean>('showStateConfigs', false);
-    const initialSortChildren = config.get<string>('sortChildren', 'original');
     const initialErrorsGrouping = config.get<ErrorsGrouping>('errorsGrouping', 'file');
     const initialErrorsFilter = config.get<ErrorsFilter>('errorsFilter', 'warning');
     let followCursor = config.get<boolean>('followCursor', true);
@@ -45,7 +44,6 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('setContext', 'xstateOutline.scopeIsWorkspace', initialScope === 'workspace'),
         vscode.commands.executeCommand('setContext', 'xstateOutline.viewModeIsFlat', initialViewMode === 'flat'),
         vscode.commands.executeCommand('setContext', 'xstateOutline.showStateConfigs', initialShowStateConfigs),
-        vscode.commands.executeCommand('setContext', 'xstateOutline.sortChildrenMode', initialSortChildren),
         vscode.commands.executeCommand('setContext', 'xstateOutline.searchSortMode', config.get<string>('searchSort', 'relevance')),
         vscode.commands.executeCommand('setContext', 'xstateOutline.searchFuzzy', config.get<boolean>('searchFuzzy', false)),
         vscode.commands.executeCommand('setContext', 'xstateErrors.grouping', initialErrorsGrouping),
@@ -164,21 +162,6 @@ export async function activate(context: vscode.ExtensionContext) {
     const setChildGroupingByTypeCommand = vscode.commands.registerCommand(
         'xstateMachineOutline.setChildGroupingByType',
         () => treeProvider.setChildGrouping('by-type')
-    );
-
-    const setSortChildrenSortedCommand = vscode.commands.registerCommand(
-        'xstateMachineOutline.setSortChildrenSorted',
-        () => treeProvider.setSortChildren('sorted')
-    );
-
-    const setSortChildrenByTypeCommand = vscode.commands.registerCommand(
-        'xstateMachineOutline.setSortChildrenByType',
-        () => treeProvider.setSortChildren('type-name')
-    );
-
-    const setSortChildrenOriginalCommand = vscode.commands.registerCommand(
-        'xstateMachineOutline.setSortChildrenOriginal',
-        () => treeProvider.setSortChildren('original')
     );
 
     // Search results sort (the search view's ⋯ menu). Each mode has a plain and
@@ -1251,9 +1234,6 @@ export async function activate(context: vscode.ExtensionContext) {
         setStateConfigsHideActiveCommand,
         setChildGroupingFlatCommand,
         setChildGroupingByTypeCommand,
-        setSortChildrenSortedCommand,
-        setSortChildrenByTypeCommand,
-        setSortChildrenOriginalCommand,
         ...searchSortCommands,
         ...searchFuzzyCommands,
         toggleFollowCursorCommand,

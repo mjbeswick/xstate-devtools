@@ -309,21 +309,6 @@
         "icon": "$(ungroup-by-ref-type)"
       },
       {
-        "command": "xstateMachineOutline.setSortChildrenSorted",
-        "title": "Sort children: A–Z",
-        "icon": "$(list-ordered)"
-      },
-      {
-        "command": "xstateMachineOutline.setSortChildrenByType",
-        "title": "Sort children: by type, then name",
-        "icon": "$(type-hierarchy)"
-      },
-      {
-        "command": "xstateMachineOutline.setSortChildrenOriginal",
-        "title": "Sort children: source order",
-        "icon": "$(list-unordered)"
-      },
-      {
         "command": "xstateMachineOutlineSearch.setSortRelevance",
         "title": "Sort results by: Relevance"
       },
@@ -576,21 +561,6 @@
           "default": "flat",
           "description": "How a state/machine's children are arranged in the outline"
         },
-        "xstateOutline.sortChildren": {
-          "type": "string",
-          "enum": [
-            "original",
-            "sorted",
-            "type-name"
-          ],
-          "enumDescriptions": [
-            "Source order",
-            "Alphabetical by name",
-            "Grouped by type, then alphabetical by name"
-          ],
-          "default": "original",
-          "description": "Order of child nodes in the outline: source order, alphabetical (sorted), or grouped by type then name (type-name)"
-        },
         "xstateOutline.searchSort": {
           "type": "string",
           "enum": [
@@ -754,21 +724,6 @@
           "command": "xstateMachineOutline.setChildGroupingFlat",
           "when": "view == xstateMachineOutline && xstateOutline.childGroupingMode == by-type",
           "group": "4_grouping@1"
-        },
-        {
-          "command": "xstateMachineOutline.setSortChildrenSorted",
-          "when": "view == xstateMachineOutline && xstateOutline.sortChildrenMode == original",
-          "group": "5_sort@1"
-        },
-        {
-          "command": "xstateMachineOutline.setSortChildrenByType",
-          "when": "view == xstateMachineOutline && xstateOutline.sortChildrenMode == sorted",
-          "group": "5_sort@1"
-        },
-        {
-          "command": "xstateMachineOutline.setSortChildrenOriginal",
-          "when": "view == xstateMachineOutline && xstateOutline.sortChildrenMode == type-name",
-          "group": "5_sort@1"
         },
         {
           "command": "xstateMachineOutline.setErrorsFilterAll",
