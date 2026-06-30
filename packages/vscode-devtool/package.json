@@ -58,7 +58,8 @@
       {
         "name": "xstate_describe_machine",
         "displayName": "Describe XState machine",
-        "modelDescription": "Return the structure of one XState machine as JSON: its states (with hierarchy, initial/final/parallel flags, entry/exit actions, invoked services) and transitions (source, target, event). Identify the machine by its id.",
+        "modelDescription": "Return the structure of one XState machine as compact JSON: its states (with hierarchy, initial/final/parallel flags, entry/exit actions, invoked services) and transitions (source, target, event). Identify the machine by its id.",
+        "toolReferenceName": "xstateDescribe",
         "canBeReferencedInPrompt": true,
         "icon": "$(symbol-structure)",
         "tags": [
@@ -85,6 +86,7 @@
         "name": "xstate_machine_diagram",
         "displayName": "XState machine diagram (Mermaid)",
         "modelDescription": "Return a Mermaid `stateDiagram-v2` for one XState machine, identified by its id. Useful for visualising or documenting the machine.",
+        "toolReferenceName": "xstateDiagram",
         "canBeReferencedInPrompt": true,
         "icon": "$(git-merge)",
         "tags": [
@@ -111,6 +113,7 @@
         "name": "xstate_test_paths",
         "displayName": "XState test paths",
         "modelDescription": "Return the shortest event sequence to reach each state of one XState machine (structural — guards assumed takeable), flag unreachable states, and include copy-paste test skeletons. Identify the machine by its id.",
+        "toolReferenceName": "xstateTestPaths",
         "canBeReferencedInPrompt": true,
         "icon": "$(beaker)",
         "tags": [
@@ -137,6 +140,7 @@
         "name": "xstate_validate",
         "displayName": "Validate XState machines",
         "modelDescription": "Run XState diagnostics over the workspace (or one file): invalid config properties, unknown transition targets, unreachable states, etc. Returns the problems found with file, line, severity, and message.",
+        "toolReferenceName": "xstateValidate",
         "canBeReferencedInPrompt": true,
         "icon": "$(checklist)",
         "tags": [
@@ -150,6 +154,37 @@
               "description": "Optional source file path. Omit to validate every XState file in the workspace."
             }
           }
+        }
+      },
+      {
+        "name": "xstate_find_implementation",
+        "displayName": "Find XState implementation",
+        "modelDescription": "Locate where an XState action, guard, service/actor, or delay is defined in the source. Give the bare name (as it appears in the machine config); returns the file, line, and a short code snippet of the definition.",
+        "toolReferenceName": "xstateFindImpl",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(go-to-file)",
+        "tags": [
+          "xstate"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The action/guard/service/delay name to locate (as referenced in the machine config)."
+            },
+            "machine": {
+              "type": "string",
+              "description": "Optional machine id whose file to search from first."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to start the search from."
+            }
+          },
+          "required": [
+            "name"
+          ]
         }
       }
     ],

@@ -63,7 +63,7 @@ The live debugger (attach to a running app, inspect instances/context, time-trav
 
 ### 🤖 AI tools (Language Model Tools)
 
-The extension contributes **Language Model Tools** so VS Code's AI agent can reason about your machines (requires VS Code ≥ 1.95). Reference them in chat or let the agent call them: **list machines**, **describe machine** (states + transitions as JSON), **machine diagram** (Mermaid), **test paths** (shortest path to each state + unreachable states), and **validate** (XState diagnostics). The same analysis is available outside the editor via the standalone [`@xstate-devtools/mcp`](../mcp-server/README.md) server.
+The extension contributes **Language Model Tools** so VS Code's AI agent can reason about your machines (requires VS Code ≥ 1.95). Let the agent call them, or `#`-reference them in chat by name: `#xstateMachines` (list machines), `#xstateDescribe` (states + transitions as compact JSON), `#xstateDiagram` (Mermaid), `#xstateTestPaths` (shortest path to each state + unreachable states), `#xstateValidate` (XState diagnostics), and `#xstateFindImpl` (locate where an action/guard/service is defined). Outputs are kept terse to minimise agent token usage. The same analysis is available outside the editor via the standalone [`@xstate-devtools/mcp`](../mcp-server/README.md) server.
 
 ## Reading the diagram
 
