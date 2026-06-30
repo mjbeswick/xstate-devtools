@@ -707,6 +707,15 @@ export async function activate(context: vscode.ExtensionContext) {
         }, delay));
     };
 
+    // True when the cursor sits on a transition `target` string. Such a name
+    // resolves to the state it points at — which can collide with a same-named
+    // local variable (e.g. `const pointsBalance = …`) that the broad
+    // implementation search would otherwise jump to instead.
+    function isTargetAtPosition(document: vscode.TextDocument, position: vscode.Position): boolean {
+        const hit = findNodeAtPosition(XStateMachineParser.parseMachines(document), position);
+        return hit?.node.type === 'target';
+    }
+
     function extractNameAtPosition(document: vscode.TextDocument, position: vscode.Position): string | null {
         const line = document.lineAt(position.line).text;
         const col  = position.character;
@@ -728,6 +737,12 @@ export async function activate(context: vscode.ExtensionContext) {
             async provideDefinition(document, position) {
                 const name = extractNameAtPosition(document, position);
                 if (!name) { return null; }
+                // On a transition target, resolve the named state first — its
+                // definition wins over any same-named action/guard/variable.
+                if (isTargetAtPosition(document, position)) {
+                    const state = treeProvider.resolveStateLocationByName(name, document, position);
+                    if (state) { return new vscode.Location(state.uri, state.range); }
+                }
                 const result = await ImplementationFinder.findImplementation(name, document);
                 if (result) { return new vscode.Location(result.document.uri, result.range); }
                 // Fall back to a transition target's state definition.
@@ -743,6 +758,11 @@ export async function activate(context: vscode.ExtensionContext) {
             async provideImplementation(document, position) {
                 const name = extractNameAtPosition(document, position);
                 if (!name) { return null; }
+                // On a transition target, the named state is the intended jump.
+                if (isTargetAtPosition(document, position)) {
+                    const state = treeProvider.resolveStateLocationByName(name, document, position);
+                    if (state) { return new vscode.Location(state.uri, state.range); }
+                }
                 const result = await ImplementationFinder.findImplementation(name, document);
                 if (result) { return new vscode.Location(result.document.uri, result.range); }
                 // Not an action/guard/service — it may be a transition target
