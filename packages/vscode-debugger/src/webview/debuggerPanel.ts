@@ -28,6 +28,21 @@ window.addEventListener('message', (e: MessageEvent) => {
     if (msg && msg.command === 'model') { render(msg.model); }
 });
 
+// Events panel keyboard nav (only when this webview is focused): ← previous,
+// → next, Esc back to live. Reuses the controller's step/back-to-live logic.
+if (ROLE === 'events') {
+    window.addEventListener('keydown', (e: KeyboardEvent) => {
+        const t = e.target as HTMLElement | null;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) { return; }
+        const command = e.key === 'ArrowLeft' ? 'stepBack'
+            : e.key === 'ArrowRight' ? 'stepForward'
+            : e.key === 'Escape' ? 'backToLive' : null;
+        if (!command) { return; }
+        e.preventDefault();
+        vscode.postMessage({ command });
+    });
+}
+
 function render(m: any): void {
     const live = m.status === 'open';
     const body = $('body');
@@ -128,7 +143,8 @@ function renderInspector(m: any): string {
 }
 
 // Event log (bottom panel) — newest first, with the actor each event hit,
-// clickable to time-travel.
+// clickable to time-travel. The log list (left) is a focusable scroll container
+// for ←/→/Esc keyboard nav; the detail panel (right) shows the selected/latest event.
 function renderEvents(m: any): string {
     const labelBy: Record<string, string> = {};
     for (const a of m.actors) { labelBy[a.sessionId] = a.label; }
@@ -136,21 +152,32 @@ function renderEvents(m: any): string {
     if (!m.events.length) {
         html += '<div class="muted">' + (m.status === 'open'
             ? 'No events captured yet.' : 'Connect from the Debugger view to capture events.') + '</div>';
-    } else {
-        html += '<table class="events">';
-        for (let i = m.events.length - 1; i >= 0; i--) {
-            const ev = m.events[i];
-            const isCur = m.timeTravelSeq !== null && ev.seq === m.timeTravelSeq;
-            const isFuture = m.timeTravelSeq !== null && ev.seq > m.timeTravelSeq;
-            html += '<tr class="evrow' + (isCur ? ' tt' : '') + (isFuture ? ' future' : '') + '" data-seq="' + ev.seq + '">' +
-                '<td class="t">' + esc(fmtTime(ev.time)) + '</td>' +
-                '<td class="t">' + esc(labelBy[ev.sessionId] || '') + '</td>' +
-                '<td class="ev">' + esc(ev.type) + '</td>' +
-                '<td class="t">#' + ev.seq + '</td></tr>';
-        }
-        html += '</table>';
+        return html + '</div>';
     }
-    html += '</div>';
+    html += '<div class="events-wrap"><div class="loglist" id="loglist" tabindex="0"><table class="events">';
+    for (let i = m.events.length - 1; i >= 0; i--) {
+        const ev = m.events[i];
+        const isCur = m.timeTravelSeq !== null && ev.seq === m.timeTravelSeq;
+        const isFuture = m.timeTravelSeq !== null && ev.seq > m.timeTravelSeq;
+        html += '<tr class="evrow' + (isCur ? ' tt' : '') + (isFuture ? ' future' : '') + '" data-seq="' + ev.seq + '">' +
+            '<td class="t">' + esc(fmtTime(ev.time)) + '</td>' +
+            '<td class="t">' + esc(labelBy[ev.sessionId] || '') + '</td>' +
+            '<td class="ev">' + esc(ev.type) + '</td>' +
+            '<td class="t">#' + ev.seq + '</td></tr>';
+    }
+    html += '</table></div><div class="evdetail">' + renderEventDetail(m, labelBy) + '</div></div>';
+    return html + '</div>';
+}
+
+// Detail panel: the selected (time-travel) event, else the latest, with full payload.
+function renderEventDetail(m: any, labelBy: Record<string, string>): string {
+    const d = m.eventDetail;
+    if (!d) { return '<div class="muted" style="padding-top:8px">No event selected.</div>'; }
+    const label = labelBy[d.sessionId] || '';
+    const kind = m.timeTravelSeq === null ? 'latest' : 'selected';
+    let html = '<div class="evhdr"><span class="type">' + esc(d.type) + '</span>' +
+        '<div class="meta">' + esc(fmtTime(d.time)) + (label ? ' · ' + esc(label) : '') + ' · #' + d.seq + ' · ' + kind + '</div></div>';
+    html += '<pre class="ctx">' + esc(JSON.stringify(d.data, null, 2)) + '</pre>';
     return html;
 }
 

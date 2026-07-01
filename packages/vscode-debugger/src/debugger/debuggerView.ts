@@ -43,6 +43,9 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
                 case 'connect': this.controller.connect(); return;
                 case 'disconnect': this.controller.disconnect(); return;
                 case 'timeTravel': this.controller.timeTravel(typeof msg.seq === 'number' ? msg.seq : null); return;
+                case 'stepBack': this.controller.stepBack(); return;
+                case 'stepForward': this.controller.stepForward(); return;
+                case 'backToLive': this.controller.backToLive(); return;
                 case 'dispatch': this.controller.dispatch({ type: String(msg.eventType) }); return;
                 case 'dispatchCustom': this.controller.dispatchCustom(String(msg.type ?? ''), String(msg.payload ?? '')); return;
                 case 'capture': this.controller.capturePersisted(); return;
@@ -123,6 +126,13 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
   table.events tr.evrow:hover td { background: var(--vscode-list-hoverBackground); }
   table.events tr.tt td { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
   table.events tr.future td { opacity: .5; }
+  .events-wrap { display: flex; align-items: stretch; gap: 0; }
+  .loglist { flex: 1 1 auto; overflow: auto; max-height: 320px; outline: none; }
+  .loglist:focus-visible { box-shadow: inset 0 0 0 1px var(--vscode-focusBorder); }
+  .evdetail { flex: 0 0 auto; min-width: 240px; max-width: 45%; border-left: 1px solid var(--vscode-panel-border); padding: 0 10px; overflow: auto; max-height: 320px; }
+  .evdetail .evhdr { font-family: var(--vscode-editor-font-family); font-size: 12px; margin: 8px 0 6px; }
+  .evdetail .evhdr .type { font-weight: 600; }
+  .evdetail .evhdr .meta { color: var(--vscode-descriptionForeground); }
   .tree { font-size: 12px; }
   .tnode { display: flex; align-items: center; gap: 6px; padding: 1px 4px; border-radius: 3px; white-space: nowrap; }
   .tnode.active { background: var(--vscode-list-activeSelectionBackground, rgba(0,160,0,.18)); font-weight: 600; }
