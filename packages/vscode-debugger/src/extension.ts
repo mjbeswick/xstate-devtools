@@ -29,7 +29,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // The debugger bundles its own diagram (no outline tree, so no expansion
     // callback — nothing is collapsed by tree state).
-    const graphViewProvider = new XStateGraphViewProvider(context.extensionUri);
+    const graphViewProvider = new XStateGraphViewProvider(context.extensionUri, undefined, { showSimulate: false });
 
     // ── Live debugger ──────────────────────────────────────────────────────────
     const debuggerController = new DebuggerController(graphViewProvider);

@@ -86,13 +86,21 @@ export class XStateGraphViewProvider {
     // matching workspace machine is found (then the invoke stays a leaf row).
     private resolveInvoke?: (src: string) => MachineNode | undefined;
 
+    // Whether the toolbar offers the interactive simulator. The live debugger
+    // hides it — you inspect a real running actor there, so walking a simulated
+    // copy is redundant and confusing.
+    private readonly showSimulate: boolean;
+
     constructor(
         private readonly extensionUri: vscode.Uri,
         // Optional: report whether a node is currently expanded in an outline
         // tree, so the diagram can collapse nodes the user has collapsed there.
         // The debugger has no outline tree and passes nothing (nothing collapses).
-        private readonly reflectsExpansion?: (node: MachineNode) => boolean
-    ) {}
+        private readonly reflectsExpansion?: (node: MachineNode) => boolean,
+        options?: { showSimulate?: boolean },
+    ) {
+        this.showSimulate = options?.showSimulate ?? true;
+    }
 
     /** Register a callback that selects the given node in the tree outline. */
     public setRevealInTreeHandler(fn: (node: MachineNode) => void) {
@@ -573,8 +581,7 @@ export class XStateGraphViewProvider {
         <button id="btn-export-svg" title="Export as SVG">SVG</button>
         <button id="btn-export-png" title="Export as PNG">PNG</button>
         <button id="btn-export-mermaid" title="Export as Mermaid">MMD</button>
-        <div class="tb-sep"></div>
-        <button id="btn-simulate" title="Simulate (walk the machine interactively)">▷ Sim</button>
+        ${this.showSimulate ? '<div class="tb-sep"></div>\n        <button id="btn-simulate" title="Simulate (walk the machine interactively)">▷ Sim</button>' : ''}
     </div>
     <div id="sim-panel" hidden>
         <div id="sim-head">
