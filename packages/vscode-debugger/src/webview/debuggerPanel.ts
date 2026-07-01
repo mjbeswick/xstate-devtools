@@ -43,46 +43,6 @@ if (ROLE === 'events') {
     });
 }
 
-// Detail-pane width, in px. Kept in a module var so it survives the innerHTML
-// rebuild on every event (otherwise each event would reset the drag); reapplied
-// in render(). Null = use the CSS default (40%).
-let detailBasis: number | null = null;
-let dragging = false;
-
-if (ROLE === 'events') {
-    window.addEventListener('mousemove', (e: MouseEvent) => {
-        if (!dragging) { return; }
-        const wrap = document.querySelector('.events-wrap') as HTMLElement | null;
-        const detail = document.querySelector('.evdetail') as HTMLElement | null;
-        if (!wrap || !detail) { return; }
-        const r = wrap.getBoundingClientRect();
-        detailBasis = Math.max(200, Math.min(r.right - e.clientX, r.width - 200));
-        detail.style.flexBasis = detailBasis + 'px';
-        detail.style.width = 'auto';
-        e.preventDefault();
-    });
-    window.addEventListener('mouseup', () => {
-        if (!dragging) { return; }
-        dragging = false;
-        document.getElementById('splitter')?.classList.remove('active');
-        document.body.style.userSelect = '';
-    });
-}
-
-/** Re-attach the splitter drag handle and reapply the remembered width after a rebuild. */
-function wireDetailResize(): void {
-    document.getElementById('splitter')?.addEventListener('mousedown', (e) => {
-        dragging = true;
-        document.getElementById('splitter')?.classList.add('active');
-        document.body.style.userSelect = 'none';
-        e.preventDefault();
-    });
-    if (detailBasis !== null) {
-        const d = document.querySelector('.evdetail') as HTMLElement | null;
-        if (d) { d.style.flexBasis = detailBasis + 'px'; d.style.width = 'auto'; }
-    }
-}
-
 function render(m: any): void {
     const live = m.status === 'open';
     const body = $('body');
@@ -134,7 +94,6 @@ function render(m: any): void {
         type: (document.getElementById('cev-type') as HTMLInputElement | null)?.value || '',
         payload: (document.getElementById('cev-payload') as HTMLTextAreaElement | null)?.value || '',
     }));
-    wireDetailResize();
 }
 
 // Selected actor inspector: state summary, context, dispatch, persisted.
@@ -184,8 +143,9 @@ function renderInspector(m: any): string {
 }
 
 // Event log (bottom panel) — newest first, with the actor each event hit,
-// clickable to time-travel. The log list (left) is a focusable scroll container
-// for ←/→/Esc keyboard nav; the detail panel (right) shows the selected/latest event.
+// clickable to time-travel. The list is a focusable scroll container for the
+// ←/→/Esc keyboard nav; the selected event's payload is shown by the native
+// "Event" tree in the Debugger sidebar.
 function renderEvents(m: any): string {
     const labelBy: Record<string, string> = {};
     for (const a of m.actors) { labelBy[a.sessionId] = a.label; }
@@ -195,7 +155,7 @@ function renderEvents(m: any): string {
             ? 'No events captured yet.' : 'Connect from the Debugger view to capture events.') + '</div>';
         return html + '</div>';
     }
-    html += '<div class="events-wrap"><div class="loglist" id="loglist" tabindex="0"><table class="events">';
+    html += '<div class="loglist" id="loglist" tabindex="0"><table class="events">';
     for (let i = m.events.length - 1; i >= 0; i--) {
         const ev = m.events[i];
         const isCur = m.timeTravelSeq !== null && ev.seq === m.timeTravelSeq;
@@ -206,20 +166,8 @@ function renderEvents(m: any): string {
             '<td class="ev">' + esc(ev.type) + '</td>' +
             '<td class="t">#' + ev.seq + '</td></tr>';
     }
-    html += '</table></div><div class="splitter" id="splitter"></div><div class="evdetail">' + renderEventDetail(m, labelBy) + '</div></div>';
+    html += '</table></div>';
     return html + '</div>';
-}
-
-// Detail panel: the selected (time-travel) event, else the latest, with full payload.
-function renderEventDetail(m: any, labelBy: Record<string, string>): string {
-    const d = m.eventDetail;
-    if (!d) { return '<div class="muted" style="padding-top:8px">No event selected.</div>'; }
-    const label = labelBy[d.sessionId] || '';
-    const kind = m.timeTravelSeq === null ? 'latest' : 'selected';
-    let html = '<div class="evhdr"><span class="type">' + esc(d.type) + '</span>' +
-        '<div class="meta">' + esc(fmtTime(d.time)) + (label ? ' · ' + esc(label) : '') + ' · #' + d.seq + ' · ' + kind + '</div></div>';
-    html += '<pre class="ctx">' + esc(JSON.stringify(d.data, null, 2)) + '</pre>';
-    return html;
 }
 
 function fmtTime(ms: number): string {

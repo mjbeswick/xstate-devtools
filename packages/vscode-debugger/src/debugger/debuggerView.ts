@@ -103,7 +103,6 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
   .actor .alabel { font-weight: 600; }
   .actor .astate { color: var(--vscode-descriptionForeground); font-family: var(--vscode-editor-font-family); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
   .chip { display: inline-block; padding: 0 6px; margin: 1px 3px 1px 0; border-radius: 9px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); font-size: 11px; }
-  pre.ctx { margin: 0; max-height: 240px; overflow: auto; font-family: var(--vscode-editor-font-family); font-size: 12px; white-space: pre; background: var(--vscode-textCodeBlock-background); padding: 6px; border-radius: 3px; }
   table.events { width: 100%; border-collapse: collapse; font-size: 12px; }
   table.events td { padding: 1px 6px 1px 0; white-space: nowrap; color: var(--vscode-foreground); }
   table.events td.t { color: var(--vscode-descriptionForeground); font-family: var(--vscode-editor-font-family); }
@@ -126,16 +125,8 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
   table.events tr.evrow:hover td { background: var(--vscode-list-hoverBackground); }
   table.events tr.tt td { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
   table.events tr.future td { opacity: .5; }
-  .events-wrap { display: flex; align-items: stretch; gap: 0; }
-  .loglist { flex: 1 1 auto; overflow: auto; max-height: 320px; outline: none; }
+  .loglist { overflow: auto; outline: none; }
   .loglist:focus-visible { box-shadow: inset 0 0 0 1px var(--vscode-focusBorder); }
-  .evdetail { flex: 0 0 auto; width: 40%; min-width: 200px; padding: 0 10px; overflow: auto; max-height: 320px; }
-  .splitter { flex: 0 0 6px; cursor: col-resize; background: var(--vscode-panel-border); }
-  .splitter:hover, .splitter.active { background: var(--vscode-focusBorder); }
-  .evdetail .evhdr { font-family: var(--vscode-editor-font-family); font-size: 12px; margin: 8px 0 6px; }
-  .evdetail .evhdr .type { font-weight: 600; }
-  .evdetail .evhdr .meta { color: var(--vscode-descriptionForeground); }
-  .evdetail pre.ctx { max-height: none; white-space: pre-wrap; overflow-wrap: anywhere; }
   .tree { font-size: 12px; }
   .tnode { display: flex; align-items: center; gap: 6px; padding: 1px 4px; border-radius: 3px; white-space: nowrap; }
   .tnode.active { background: var(--vscode-list-activeSelectionBackground, rgba(0,160,0,.18)); font-weight: 600; }

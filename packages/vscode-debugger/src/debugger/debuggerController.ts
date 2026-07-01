@@ -36,15 +36,6 @@ export interface EventVM {
     time: number;
 }
 
-/** The one event shown in the Events detail panel — latest, or the selected/time-travel seq. */
-export interface EventDetailVM {
-    sessionId: string;
-    type: string;
-    seq: number;
-    time: number;
-    data: unknown;
-}
-
 /** An event the selected actor could be sent from its current state. */
 export interface TransitionVM {
     eventType: string;
@@ -70,7 +61,6 @@ export interface DebuggerViewModel {
         persisted: { captured: boolean; error?: string };
     } | null;
     events: EventVM[];
-    eventDetail: EventDetailVM | null;
 }
 
 /** A surface (the sidebar webview) that renders the debugger view-model. */
@@ -474,15 +464,6 @@ export class DebuggerController implements vscode.Disposable {
             .slice(-MAX_EVENT_ROWS)
             .map((e) => ({ sessionId: e.sessionId, type: e.event.type, seq: e.globalSeq, time: e.timestamp }));
 
-        // The detail panel shows the selected (time-travel) event, else the latest.
-        // Only this one carries the full payload, so the pushed model stays small.
-        const detailEntry = state.timeTravelSeq !== null
-            ? state.events.find((e) => e.globalSeq === state.timeTravelSeq)
-            : state.events[state.events.length - 1];
-        const eventDetail: EventDetailVM | null = detailEntry
-            ? { sessionId: detailEntry.sessionId, type: detailEntry.event.type, seq: detailEntry.globalSeq, time: detailEntry.timestamp, data: detailEntry.event }
-            : null;
-
         return {
             status: this.status,
             url: this.url(),
@@ -493,7 +474,6 @@ export class DebuggerController implements vscode.Disposable {
             actors,
             selected,
             events,
-            eventDetail,
         };
     }
 

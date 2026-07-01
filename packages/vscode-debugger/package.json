@@ -33,6 +33,7 @@
   "activationEvents": [
     "onView:xstateDebuggerInstances",
     "onView:xstateDebuggerContext",
+    "onView:xstateDebuggerEvent",
     "onView:xstateEventsLog"
   ],
   "main": "./out/extension.js",
@@ -46,6 +47,10 @@
         {
           "id": "xstateDebuggerContext",
           "name": "Context"
+        },
+        {
+          "id": "xstateDebuggerEvent",
+          "name": "Event"
         }
       ],
       "xstate-events": [

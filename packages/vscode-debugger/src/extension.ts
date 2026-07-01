@@ -8,6 +8,7 @@ import { DebuggerController } from './debugger/debuggerController';
 import { DebuggerViewProvider } from './debugger/debuggerView';
 import { DebuggerTreeProvider } from './debugger/debuggerTreeProvider';
 import { DebuggerContextTreeProvider, ContextTreeItem } from './debugger/debuggerContextTreeProvider';
+import { DebuggerEventTreeProvider } from './debugger/debuggerEventTreeProvider';
 import { registerDebuggerCommands } from './debugger/debuggerCommands';
 import { DebuggerActiveDecorationProvider } from './debugger/debuggerDecorationProvider';
 import { DebuggerSetupDetector } from './debugger/debuggerSetup';
@@ -64,6 +65,11 @@ export async function activate(context: vscode.ExtensionContext) {
     const debuggerContextTreeView = vscode.window.createTreeView('xstateDebuggerContext', {
         treeDataProvider: debuggerContextTreeProvider,
     });
+    const debuggerEventTreeProvider = new DebuggerEventTreeProvider(debuggerController);
+    const debuggerEventTreeView = vscode.window.createTreeView('xstateDebuggerEvent', {
+        treeDataProvider: debuggerEventTreeProvider,
+    });
+    debuggerEventTreeProvider.setView(debuggerEventTreeView);
     const setShowStopped = (value: boolean) => {
         debuggerTreeProvider.setShowStopped(value);
         void vscode.commands.executeCommand('setContext', 'xstateDebugger.showStopped', value);
@@ -173,6 +179,8 @@ export async function activate(context: vscode.ExtensionContext) {
         debuggerTreeSelectionListener,
         { dispose: () => debuggerFreezeIndicator() },
         debuggerContextTreeView,
+        debuggerEventTreeView,
+        debuggerEventTreeProvider,
         debuggerShowStoppedCommand,
         debuggerHideStoppedCommand,
         debuggerFollowDiagramCommand,
