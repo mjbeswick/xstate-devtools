@@ -135,6 +135,7 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
   .evdetail .evhdr { font-family: var(--vscode-editor-font-family); font-size: 12px; margin: 8px 0 6px; }
   .evdetail .evhdr .type { font-weight: 600; }
   .evdetail .evhdr .meta { color: var(--vscode-descriptionForeground); }
+  .evdetail pre.ctx { max-height: none; white-space: pre-wrap; overflow-wrap: anywhere; }
   .tree { font-size: 12px; }
   .tnode { display: flex; align-items: center; gap: 6px; padding: 1px 4px; border-radius: 3px; white-space: nowrap; }
   .tnode.active { background: var(--vscode-list-activeSelectionBackground, rgba(0,160,0,.18)); font-weight: 600; }
