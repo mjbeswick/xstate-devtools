@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.23.0] - 2026-07-01
+
+### Changed
+- Maintenance release: rebuilt against the shared diagram-core (which gained an internal option to hide the simulator, used only by the live debugger). No user-facing changes to the outline, diagram, or simulator here.
+
 ## [1.22.0] - 2026-06-30
 
 ### Added
