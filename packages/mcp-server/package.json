@@ -1,6 +1,6 @@
 {
   "name": "@xstate-devtools/mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Model Context Protocol server for XState: list machines, describe structure, Mermaid diagrams, test paths, and validation — over any workspace, no VS Code required.",
   "license": "MIT",
   "repository": {
@@ -8,12 +8,20 @@
     "url": "https://github.com/mjbeswick/xstate-devtools.git",
     "directory": "packages/mcp-server"
   },
-  "keywords": ["xstate", "mcp", "model-context-protocol", "statechart", "ai"],
+  "keywords": [
+    "xstate",
+    "mcp",
+    "model-context-protocol",
+    "statechart",
+    "ai"
+  ],
   "bin": {
     "xstate-mcp": "dist/index.js"
   },
   "main": "dist/index.js",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=18"
   },

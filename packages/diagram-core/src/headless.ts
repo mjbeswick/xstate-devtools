@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { MachineNode, XStateMachineParser } from './parser';
-import { validateXStateDocument } from './diagnostics';
+import { validateXStateDocument, computeSetupCoverage, type SetupCoverage } from './diagnostics';
 
 // Build the minimal TextDocument the parser/diagnostics actually use
 // (getText/fileName/languageId/uri/positionAt/offsetAt) from raw source — no
@@ -34,6 +34,13 @@ function makeDoc(fileName: string, text: string, languageId = 'typescript'): vsc
 /** Parse XState machines from raw source, no VS Code TextDocument needed. */
 export function parseSource(fileName: string, text: string): MachineNode[] {
     return XStateMachineParser.parseMachines(makeDoc(fileName, text));
+}
+
+/** setup() coverage for one machine from raw source. `machinePos` (a parsed
+ *  MachineNode's `range.start`) selects the machine when a file has several. */
+export function setupCoverageSource(fileName: string, text: string, machinePos?: { line: number; character: number }): SetupCoverage | undefined {
+    const doc = makeDoc(fileName, text);
+    return computeSetupCoverage(doc, machinePos ? doc.offsetAt(machinePos as vscode.Position) : undefined);
 }
 
 export interface PlainDiagnostic {

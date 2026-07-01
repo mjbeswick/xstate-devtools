@@ -13,6 +13,10 @@ It reuses the same analysis engine as the [XState Devtools](../vscode-devtool/RE
 | `machine_diagram` | Mermaid `stateDiagram-v2` for a machine. |
 | `test_paths` | Shortest event sequence to reach each state, unreachable states flagged, plus test skeletons. |
 | `validate` | XState diagnostics (invalid properties, unknown transition targets, unreachable states, …). |
+| `find_references` | Everywhere a name is *used* as an action, guard, invoked actor, or event, with machine, state, file and line. |
+| `setup_coverage` | Which actions/guards/actors a machine references and which are missing from `setup()` (and which declared ones are unused). |
+| `list_events` | A machine's `send()` API — every event, the states that handle it, and any guard/target. |
+| `state_detail` | One state's entry/exit actions, invokes, and outgoing transitions. |
 
 ## Usage
 
