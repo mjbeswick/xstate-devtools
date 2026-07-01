@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.0] - 2026-07-01
+
+- Version bump for a coordinated release with the XState Devtools extension; no functional changes since 1.0.0.
+
 ## [1.0.0] - 2026-07-01
 
 First stable release.

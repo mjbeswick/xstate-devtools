@@ -2,7 +2,7 @@
   "name": "xstate-debugger",
   "displayName": "XState Debugger",
   "description": "Live XState debugger: attach to running Node/SSR actors over the server adapter, inspect instances & context, time-travel the event log, and overlay live state on a statechart diagram.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "MichaelBeswick",
   "license": "MIT",
   "icon": "images/icon.png",

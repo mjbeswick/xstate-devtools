@@ -1,11 +1,6 @@
 # Changelog
 
-## [1.24.1] - 2026-07-01
-
-### Changed
-- Removed the problem-count badge from the XState Devtools activity-bar icon (the count is still shown in the Errors view).
-
-## [1.24.0] - 2026-07-01
+## [1.25.0] - 2026-07-01
 
 ### Added
 - **Four new AI (Language Model) tools** for Copilot:
@@ -13,6 +8,9 @@
   - `#xstateSetupCoverage` — the actions/guards/actors a machine references and which are **missing** from its `setup()` (plus which declared ones are unused).
   - `#xstateEvents` — a machine's `send()` API: every event, the states that handle it, and any guard/target (eventless/delayed transitions flagged as automatic).
   - `#xstateStateDetail` — one state's entry/exit actions, invoked services, and outgoing transitions.
+
+### Changed
+- Removed the problem-count badge from the XState Devtools activity-bar icon (the count is still shown in the Errors view).
 
 ## [1.23.0] - 2026-07-01
 
