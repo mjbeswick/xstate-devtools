@@ -206,36 +206,36 @@
       },
       {
         "command": "xstateDebugger.showStopped",
-        "title": "Show Stopped Actors",
+        "title": "Stopped Actors: Shown",
         "category": "XState Debugger",
         "icon": "$(eye)"
       },
       {
         "command": "xstateDebugger.hideStopped",
-        "title": "Hide Stopped Actors",
+        "title": "Stopped Actors: Hidden",
         "category": "XState Debugger",
         "icon": "$(eye-closed)"
       },
       {
         "command": "xstateDebugger.followDiagram",
-        "title": "Follow Actor in Diagram",
+        "title": "Follow in Diagram: On",
         "category": "XState Debugger",
         "icon": "$(type-hierarchy)"
       },
       {
         "command": "xstateDebugger.unfollowDiagram",
-        "title": "Stop Following in Diagram",
+        "title": "Follow in Diagram: Off",
         "category": "XState Debugger",
         "icon": "$(type-hierarchy-sub)"
       },
       {
         "command": "xstateDebugger.setNavigateDiagram",
-        "title": "Navigate to Diagram on Select",
+        "title": "Navigate: Diagram",
         "category": "XState Debugger"
       },
       {
         "command": "xstateDebugger.setNavigateCode",
-        "title": "Navigate to Code on Select",
+        "title": "Navigate: Code",
         "category": "XState Debugger"
       },
       {

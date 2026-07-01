@@ -60,11 +60,14 @@ export async function activate(context: vscode.ExtensionContext) {
             item,
         );
     };
+    // Set while an event-log click programmatically reveals+selects an actor, so
+    // the selection handler doesn't also fire navigate-on-select for it.
+    let revealingFromEvent = false;
     const debuggerTreeSelectionListener = debuggerTreeView.onDidChangeSelection((e) => {
         const item = e.selection[0];
         if (item && item.kind !== 'waiting') {
             debuggerController.selectActor(item.sessionId);
-            navigateToSelected(item);
+            if (!revealingFromEvent) { navigateToSelected(item); }
         }
     });
     const setNavigateTarget = (value: 'diagram' | 'code') => {
@@ -86,10 +89,19 @@ export async function activate(context: vscode.ExtensionContext) {
     const debuggerContextTreeView = vscode.window.createTreeView('xstateDebuggerContext', {
         treeDataProvider: debuggerContextTreeProvider,
     });
-    // Selecting an event reveals the actor it hit in the Instances tree.
+    // Selecting an event reveals + selects the actor it hit in the Instances tree,
+    // expanding ancestors. Deferred a tick so the tree has processed the
+    // selection-driven refresh first — revealing synchronously can miss the
+    // freshly-built nodes and silently no-op.
     const debuggerRevealActorSub = debuggerController.onDidSelectEventActor((sessionId) => {
-        const item = debuggerTreeProvider.getActorItem(sessionId);
-        if (item) { void debuggerTreeView.reveal(item, { select: true, focus: false, expand: true }); }
+        setTimeout(() => {
+            const item = debuggerTreeProvider.getActorItem(sessionId);
+            if (!item) { return; }
+            revealingFromEvent = true;
+            Promise.resolve(debuggerTreeView.reveal(item, { select: true, focus: false, expand: true }))
+                .then(undefined, () => { /* view hidden / item gone — ignore */ })
+                .finally(() => { revealingFromEvent = false; });
+        }, 0);
     });
     const debuggerEventTreeProvider = new DebuggerEventTreeProvider(debuggerController);
     const debuggerEventTreeView = vscode.window.createTreeView('xstateDebuggerEvent', {
