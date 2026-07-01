@@ -877,13 +877,6 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     const errorsView = vscode.window.createTreeView('xstateMachineErrors', { treeDataProvider: errorsProvider, showCollapseAll: true });
 
-    // Keep the badge in sync with whatever the provider currently shows.
-    const updateErrorsBadge = () => {
-        const count = errorsProvider.totalCount();
-        errorsView.badge = count > 0 ? { value: count, tooltip: 'XState problems' } : undefined;
-    };
-    const errorsBadgeListener = errorsProvider.onDidChangeTreeData(() => updateErrorsBadge());
-
     // Incremental refresh: coalesce per-file changes and bulk rebuilds over a short
     // debounce. Bulk (scope change / scan complete) re-validates everything; per-file
     // changes (a single edited/created/deleted machine file) re-validate just that file.
@@ -1209,7 +1202,6 @@ export async function activate(context: vscode.ExtensionContext) {
         setErrorsFilterAllCommand,
         setErrorsFilterWarningsCommand,
         setErrorsFilterErrorsCommand,
-        errorsBadgeListener,
         errorsScanListener,
         errorsEditorListener,
         errorsConfigListener,

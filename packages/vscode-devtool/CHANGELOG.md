@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.24.1] - 2026-07-01
+
+### Changed
+- Removed the problem-count badge from the XState Devtools activity-bar icon (the count is still shown in the Errors view).
+
 ## [1.24.0] - 2026-07-01
 
 ### Added
