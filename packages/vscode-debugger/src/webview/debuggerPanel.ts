@@ -52,10 +52,9 @@ function render(m: any): void {
     if (m.replayMode) {
         banner = '<div class="banner replay"><span class="grow">● Replay' + (m.replayName ? (' · ' + esc(m.replayName)) : '') +
             '</span><button class="secondary" id="exit-replay">Exit replay</button></div>';
-    } else if (m.timeTravelSeq !== null) {
-        banner = '<div class="banner tt"><span class="grow">⏱ Time travel · seq ' + m.timeTravelSeq +
-            '</span><button class="secondary" id="back-live">Back to live</button></div>';
     }
+    // Time-travel is shown by the selected/dimmed rows here, the Instances tree
+    // message, and the title-bar "Back to Live" action — no in-panel banner needed.
 
     if (ROLE === 'events') {
         // Scroll-lock: when an event is selected, keep its row pinned at the same
@@ -100,7 +99,6 @@ function render(m: any): void {
         el.addEventListener('click', () => vscode.postMessage({ command: 'timeTravel', seq: Number((el as HTMLElement).dataset.seq) }));
     });
     document.getElementById('exit-replay')?.addEventListener('click', () => vscode.postMessage({ command: 'exitReplay' }));
-    document.getElementById('back-live')?.addEventListener('click', () => vscode.postMessage({ command: 'timeTravel', seq: null }));
     document.getElementById('capture')?.addEventListener('click', () => vscode.postMessage({ command: 'capture' }));
     document.getElementById('restore')?.addEventListener('click', () => vscode.postMessage({ command: 'restore' }));
     document.getElementById('cev-send')?.addEventListener('click', () => vscode.postMessage({
@@ -163,7 +161,7 @@ function renderInspector(m: any): string {
 function renderEvents(m: any): string {
     const labelBy: Record<string, string> = {};
     for (const a of m.actors) { labelBy[a.sessionId] = a.label; }
-    let html = '<div class="section"><h3>Events</h3>';
+    let html = '<div class="section">';
     if (!m.events.length) {
         html += '<div class="muted">' + (m.status === 'open'
             ? 'No events captured yet.' : 'Connect from the Debugger view to capture events.') + '</div>';
