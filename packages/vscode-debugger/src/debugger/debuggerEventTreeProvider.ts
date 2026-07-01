@@ -93,9 +93,7 @@ export class DebuggerEventTreeProvider implements vscode.TreeDataProvider<EventT
 
     private headerText(): string | undefined {
         const entry = this.selectedEntry();
-        if (!entry) { return undefined; }
-        const kind = this.controller.getStore().getState().timeTravelSeq === null ? 'latest' : 'selected';
-        return `#${entry.globalSeq} · ${kind}`;
+        return entry ? `#${entry.globalSeq}` : undefined;
     }
 
     private item(key: string, value: unknown): EventTreeItem {
