@@ -43,6 +43,46 @@ if (ROLE === 'events') {
     });
 }
 
+// Detail-pane width, in px. Kept in a module var so it survives the innerHTML
+// rebuild on every event (otherwise each event would reset the drag); reapplied
+// in render(). Null = use the CSS default (40%).
+let detailBasis: number | null = null;
+let dragging = false;
+
+if (ROLE === 'events') {
+    window.addEventListener('mousemove', (e: MouseEvent) => {
+        if (!dragging) { return; }
+        const wrap = document.querySelector('.events-wrap') as HTMLElement | null;
+        const detail = document.querySelector('.evdetail') as HTMLElement | null;
+        if (!wrap || !detail) { return; }
+        const r = wrap.getBoundingClientRect();
+        detailBasis = Math.max(200, Math.min(r.right - e.clientX, r.width - 200));
+        detail.style.flexBasis = detailBasis + 'px';
+        detail.style.width = 'auto';
+        e.preventDefault();
+    });
+    window.addEventListener('mouseup', () => {
+        if (!dragging) { return; }
+        dragging = false;
+        document.getElementById('splitter')?.classList.remove('active');
+        document.body.style.userSelect = '';
+    });
+}
+
+/** Re-attach the splitter drag handle and reapply the remembered width after a rebuild. */
+function wireDetailResize(): void {
+    document.getElementById('splitter')?.addEventListener('mousedown', (e) => {
+        dragging = true;
+        document.getElementById('splitter')?.classList.add('active');
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+    if (detailBasis !== null) {
+        const d = document.querySelector('.evdetail') as HTMLElement | null;
+        if (d) { d.style.flexBasis = detailBasis + 'px'; d.style.width = 'auto'; }
+    }
+}
+
 function render(m: any): void {
     const live = m.status === 'open';
     const body = $('body');
@@ -94,6 +134,7 @@ function render(m: any): void {
         type: (document.getElementById('cev-type') as HTMLInputElement | null)?.value || '',
         payload: (document.getElementById('cev-payload') as HTMLTextAreaElement | null)?.value || '',
     }));
+    wireDetailResize();
 }
 
 // Selected actor inspector: state summary, context, dispatch, persisted.
@@ -165,7 +206,7 @@ function renderEvents(m: any): string {
             '<td class="ev">' + esc(ev.type) + '</td>' +
             '<td class="t">#' + ev.seq + '</td></tr>';
     }
-    html += '</table></div><div class="evdetail">' + renderEventDetail(m, labelBy) + '</div></div>';
+    html += '</table></div><div class="splitter" id="splitter"></div><div class="evdetail">' + renderEventDetail(m, labelBy) + '</div></div>';
     return html + '</div>';
 }
 

@@ -129,7 +129,9 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
   .events-wrap { display: flex; align-items: stretch; gap: 0; }
   .loglist { flex: 1 1 auto; overflow: auto; max-height: 320px; outline: none; }
   .loglist:focus-visible { box-shadow: inset 0 0 0 1px var(--vscode-focusBorder); }
-  .evdetail { flex: 0 0 auto; min-width: 240px; max-width: 45%; border-left: 1px solid var(--vscode-panel-border); padding: 0 10px; overflow: auto; max-height: 320px; }
+  .evdetail { flex: 0 0 auto; width: 40%; min-width: 200px; padding: 0 10px; overflow: auto; max-height: 320px; }
+  .splitter { flex: 0 0 6px; cursor: col-resize; background: var(--vscode-panel-border); }
+  .splitter:hover, .splitter.active { background: var(--vscode-focusBorder); }
   .evdetail .evhdr { font-family: var(--vscode-editor-font-family); font-size: 12px; margin: 8px 0 6px; }
   .evdetail .evhdr .type { font-weight: 600; }
   .evdetail .evhdr .meta { color: var(--vscode-descriptionForeground); }
