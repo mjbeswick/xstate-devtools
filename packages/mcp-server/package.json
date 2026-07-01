@@ -1,7 +1,7 @@
 {
   "name": "@xstate-devtools/mcp",
   "version": "0.2.0",
-  "description": "Model Context Protocol server for XState: list machines, describe structure, Mermaid diagrams, test paths, and validation — over any workspace, no VS Code required.",
+  "description": "Model Context Protocol server for XState: list machines, describe structure, Mermaid diagrams, test paths, validation, find references, setup() coverage, events, and state detail — over any workspace, no VS Code required.",
   "license": "MIT",
   "repository": {
     "type": "git",
