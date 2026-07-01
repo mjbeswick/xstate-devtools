@@ -9,6 +9,10 @@ import {
     renderTestPathsMarkdown,
     validateXStateDocument,
     fuzzyMatch,
+    findReferences,
+    listEvents,
+    stateDetail,
+    computeSetupCoverage,
 } from '@xstate-devtools/diagram-core';
 import { ImplementationFinder } from './implementationFinder';
 
@@ -170,5 +174,75 @@ export function registerLanguageModelTools(
         }
         if (total === 0) { return result(`No XState problems found in ${targets.length} file(s).`); }
         return result(`${total} problem(s):\n\n${blocks.join('\n\n')}`);
+    });
+
+    tool<{ name: string; file?: string }>('xstate_find_references', async ({ name, file }) => {
+        const files = await allFiles(scanner);
+        let refs = flatten(files);
+        if (file) { refs = refs.filter((x) => x.file.includes(file) || (x.machine.uri?.fsPath ?? '').includes(file)); }
+        const found = findReferences(refs.map((x) => x.machine), name);
+        if (found.length === 0) { return result(`No references to "${name}" as an action/guard/actor/event.`); }
+        const lines = found.map((r) => {
+            const rel = r.file ? vscode.workspace.asRelativePath(r.file) : '?';
+            return `[${r.kind}] ${r.machine}${r.state ? ' › ' + r.state : ''} — ${rel}:${r.line}`;
+        });
+        return result(lines.join('\n'));
+    });
+
+    tool<{ machine: string; file?: string }>('xstate_setup_coverage', async ({ machine, file }) => {
+        const files = await allFiles(scanner);
+        const r = resolve(files, machine, file);
+        if (r.error) { return r.error; }
+        const doc = await vscode.workspace.openTextDocument(r.ref!.machine.uri);
+        const cov = computeSetupCoverage(doc, doc.offsetAt(r.ref!.machine.range.start));
+        if (!cov) { return result(`Could not analyse setup() for "${machine}".`); }
+        if (!cov.hasSetup) { return result(`"${cov.machine}" has no setup() block — actions/guards/actors are inline or unresolved.`); }
+        const line = (title: string, s: { referenced: string[]; missing: string[]; unused: string[] }) =>
+            `${title}: ${s.referenced.length} referenced` +
+            (s.missing.length ? `, MISSING: ${s.missing.join(', ')}` : ', none missing') +
+            (s.unused.length ? ` (unused: ${s.unused.join(', ')})` : '');
+        return result([
+            `Setup coverage — ${cov.machine}`,
+            line('Actions', { referenced: cov.referenced.actions, missing: cov.missing.actions, unused: cov.unused.actions }),
+            line('Guards', { referenced: cov.referenced.guards, missing: cov.missing.guards, unused: cov.unused.guards }),
+            line('Actors', { referenced: cov.referenced.actors, missing: cov.missing.actors, unused: cov.unused.actors }),
+        ].join('\n'));
+    });
+
+    tool<{ machine: string; file?: string }>('xstate_list_events', async ({ machine, file }) => {
+        const files = await allFiles(scanner);
+        const r = resolve(files, machine, file);
+        if (r.error) { return r.error; }
+        const events = listEvents(r.ref!.machine, invokeResolver(files));
+        if (events.length === 0) { return result(`"${r.ref!.machine.label}" handles no events.`); }
+        const lines = events.map((e) => {
+            const hs = e.handlers.map((h) => `${h.state}${h.target ? '→' + h.target : ' (internal)'}${h.guard ? ' [' + h.guard + ']' : ''}`).join(', ');
+            return `${e.auto ? '(auto) ' : ''}${e.event} — ${hs}`;
+        });
+        return result(lines.join('\n'));
+    });
+
+    tool<{ machine: string; state: string; file?: string }>('xstate_state_detail', async ({ machine, state, file }) => {
+        const files = await allFiles(scanner);
+        const r = resolve(files, machine, file);
+        if (r.error) { return r.error; }
+        const d = stateDetail(r.ref!.machine, state, invokeResolver(files));
+        if (!d) {
+            const labels = describeMachine(r.ref!.machine, invokeResolver(files)).states.map((s) => s.label);
+            return result(`No state "${state}" in "${r.ref!.machine.label}". States: ${labels.join(', ')}.`);
+        }
+        const flags = [d.parallel && 'parallel', d.compound && 'compound', d.initial && 'initial', d.final && 'final'].filter(Boolean).join(', ');
+        const out: string[] = [`State "${d.state}"${flags ? ' (' + flags + ')' : ''} in ${d.machine}${d.parent ? ' › ' + d.parent : ''}`];
+        if (d.entryActions) { out.push(`entry: ${d.entryActions.join(', ')}`); }
+        if (d.exitActions) { out.push(`exit: ${d.exitActions.join(', ')}`); }
+        if (d.invokes) { out.push(`invoke: ${d.invokes.join(', ')}`); }
+        if (d.transitions.length) {
+            out.push('transitions:');
+            for (const t of d.transitions) {
+                out.push(`  ${t.event}${t.target ? ' → ' + t.target : ''}${t.guard ? ' [' + t.guard + ']' : ''}${t.actions ? ' / ' + t.actions.join(', ') : ''}`);
+            }
+        }
+        if (d.ambiguous) { out.push(`(note: ${d.ambiguous} states share the label "${d.state}"; showing the first)`); }
+        return result(out.join('\n'));
     });
 }

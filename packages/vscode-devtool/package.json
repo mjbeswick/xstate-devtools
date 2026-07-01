@@ -2,7 +2,7 @@
   "name": "xstate-devtools",
   "displayName": "xState Devtools",
   "description": "XState developer tools: interactive outline, search, and navigation",
-  "version": "1.23.0",
+  "version": "1.24.0",
   "publisher": "MichaelBeswick",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -184,6 +184,119 @@
           },
           "required": [
             "name"
+          ]
+        }
+      },
+      {
+        "name": "xstate_find_references",
+        "displayName": "Find XState references",
+        "modelDescription": "Find every place a name is USED across the workspace as an XState action, guard, invoked actor (service), or event — the inverse of xstate_find_implementation. Returns each usage with its machine, enclosing state, file and line.",
+        "toolReferenceName": "xstateFindRefs",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(references)",
+        "tags": [
+          "xstate"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The action/guard/actor/event name to find usages of."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to restrict the search to."
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      },
+      {
+        "name": "xstate_setup_coverage",
+        "displayName": "XState setup() coverage",
+        "modelDescription": "For one XState v5 machine, list every action, guard, and actor referenced in its config and which are MISSING an implementation in setup() (also which declared ones are unused). Use to check a machine's setup() is complete before running it.",
+        "toolReferenceName": "xstateSetupCoverage",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(checklist)",
+        "tags": [
+          "xstate"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "machine": {
+              "type": "string",
+              "description": "The machine's id."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to disambiguate."
+            }
+          },
+          "required": [
+            "machine"
+          ]
+        }
+      },
+      {
+        "name": "xstate_list_events",
+        "displayName": "List XState events",
+        "modelDescription": "List the events an XState machine handles — its send() API. For each event, the states that handle it and any guard/target. Includes eventless (always) and delayed (after) transitions, flagged as automatic (not sendable).",
+        "toolReferenceName": "xstateEvents",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(symbol-event)",
+        "tags": [
+          "xstate"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "machine": {
+              "type": "string",
+              "description": "The machine's id."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to disambiguate."
+            }
+          },
+          "required": [
+            "machine"
+          ]
+        }
+      },
+      {
+        "name": "xstate_state_detail",
+        "displayName": "XState state detail",
+        "modelDescription": "Focused detail for one state of an XState machine, by label or id: its entry/exit actions, invoked services, and outgoing transitions (event, target, guard, actions). Cheaper than describing the whole machine.",
+        "toolReferenceName": "xstateStateDetail",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(symbol-field)",
+        "tags": [
+          "xstate"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "machine": {
+              "type": "string",
+              "description": "The machine's id."
+            },
+            "state": {
+              "type": "string",
+              "description": "The state's label or id."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to disambiguate."
+            }
+          },
+          "required": [
+            "machine",
+            "state"
           ]
         }
       }

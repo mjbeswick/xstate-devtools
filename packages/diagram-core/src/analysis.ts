@@ -94,6 +94,88 @@ export function computeTestPaths(machine: MachineNode, resolveInvoke?: ResolveIn
     };
 }
 
+export type ReferenceKind = 'action' | 'guard' | 'actor' | 'event';
+export interface Reference {
+    kind: ReferenceKind;
+    name: string;
+    machine: string;
+    state?: string;
+    file?: string;
+    line: number;
+}
+
+/** Every place `name` is USED (action/guard/actor/event) across the given machines. */
+export function findReferences(machines: MachineNode[], name: string): Reference[] {
+    const out: Reference[] = [];
+    const walk = (node: MachineNode, machine: string, state: string | undefined) => {
+        // Don't report setup() declarations as usages.
+        if (node.type === 'setup') { return; }
+        if (node.label === name && !node.isInline) {
+            let kind: ReferenceKind | undefined;
+            if (node.type === 'action' || node.type === 'entry' || node.type === 'exit') { kind = 'action'; }
+            else if (node.type === 'guard' && node.guardCombinator === undefined) { kind = 'guard'; }
+            else if (node.type === 'invoke') { kind = 'actor'; }
+            else if (node.type === 'transition') { kind = 'event'; }
+            if (kind) { out.push({ kind, name, machine, state, file: node.uri?.fsPath, line: (node.range?.start.line ?? 0) + 1 }); }
+        }
+        const childState = node.type === 'state' ? node.label : state;
+        for (const c of node.children ?? []) { walk(c, machine, childState); }
+    };
+    for (const m of machines) { walk(m, m.label, undefined); }
+    return out;
+}
+
+export interface EventHandler { state: string; guard?: string; target?: string }
+export interface MachineEvent { event: string; auto?: boolean; handlers: EventHandler[] }
+
+const AUTO_EVENT = /^(always$|after |onDone$|onError$)/;
+
+/** The events a machine handles — its `send()` API — with the states that handle each. */
+export function listEvents(machine: MachineNode, resolveInvoke?: ResolveInvoke): MachineEvent[] {
+    const sim = buildGraphPayload(machine, { resolveInvoke }).sim!;
+    const labelById = new Map(sim.states.map((s) => [s.id, s.label]));
+    const byEvent = new Map<string, EventHandler[]>();
+    for (const t of sim.transitions) {
+        const list = byEvent.get(t.event) ?? [];
+        list.push({ state: labelById.get(t.source) ?? t.source, guard: t.guard, target: t.target ? labelById.get(t.target) : undefined });
+        byEvent.set(t.event, list);
+    }
+    return [...byEvent.entries()].map(([event, handlers]) => ({ event, auto: AUTO_EVENT.test(event) || undefined, handlers }));
+}
+
+export interface StateDetail {
+    machine: string;
+    state: string;
+    id: string;
+    parent?: string;
+    compound?: boolean; initial?: boolean; final?: boolean; parallel?: boolean;
+    entryActions?: string[]; exitActions?: string[]; invokes?: string[];
+    transitions: Array<{ event: string; target?: string; guard?: string; actions?: string[] }>;
+    ambiguous?: number;
+}
+
+/** Focused detail for one state (by label or id): entry/exit/invokes + outgoing transitions. */
+export function stateDetail(machine: MachineNode, state: string, resolveInvoke?: ResolveInvoke): StateDetail | undefined {
+    const payload = buildGraphPayload(machine, { resolveInvoke });
+    const matches = payload.nodes.filter((n) => n.data.label === state || n.data.id === state);
+    const node = matches[0];
+    if (!node) { return undefined; }
+    const labelById = new Map(payload.sim!.states.map((s) => [s.id, s.label]));
+    const transitions = payload.sim!.transitions
+        .filter((t) => t.source === node.data.id)
+        .map((t) => ({ event: t.event, target: t.target ? labelById.get(t.target) : undefined, guard: t.guard, actions: t.actions?.length ? t.actions : undefined }));
+    const d = node.data;
+    return {
+        machine: machine.label, state: d.label, id: d.id, parent: d.parent ? labelById.get(d.parent) : undefined,
+        compound: d.compound, initial: d.initial, final: d.final, parallel: d.parallel,
+        entryActions: d.entryActions?.length ? d.entryActions : undefined,
+        exitActions: d.exitActions?.length ? d.exitActions : undefined,
+        invokes: d.invokes?.length ? d.invokes : undefined,
+        transitions,
+        ambiguous: matches.length > 1 ? matches.length : undefined,
+    };
+}
+
 /** The Markdown coverage report (shared with the outline's Generate Test Paths). */
 export function renderTestPathsMarkdown(machine: MachineNode, resolveInvoke?: ResolveInvoke): string {
     const tp = computeTestPaths(machine, resolveInvoke);

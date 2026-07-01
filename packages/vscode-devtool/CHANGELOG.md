@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.24.0] - 2026-07-01
+
+### Added
+- **Four new AI (Language Model) tools** for Copilot:
+  - `#xstateFindRefs` — every place a name is *used* as an action, guard, invoked actor, or event across the workspace (the inverse of `#xstateFindImpl`).
+  - `#xstateSetupCoverage` — the actions/guards/actors a machine references and which are **missing** from its `setup()` (plus which declared ones are unused).
+  - `#xstateEvents` — a machine's `send()` API: every event, the states that handle it, and any guard/target (eventless/delayed transitions flagged as automatic).
+  - `#xstateStateDetail` — one state's entry/exit actions, invoked services, and outgoing transitions.
+
 ## [1.23.0] - 2026-07-01
 
 ### Changed

@@ -97,6 +97,79 @@ export function validateXStateDocument(document: vscode.TextDocument): vscode.Di
     return diagnostics;
 }
 
+export interface SetupCoverage {
+    machine: string;
+    hasSetup: boolean;
+    declared: { actions: string[]; guards: string[]; actors: string[] };
+    referenced: { actions: string[]; guards: string[]; actors: string[] };
+    missing: { actions: string[]; guards: string[]; actors: string[] };
+    unused: { actions: string[]; guards: string[]; actors: string[] };
+}
+
+/**
+ * For one machine, which setup() implementations are declared, referenced, missing, or unused.
+ * `machineOffset` (a document offset within the target machine call, e.g. from the parsed
+ * MachineNode's range) selects the machine when a file has several; omit for the first.
+ * Reuses the validation pass, which sets `used` flags and emits `unknown*` diagnostics.
+ */
+export function computeSetupCoverage(document: vscode.TextDocument, machineOffset?: number): SetupCoverage | undefined {
+    const sourceFile = ts.createSourceFile(
+        document.fileName, document.getText(), ts.ScriptTarget.Latest, true, getScriptKind(document),
+    );
+
+    const machines: { call: ts.CallExpression; config: ts.ObjectLiteralExpression }[] = [];
+    const visit = (node: ts.Node): void => {
+        if (ts.isCallExpression(node) && getMachineCallKind(node) === 'machine') {
+            const [configArg] = node.arguments;
+            if (configArg && ts.isObjectLiteralExpression(configArg)) { machines.push({ call: node, config: configArg }); }
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+    if (machines.length === 0) { return undefined; }
+
+    // Pick the call containing the offset (innermost), else the nearest by start, else the first.
+    let target = machines[0];
+    if (machineOffset !== undefined) {
+        const containing = machines.filter((m) => m.call.getStart() <= machineOffset && machineOffset <= m.call.getEnd());
+        target = containing.length
+            ? containing.reduce((a, b) => (b.call.getStart() > a.call.getStart() ? b : a))
+            : machines.reduce((a, b) => (Math.abs(b.call.getStart() - machineOffset) < Math.abs(a.call.getStart() - machineOffset) ? b : a));
+    }
+
+    const machine = getStringProperty(target.config, 'id') ?? '(machine)';
+    const empty = () => ({ actions: [], guards: [], actors: [] });
+    const setupConfig = getSetupConfig(target.call);
+    if (!setupConfig) {
+        return { machine, hasSetup: false, declared: empty(), referenced: empty(), missing: empty(), unused: empty() };
+    }
+
+    const setupReferences = collectSetupReferences(setupConfig, document);
+    const context: ValidationContext = { document, diagnostics: [], explicitIds: new Map(), setupReferences };
+    validateMachineConfig(target.config, context);
+
+    type UsedMap = Map<string, { used: boolean; range: vscode.Range }>;
+    const keys = (m: UsedMap) => [...m.keys()];
+    const used = (m: UsedMap) => [...m.entries()].filter(([, v]) => v.used).map(([k]) => k);
+    const unused = (m: UsedMap) => [...m.entries()].filter(([, v]) => !v.used).map(([k]) => k);
+    const missingFor = (code: string) => [...new Set(
+        context.diagnostics.filter((d) => d.code === code).map((d) => /'([^']+)'/.exec(d.message)?.[1]).filter((n): n is string => !!n),
+    )];
+    const missA = missingFor(XSTATE_DIAGNOSTIC_CODES.unknownAction);
+    const missG = missingFor(XSTATE_DIAGNOSTIC_CODES.unknownGuard);
+    const missAc = missingFor(XSTATE_DIAGNOSTIC_CODES.unknownActor);
+    const dedup = (a: string[], b: string[]) => [...new Set([...a, ...b])];
+
+    return {
+        machine,
+        hasSetup: true,
+        declared: { actions: keys(setupReferences.actions), guards: keys(setupReferences.guards), actors: keys(setupReferences.actors) },
+        referenced: { actions: dedup(used(setupReferences.actions), missA), guards: dedup(used(setupReferences.guards), missG), actors: dedup(used(setupReferences.actors), missAc) },
+        missing: { actions: missA, guards: missG, actors: missAc },
+        unused: { actions: unused(setupReferences.actions), guards: unused(setupReferences.guards), actors: unused(setupReferences.actors) },
+    };
+}
+
 function validateMachineConfig(config: ts.ObjectLiteralExpression, context: ValidationContext): void {
     validateInvalidProperties(config, 'machine', context);
     validateExplicitId(config, context);
