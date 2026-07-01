@@ -37,6 +37,14 @@ export async function activate(context: vscode.ExtensionContext) {
         DebuggerViewProvider.eventsViewType,
         new DebuggerViewProvider(context.extensionUri, debuggerController, 'events'),
     );
+    // Bring the XState event log to the front when the debugger attaches (only on
+    // the transition into 'open', so reconnect flaps don't keep stealing focus).
+    let debuggerWasOpen = false;
+    const debuggerFocusLogSub = debuggerController.onDidChangeStatus((status) => {
+        const open = status === 'open';
+        if (open && !debuggerWasOpen) { void vscode.commands.executeCommand('xstateEventsLog.focus'); }
+        debuggerWasOpen = open;
+    });
     // Seed the menu/welcome context keys BEFORE the Instances tree is created.
     void vscode.commands.executeCommand('setContext', 'xstateDebugger.showStopped',
         vscode.workspace.getConfiguration('xstateDebugger').get('showStopped', true));
@@ -213,6 +221,7 @@ export async function activate(context: vscode.ExtensionContext) {
         outputChannel,
         workspaceScanner,
         eventsViewRegistration,
+        debuggerFocusLogSub,
         debuggerTreeView,
         debuggerTreeSelectionListener,
         { dispose: () => debuggerFreezeIndicator() },
