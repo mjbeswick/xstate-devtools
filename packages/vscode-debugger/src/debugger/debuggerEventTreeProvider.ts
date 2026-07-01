@@ -86,6 +86,11 @@ export class DebuggerEventTreeProvider implements vscode.TreeDataProvider<EventT
         return this.selectedEntry()?.event;
     }
 
+    /** The whole event object the tree currently roots on (for "Copy Event"). */
+    currentEvent(): unknown {
+        return this.selectedEntry()?.event;
+    }
+
     private headerText(): string | undefined {
         const entry = this.selectedEntry();
         if (!entry) { return undefined; }

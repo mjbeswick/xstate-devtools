@@ -8,7 +8,7 @@ import { DebuggerController } from './debugger/debuggerController';
 import { DebuggerViewProvider } from './debugger/debuggerView';
 import { DebuggerTreeProvider, DebuggerTreeItem } from './debugger/debuggerTreeProvider';
 import { DebuggerContextTreeProvider, ContextTreeItem } from './debugger/debuggerContextTreeProvider';
-import { DebuggerEventTreeProvider } from './debugger/debuggerEventTreeProvider';
+import { DebuggerEventTreeProvider, EventTreeItem } from './debugger/debuggerEventTreeProvider';
 import { registerDebuggerCommands } from './debugger/debuggerCommands';
 import { DebuggerActiveDecorationProvider } from './debugger/debuggerDecorationProvider';
 import { DebuggerSetupDetector } from './debugger/debuggerSetup';
@@ -190,6 +190,20 @@ export async function activate(context: vscode.ExtensionContext) {
             void vscode.env.clipboard.writeText(text ?? String(v));
         },
     );
+    const debuggerCopyEventKeyCommand = vscode.commands.registerCommand(
+        'xstateDebugger.copyEventKey',
+        (item?: EventTreeItem) => {
+            if (item) { void vscode.env.clipboard.writeText(String(item.label)); }
+        },
+    );
+    const debuggerCopyEventCommand = vscode.commands.registerCommand(
+        'xstateDebugger.copyEvent',
+        () => {
+            const v = debuggerEventTreeProvider.currentEvent();
+            if (v === undefined) { return; }
+            void vscode.env.clipboard.writeText(typeof v === 'string' ? v : JSON.stringify(v, null, 2));
+        },
+    );
     const debuggerConnectCommand = vscode.commands.registerCommand('xstateDebugger.connect', () => debuggerController.connect());
     const debuggerDisconnectCommand = vscode.commands.registerCommand('xstateDebugger.disconnect', () => debuggerController.disconnect());
     const debuggerToggleCommand = vscode.commands.registerCommand('xstateDebugger.toggle', () => debuggerController.toggle());
@@ -247,6 +261,8 @@ export async function activate(context: vscode.ExtensionContext) {
         debuggerStepForwardCommand,
         debuggerClearEventsCommand,
         debuggerCopyContextCommand,
+        debuggerCopyEventKeyCommand,
+        debuggerCopyEventCommand,
         debuggerConnectCommand,
         debuggerDisconnectCommand,
         debuggerToggleCommand,

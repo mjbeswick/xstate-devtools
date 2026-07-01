@@ -169,6 +169,17 @@
         "icon": "$(copy)"
       },
       {
+        "command": "xstateDebugger.copyEventKey",
+        "title": "Copy Key",
+        "category": "XState Debugger"
+      },
+      {
+        "command": "xstateDebugger.copyEvent",
+        "title": "Copy Event",
+        "category": "XState Debugger",
+        "icon": "$(copy)"
+      },
+      {
         "command": "xstateDebugger.goToSource",
         "title": "Go to Source",
         "category": "XState Debugger",
@@ -322,6 +333,11 @@
           "command": "xstateDebugger.exportSession",
           "when": "view == xstateEventsLog",
           "group": "navigation@5"
+        },
+        {
+          "command": "xstateDebugger.copyEvent",
+          "when": "view == xstateDebuggerEvent",
+          "group": "navigation@0"
         }
       ],
       "view/item/context": [
@@ -359,11 +375,29 @@
           "command": "xstateDebugger.copyContextValue",
           "when": "view == xstateDebuggerContext && viewItem == xstateDebuggerContext",
           "group": "navigation@0"
+        },
+        {
+          "command": "xstateDebugger.copyContextValue",
+          "when": "view == xstateDebuggerEvent && viewItem == xstateDebuggerEvent",
+          "group": "navigation@0"
+        },
+        {
+          "command": "xstateDebugger.copyEventKey",
+          "when": "view == xstateDebuggerEvent && viewItem == xstateDebuggerEvent",
+          "group": "navigation@1"
         }
       ],
       "commandPalette": [
         {
           "command": "xstateDebugger.copyContextValue",
+          "when": "false"
+        },
+        {
+          "command": "xstateDebugger.copyEventKey",
+          "when": "false"
+        },
+        {
+          "command": "xstateDebugger.copyEvent",
           "when": "false"
         },
         {
