@@ -85,6 +85,9 @@ export class DebuggerController implements vscode.Disposable {
     private readonly _onDidChangeStatus = new vscode.EventEmitter<ConnectionStatus>();
     /** Fires on every connection-status change (for surfaces that key off it). */
     readonly onDidChangeStatus = this._onDidChangeStatus.event;
+    private readonly _onDidSelectEventActor = new vscode.EventEmitter<string>();
+    /** Fires the sessionId when selecting an event selects its actor (so the Instances tree can reveal it). */
+    readonly onDidSelectEventActor = this._onDidSelectEventActor.event;
     private readonly log: vscode.OutputChannel;
     /** Resolves an actor to the label of its statically-parsed machine, so the
      *  live overlay can target the open diagram even for anonymous machines
@@ -130,9 +133,17 @@ export class DebuggerController implements vscode.Disposable {
         this.store.getState().selectActor(sessionId);
     }
 
-    /** Freeze the display at a captured event seq (null = back to live). */
+    /** Freeze the display at a captured event seq (null = back to live). Selecting
+     *  an event also selects the actor it hit, so the Instances/Context views follow. */
     timeTravel(seq: number | null): void {
         this.store.getState().timeTravel(seq);
+        if (seq !== null) {
+            const ev = this.store.getState().events.find((e) => e.globalSeq === seq);
+            if (ev) {
+                this.selectActor(ev.sessionId);
+                this._onDidSelectEventActor.fire(ev.sessionId);
+            }
+        }
     }
 
     /** Exit time-travel and resume showing live snapshots. */

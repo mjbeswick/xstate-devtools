@@ -164,6 +164,68 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
         return items;
     }
 
+    // getParent lets TreeView.reveal() locate a node — used to reveal the actor
+    // an event hit. Mirrors the hierarchy getChildren() builds: an actor's parent
+    // is its parent actor (direct child) or the state that invoked it (nested); a
+    // state's parent is its parent state, or the owning actor for a top-level state.
+    getParent(element: DebuggerTreeItem): DebuggerTreeItem | undefined {
+        const state = this.controller.getStore().getState();
+        if (element.kind === 'actor') {
+            const a = state.actors.get(element.sessionId);
+            const parentId = a?.parentSessionId;
+            if (!parentId || !state.actors.has(parentId)) { return undefined; }
+            const p = state.actors.get(parentId)!;
+            const nested = p.machine && (
+                (a!.actorId && this.allInvokeIds(p.machine.root).has(a!.actorId)) ||
+                (a!.machine && this.allInvokeSrcs(p.machine.root).has(a!.machine.id))
+            );
+            if (!nested || !p.machine) { return this.actorItem(parentId); }
+            const owner = this.findInvokingNode(parentId, p.machine.root, element.sessionId);
+            return owner ? this.stateItem(parentId, owner) : this.actorItem(parentId);
+        }
+        if (element.kind === 'state' && element.node) {
+            const machine = state.actors.get(element.sessionId)?.machine;
+            if (!machine) { return undefined; }
+            if (Object.values(machine.root.states).some((n) => n.id === element.node!.id)) {
+                return this.actorItem(element.sessionId);
+            }
+            const parentNode = this.findParentNode(machine.root, element.node.id);
+            return parentNode ? this.stateItem(element.sessionId, parentNode) : undefined;
+        }
+        return undefined;
+    }
+
+    /** The actor tree item for a sessionId, or undefined if it isn't in the store. */
+    getActorItem(sessionId: string): DebuggerTreeItem | undefined {
+        return this.controller.getStore().getState().actors.has(sessionId) ? this.actorItem(sessionId) : undefined;
+    }
+
+    /** The state node in `root` (of actor `ownerSessionId`) that invoked `invokedSessionId`. */
+    private findInvokingNode(ownerSessionId: string, root: SerializedStateNode, invokedSessionId: string): SerializedStateNode | undefined {
+        let found: SerializedStateNode | undefined;
+        const walk = (n: SerializedStateNode) => {
+            if (found) { return; }
+            if (this.invokedActorsOf(ownerSessionId, n).includes(invokedSessionId)) { found = n; return; }
+            for (const c of Object.values(n.states)) { walk(c); }
+        };
+        walk(root);
+        return found;
+    }
+
+    /** The state node whose `.states` contains the node with id `childId`. */
+    private findParentNode(root: SerializedStateNode, childId: string): SerializedStateNode | undefined {
+        let found: SerializedStateNode | undefined;
+        const walk = (n: SerializedStateNode) => {
+            if (found) { return; }
+            for (const c of Object.values(n.states)) {
+                if (c.id === childId) { found = n; return; }
+                walk(c);
+            }
+        };
+        walk(root);
+        return found;
+    }
+
     /** All invoke `src` names anywhere in a machine's state tree. */
     private allInvokeSrcs(root: SerializedStateNode): Set<string> {
         const out = new Set<string>();

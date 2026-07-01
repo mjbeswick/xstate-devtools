@@ -65,6 +65,11 @@ export async function activate(context: vscode.ExtensionContext) {
     const debuggerContextTreeView = vscode.window.createTreeView('xstateDebuggerContext', {
         treeDataProvider: debuggerContextTreeProvider,
     });
+    // Selecting an event reveals the actor it hit in the Instances tree.
+    const debuggerRevealActorSub = debuggerController.onDidSelectEventActor((sessionId) => {
+        const item = debuggerTreeProvider.getActorItem(sessionId);
+        if (item) { void debuggerTreeView.reveal(item, { select: true, focus: false, expand: true }); }
+    });
     const debuggerEventTreeProvider = new DebuggerEventTreeProvider(debuggerController);
     const debuggerEventTreeView = vscode.window.createTreeView('xstateDebuggerEvent', {
         treeDataProvider: debuggerEventTreeProvider,
@@ -179,6 +184,7 @@ export async function activate(context: vscode.ExtensionContext) {
         debuggerTreeSelectionListener,
         { dispose: () => debuggerFreezeIndicator() },
         debuggerContextTreeView,
+        debuggerRevealActorSub,
         debuggerEventTreeView,
         debuggerEventTreeProvider,
         debuggerShowStoppedCommand,
