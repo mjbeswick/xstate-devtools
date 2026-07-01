@@ -58,12 +58,26 @@ function render(m: any): void {
     }
 
     if (ROLE === 'events') {
+        // Scroll-lock: when an event is selected, keep its row pinned at the same
+        // spot in the viewport across the rebuild, so events streaming in above it
+        // (newest-first) don't shift it or yank the view to the top.
+        const listBefore = document.getElementById('loglist');
+        const rowBefore = body.querySelector('tr.tt') as HTMLElement | null;
+        const anchor = (m.timeTravelSeq !== null && listBefore && rowBefore)
+            ? rowBefore.getBoundingClientRect().top - listBefore.getBoundingClientRect().top
+            : null;
+
         body.innerHTML = banner + renderEvents(m);
-        // Keep the selected event in view while time-travelling — the innerHTML
-        // rebuild otherwise resets scroll to the top (newest) on every new event,
-        // yanking the user off the row they selected.
-        if (m.timeTravelSeq !== null) {
-            body.querySelector('tr.tt')?.scrollIntoView({ block: 'nearest' });
+
+        const listAfter = document.getElementById('loglist');
+        const rowAfter = body.querySelector('tr.tt') as HTMLElement | null;
+        if (rowAfter && listAfter) {
+            if (anchor !== null) {
+                // Shift scroll so the row returns to its previous viewport offset.
+                listAfter.scrollTop += (rowAfter.getBoundingClientRect().top - listAfter.getBoundingClientRect().top) - anchor;
+            } else {
+                rowAfter.scrollIntoView({ block: 'nearest' });
+            }
         }
     } else if (!m.selected) {
         // Instances now live in the native "Instances" tree; this webview is the
