@@ -6,7 +6,7 @@ import {
 } from '@xstate-devtools/diagram-core';
 import { DebuggerController } from './debugger/debuggerController';
 import { DebuggerViewProvider } from './debugger/debuggerView';
-import { DebuggerTreeProvider } from './debugger/debuggerTreeProvider';
+import { DebuggerTreeProvider, DebuggerTreeItem } from './debugger/debuggerTreeProvider';
 import { DebuggerContextTreeProvider, ContextTreeItem } from './debugger/debuggerContextTreeProvider';
 import { DebuggerEventTreeProvider } from './debugger/debuggerEventTreeProvider';
 import { registerDebuggerCommands } from './debugger/debuggerCommands';
@@ -44,15 +44,36 @@ export async function activate(context: vscode.ExtensionContext) {
     void vscode.commands.executeCommand('setContext', 'xstateDebugger.setupChecking', false);
     void vscode.commands.executeCommand('setContext', 'xstateDebugger.followDiagram',
         vscode.workspace.getConfiguration('xstateDebugger').get('followDiagram', false));
+    void vscode.commands.executeCommand('setContext', 'xstateDebugger.navigateTarget',
+        vscode.workspace.getConfiguration('xstateDebugger').get('navigateTarget', 'code'));
 
     const debuggerTreeProvider = new DebuggerTreeProvider(context.extensionUri, debuggerController);
     const debuggerTreeView = vscode.window.createTreeView('xstateDebuggerInstances', {
         treeDataProvider: debuggerTreeProvider,
     });
+    let navigateTarget = vscode.workspace.getConfiguration('xstateDebugger').get<'diagram' | 'code'>('navigateTarget', 'code');
+    const navigateToSelected = (item: DebuggerTreeItem): void => {
+        // Only navigate for items backed by a machine (skip placeholders/machineless actors).
+        if (!debuggerController.getStore().getState().actors.get(item.sessionId)?.machine) { return; }
+        void vscode.commands.executeCommand(
+            navigateTarget === 'diagram' ? 'xstateDebugger.revealInDiagram' : 'xstateDebugger.goToSource',
+            item,
+        );
+    };
     const debuggerTreeSelectionListener = debuggerTreeView.onDidChangeSelection((e) => {
         const item = e.selection[0];
-        if (item && item.kind !== 'waiting') { debuggerController.selectActor(item.sessionId); }
+        if (item && item.kind !== 'waiting') {
+            debuggerController.selectActor(item.sessionId);
+            navigateToSelected(item);
+        }
     });
+    const setNavigateTarget = (value: 'diagram' | 'code') => {
+        navigateTarget = value;
+        void vscode.workspace.getConfiguration('xstateDebugger').update('navigateTarget', value, vscode.ConfigurationTarget.Global);
+        void vscode.commands.executeCommand('setContext', 'xstateDebugger.navigateTarget', value);
+    };
+    const debuggerNavigateDiagramCommand = vscode.commands.registerCommand('xstateDebugger.setNavigateDiagram', () => setNavigateTarget('diagram'));
+    const debuggerNavigateCodeCommand = vscode.commands.registerCommand('xstateDebugger.setNavigateCode', () => setNavigateTarget('code'));
     const debuggerFreezeIndicator = debuggerController.getStore().subscribe(() => {
         const s = debuggerController.getStore().getState();
         debuggerTreeView.message = s.timeTravelSeq !== null
@@ -191,6 +212,8 @@ export async function activate(context: vscode.ExtensionContext) {
         debuggerHideStoppedCommand,
         debuggerFollowDiagramCommand,
         debuggerUnfollowDiagramCommand,
+        debuggerNavigateDiagramCommand,
+        debuggerNavigateCodeCommand,
         { dispose: () => debuggerFollowSub() },
         ...debuggerItemCommands,
         debuggerDecorationRegistration,

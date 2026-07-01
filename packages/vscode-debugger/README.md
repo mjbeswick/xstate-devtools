@@ -6,7 +6,7 @@ It is the runtime companion to the **xState Devtools** extension (static outline
 
 ## Features
 
-- **Instances** — a tree of running actors (parent → child) with each instance's current state; expand an instance to see its live state-node tree with the active configuration highlighted.
+- **Instances** — a tree of running actors (parent → child) with each instance's current state; expand an instance to see its live state-node tree with the active configuration highlighted. Selecting an instance navigates to its **diagram** or **source code** (choose which in the view's **⋯** menu, alongside show/hide stopped actors and follow-in-diagram).
 - **Context** — the selected actor's real context as an expandable tree (right-click a value to **Copy**).
 - **Events** — every event each actor receives. Click an event to inspect it and pause the log on that row — the Instances tree reveals the actor it hit, and the Context / Event trees follow. With the log focused, **← / →** step to the previous / next event and **Esc** returns to live. Also **Step Back / Forward**, **Back to Live**, **Clear**, and **Export / Import session**. Stepping freezes the Instances + Context trees at that point.
 - **Event** — a tree in the Debugger sidebar showing the latest (or selected) event's payload as an expandable JSON tree; it follows the Events log selection / time-travel.

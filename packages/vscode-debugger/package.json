@@ -229,6 +229,16 @@
         "icon": "$(type-hierarchy-sub)"
       },
       {
+        "command": "xstateDebugger.setNavigateDiagram",
+        "title": "Navigate to Diagram on Select",
+        "category": "XState Debugger"
+      },
+      {
+        "command": "xstateDebugger.setNavigateCode",
+        "title": "Navigate to Code on Select",
+        "category": "XState Debugger"
+      },
+      {
         "command": "xstateDebugger.exportSession",
         "title": "Export Session…",
         "category": "XState Debugger",
@@ -256,22 +266,32 @@
         {
           "command": "xstateDebugger.hideStopped",
           "when": "view == xstateDebuggerInstances && xstateDebugger.showStopped",
-          "group": "navigation@1"
+          "group": "1_options@0"
         },
         {
           "command": "xstateDebugger.showStopped",
           "when": "view == xstateDebuggerInstances && !xstateDebugger.showStopped",
-          "group": "navigation@1"
+          "group": "1_options@0"
         },
         {
           "command": "xstateDebugger.unfollowDiagram",
           "when": "view == xstateDebuggerInstances && xstateDebugger.followDiagram",
-          "group": "navigation@2"
+          "group": "1_options@1"
         },
         {
           "command": "xstateDebugger.followDiagram",
           "when": "view == xstateDebuggerInstances && !xstateDebugger.followDiagram",
-          "group": "navigation@2"
+          "group": "1_options@1"
+        },
+        {
+          "command": "xstateDebugger.setNavigateCode",
+          "when": "view == xstateDebuggerInstances && xstateDebugger.navigateTarget == diagram",
+          "group": "1_options@2"
+        },
+        {
+          "command": "xstateDebugger.setNavigateDiagram",
+          "when": "view == xstateDebuggerInstances && xstateDebugger.navigateTarget != diagram",
+          "group": "1_options@2"
         },
         {
           "command": "xstateDebugger.stepBack",
@@ -403,6 +423,15 @@
           "type": "boolean",
           "default": false,
           "description": "Automatically open/reveal the statechart diagram for the selected actor, with its live state highlighted."
+        },
+        "xstateDebugger.navigateTarget": {
+          "type": "string",
+          "enum": [
+            "diagram",
+            "code"
+          ],
+          "default": "code",
+          "description": "Where selecting an instance in the XState Debugger Instances view navigates: its statechart diagram, or its source code."
         }
       }
     }
