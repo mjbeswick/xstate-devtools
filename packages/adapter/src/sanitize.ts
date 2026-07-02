@@ -42,6 +42,19 @@ function sanitizeInner(value: unknown, ctx: Ctx): unknown {
     return `[DOMNode: ${(value as Element).tagName ?? value.nodeName}]`
   }
 
+  // Respect toJSON, like JSON.stringify — critical for XState ActorRefs held in
+  // context (e.g. `receiver`/spawned children): their toJSON is a tiny
+  // { xstate$$type, id } marker, whereas recursing into the raw ref walks the
+  // whole actor system and eats the node budget, truncating everything else.
+  // Not for Map/Set/Array (handled below) or plain objects (no toJSON).
+  if (!Array.isArray(value) && !(value instanceof Map) && !(value instanceof Set) &&
+      typeof (value as { toJSON?: unknown }).toJSON === 'function') {
+    try {
+      const json = (value as { toJSON: () => unknown }).toJSON()
+      if (json !== value) { return sanitizeInner(json, ctx) }
+    } catch { /* fall through to normal object handling */ }
+  }
+
   // From here on we recurse into containers — guard against shared/circular refs.
   if (ctx.seen.has(value as object)) return '[Circular]'
   ctx.seen.add(value as object)

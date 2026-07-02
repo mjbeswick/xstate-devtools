@@ -63,6 +63,21 @@ describe('sanitize', () => {
     expect(result).toContain('[MaxDepth]')
   })
 
+  it('uses toJSON (like JSON.stringify) instead of walking the raw object', () => {
+    // An XState ActorRef held in context exposes toJSON = { xstate$$type, id };
+    // without honouring it we would recurse into the whole actor system and eat
+    // the budget, truncating every other context key.
+    const actorRefLike = {
+      id: 'kid',
+      _huge: (() => { const o: any = {}; for (let i = 0; i < 500; i++) o['k' + i] = { a: 1, b: 2 }; return o })(),
+      toJSON: () => ({ xstate$$type: 1, id: 'kid' }),
+    }
+    const out = sanitize({ receiver: actorRefLike, theme: { size: 'std' }, flag: true }) as any
+    expect(out.receiver).toEqual({ xstate$$type: 1, id: 'kid' })
+    expect(out.theme).toEqual({ size: 'std' })
+    expect(out.flag).toBe(true)
+  })
+
   it('does not starve later top-level keys when earlier ones are huge', () => {
     // Many large top-level values whose combined node count far exceeds the
     // budget — with a single shared depth-first budget these would exhaust it and
