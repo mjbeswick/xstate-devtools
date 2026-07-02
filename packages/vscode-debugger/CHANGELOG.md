@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0] - 2026-07-02
+
+### Added
+- Collapse-all icon on the Instances view title.
+
+### Fixed
+- The Instances tree no longer flashes green/black as events stream in (the active-state decoration is no longer globally re-resolved on every event).
+
 ## [1.1.0] - 2026-07-01
 
 - Version bump for a coordinated release with the XState Devtools extension; no functional changes since 1.0.0.
