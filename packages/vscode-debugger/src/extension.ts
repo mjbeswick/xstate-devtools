@@ -58,6 +58,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const debuggerTreeProvider = new DebuggerTreeProvider(context.extensionUri, debuggerController);
     const debuggerTreeView = vscode.window.createTreeView('xstateDebuggerInstances', {
         treeDataProvider: debuggerTreeProvider,
+        showCollapseAll: true,
     });
     let navigateTarget = vscode.workspace.getConfiguration('xstateDebugger').get<'diagram' | 'code'>('navigateTarget', 'code');
     const navigateToSelected = (item: DebuggerTreeItem): void => {
