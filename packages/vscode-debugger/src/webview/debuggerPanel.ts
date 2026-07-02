@@ -57,25 +57,27 @@ function render(m: any): void {
     // message, and the title-bar "Back to Live" action — no in-panel banner needed.
 
     if (ROLE === 'events') {
-        // Scroll-lock: when an event is selected, keep its row pinned at the same
-        // spot in the viewport across the rebuild, so events streaming in above it
-        // (newest-first) don't shift it or yank the view to the top.
+        // Scroll-lock: pin the selected row at the same spot in the viewport across
+        // the rebuild. Anchor to the row that is *becoming* selected (matched by
+        // seq in the current DOM — i.e. exactly where the user clicked it), NOT the
+        // previously-selected tr.tt, so clicking a new event doesn't scroll. This
+        // also covers streaming (seq unchanged → same row) and ←/→ stepping.
         const listBefore = document.getElementById('loglist');
-        const rowBefore = body.querySelector('tr.tt') as HTMLElement | null;
-        const anchor = (m.timeTravelSeq !== null && listBefore && rowBefore)
+        const rowBefore = m.timeTravelSeq !== null
+            ? body.querySelector('tr[data-seq="' + m.timeTravelSeq + '"]') as HTMLElement | null
+            : null;
+        const anchor = (listBefore && rowBefore)
             ? rowBefore.getBoundingClientRect().top - listBefore.getBoundingClientRect().top
             : null;
 
         body.innerHTML = banner + renderEvents(m);
 
-        const listAfter = document.getElementById('loglist');
-        const rowAfter = body.querySelector('tr.tt') as HTMLElement | null;
-        if (rowAfter && listAfter) {
-            if (anchor !== null) {
-                // Shift scroll so the row returns to its previous viewport offset.
+        if (anchor !== null) {
+            const listAfter = document.getElementById('loglist');
+            const rowAfter = body.querySelector('tr.tt') as HTMLElement | null;
+            if (rowAfter && listAfter) {
+                // Shift scroll so the row returns to the exact viewport offset it had.
                 listAfter.scrollTop += (rowAfter.getBoundingClientRect().top - listAfter.getBoundingClientRect().top) - anchor;
-            } else {
-                rowAfter.scrollIntoView({ block: 'nearest' });
             }
         }
     } else if (!m.selected) {
