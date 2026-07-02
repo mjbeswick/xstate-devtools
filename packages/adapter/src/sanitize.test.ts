@@ -62,4 +62,25 @@ describe('sanitize', () => {
     const result = JSON.stringify(sanitize(deep))
     expect(result).toContain('[MaxDepth]')
   })
+
+  it('does not starve later top-level keys when earlier ones are huge', () => {
+    // Many large top-level values whose combined node count far exceeds the
+    // budget — with a single shared depth-first budget these would exhaust it and
+    // the trailing simple keys would come back "[Truncated]" (the reported bug).
+    const bigObj = () => {
+      const o: any = {}
+      for (let i = 0; i < 90; i++) o['k' + i] = { a: 1, b: 2, c: 3, d: 4, e: 5 }
+      return o
+    }
+    const ctx: any = {}
+    for (let i = 0; i < 50; i++) ctx['big' + i] = bigObj()
+    ctx.isTrainingMode = true
+    ctx.theme = 'dark'
+    ctx.name = 'visible'
+
+    const out = sanitize(ctx) as Record<string, unknown>
+    expect(out.isTrainingMode).toBe(true)
+    expect(out.theme).toBe('dark')
+    expect(out.name).toBe('visible')
+  })
 })

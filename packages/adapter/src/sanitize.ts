@@ -3,23 +3,26 @@
 const MAX_DEPTH = 10
 const MAX_STRING_LENGTH = 500
 const MAX_ARRAY_LENGTH = 100
-// Hard ceiling on total nodes across the whole tree. The per-level caps above
-// still allow multiplicative blow-up (100^depth) on wide+deep or cross-linked
-// objects, which can produce a string too large for JSON.stringify to handle.
-// This bounds the output regardless of shape.
-const MAX_NODES = 10000
+// Node budget. The per-level caps above still allow multiplicative blow-up
+// (100^depth) on wide+deep or cross-linked objects, which can produce a string
+// too large for JSON.stringify to handle. This bounds the output regardless of
+// shape. Each TOP-LEVEL key of the root value gets its OWN slice of this budget
+// (see the object branch) so one huge value — a store, an actor ref, a logger —
+// can't spend it all depth-first and leave the rest of the context as "[Truncated]".
+const MAX_NODES = 20000
+const MIN_KEY_BUDGET = 500
 
 interface Ctx {
   depth: number
-  /** Shared mutable node counter — the global budget. */
-  budget: { n: number }
+  /** Mutable node counter + ceiling — per top-level key at the root, shared below it. */
+  budget: { n: number; max: number }
   /** Objects/arrays seen on the current path + elsewhere, to break cycles and DAGs. */
   seen: WeakSet<object>
 }
 
 function sanitizeInner(value: unknown, ctx: Ctx): unknown {
   if (ctx.depth > MAX_DEPTH) return '[MaxDepth]'
-  if (++ctx.budget.n > MAX_NODES) return '[Truncated]'
+  if (++ctx.budget.n > ctx.budget.max) return '[Truncated]'
   if (value === null || value === undefined) return value
   if (typeof value === 'boolean' || typeof value === 'number') return value
   if (typeof value === 'string') {
@@ -67,11 +70,18 @@ function sanitizeInner(value: unknown, ctx: Ctx): unknown {
     return result
   }
   if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
     const result: Record<string, unknown> = {}
+    // At the root, fair-share the budget across top-level keys so a giant value
+    // can't starve the rest into "[Truncated]" (depth-first would spend it early).
+    const perKey = ctx.depth === 0 && entries.length > 0
+      ? Math.max(MIN_KEY_BUDGET, Math.floor(MAX_NODES / Math.min(entries.length, MAX_ARRAY_LENGTH)))
+      : 0
     let count = 0
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    for (const [k, v] of entries) {
       if (count++ >= MAX_ARRAY_LENGTH) { result['…'] = '[truncated]'; break }
-      result[k] = sanitizeInner(v, child)
+      const kctx = perKey ? { ...child, budget: { n: 0, max: perKey } } : child
+      result[k] = sanitizeInner(v, kctx)
     }
     return result
   }
@@ -79,5 +89,5 @@ function sanitizeInner(value: unknown, ctx: Ctx): unknown {
 }
 
 export function sanitize(value: unknown): unknown {
-  return sanitizeInner(value, { depth: 0, budget: { n: 0 }, seen: new WeakSet() })
+  return sanitizeInner(value, { depth: 0, budget: { n: 0, max: MAX_NODES }, seen: new WeakSet() })
 }
