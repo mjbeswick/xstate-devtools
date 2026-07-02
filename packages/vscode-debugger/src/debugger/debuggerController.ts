@@ -6,7 +6,7 @@
 // status-bar indicator, and the bridge that overlays each running machine's
 // active state onto its open statechart diagram.
 import * as vscode from 'vscode';
-import { createInspectorStore, exportSession, getActivePaths, getDisplaySnapshot, importSession, type InspectorStore } from '@xstate-devtools/panel-core';
+import { createInspectorStore, getActivePaths, getDisplaySnapshot, type InspectorStore } from '@xstate-devtools/panel-core';
 import type { StoreApi } from 'zustand/vanilla';
 import type { ExtensionToPageMessage, PageToExtensionMessage, SerializedEvent, SerializedStateNode } from '@xstate-devtools/protocol';
 import { DebuggerWsClient, type ConnectionStatus } from './wsClient';
@@ -47,8 +47,6 @@ export interface TransitionVM {
 export interface DebuggerViewModel {
     status: ConnectionStatus;
     url: string;
-    replayMode: boolean;
-    replayName: string | null;
     timeTravelSeq: number | null;
     canInteract: boolean;
     actors: ActorVM[];
@@ -227,42 +225,6 @@ export class DebuggerController implements vscode.Disposable {
         this.send({ type: 'XSTATE_RESTORE', sessionId, persisted: entry.persisted });
     }
 
-    /** Write the current captured session to a JSON file. */
-    async exportSession(): Promise<void> {
-        const doc = exportSession(this.store.getState(), Date.now());
-        const uri = await vscode.window.showSaveDialog({
-            filters: { 'XState session': ['json'] },
-            saveLabel: 'Export XState session',
-        });
-        if (!uri) { return; }
-        await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(doc, null, 2), 'utf8'));
-        void vscode.window.showInformationMessage(`Exported XState session to ${uri.fsPath}`);
-    }
-
-    /** Load a session JSON file into the store as a read-only replay. */
-    async importSession(): Promise<void> {
-        const picks = await vscode.window.showOpenDialog({
-            canSelectMany: false,
-            filters: { 'XState session': ['json'] },
-            openLabel: 'Import XState session',
-        });
-        const uri = picks?.[0];
-        if (!uri) { return; }
-        try {
-            const bytes = await vscode.workspace.fs.readFile(uri);
-            const data = importSession(JSON.parse(Buffer.from(bytes).toString('utf8')));
-            const name = uri.path.split('/').pop() ?? 'session';
-            this.store.getState().loadSession(data, name);
-        } catch (e) {
-            void vscode.window.showErrorMessage(`Could not import session: ${(e as Error).message}`);
-        }
-    }
-
-    /** Leave replay mode and return to an empty live session. */
-    exitReplay(): void {
-        this.store.getState().exitReplay();
-        this.graphView.clearLiveConfig();
-    }
 
     /** Current connection URL (from config, falling back to the default). */
     private url(): string {
@@ -426,7 +388,7 @@ export class DebuggerController implements vscode.Disposable {
         };
         for (const root of childrenOf.get(undefined) ?? []) { walk(root, 0); }
 
-        const liveSelectable = this.status === 'open' && state.timeTravelSeq === null && !state.replayMode;
+        const liveSelectable = this.status === 'open' && state.timeTravelSeq === null;
 
         let selected: DebuggerViewModel['selected'] = null;
         const selId = state.selectedActorId;
@@ -478,8 +440,6 @@ export class DebuggerController implements vscode.Disposable {
         return {
             status: this.status,
             url: this.url(),
-            replayMode: state.replayMode,
-            replayName: state.replayName,
             timeTravelSeq: state.timeTravelSeq,
             canInteract: liveSelectable,
             actors,

@@ -248,18 +248,6 @@
         "command": "xstateDebugger.setNavigateCode",
         "title": "Navigate: Code",
         "category": "XState Debugger"
-      },
-      {
-        "command": "xstateDebugger.exportSession",
-        "title": "Export Session…",
-        "category": "XState Debugger",
-        "icon": "$(save)"
-      },
-      {
-        "command": "xstateDebugger.importSession",
-        "title": "Import Session…",
-        "category": "XState Debugger",
-        "icon": "$(folder-opened)"
       }
     ],
     "menus": {
@@ -323,16 +311,6 @@
           "command": "xstateDebugger.clearEvents",
           "when": "view == xstateEventsLog",
           "group": "navigation@3"
-        },
-        {
-          "command": "xstateDebugger.importSession",
-          "when": "view == xstateEventsLog",
-          "group": "navigation@4"
-        },
-        {
-          "command": "xstateDebugger.exportSession",
-          "when": "view == xstateEventsLog",
-          "group": "navigation@5"
         },
         {
           "command": "xstateDebugger.copyEvent",

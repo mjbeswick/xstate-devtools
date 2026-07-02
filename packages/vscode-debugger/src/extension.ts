@@ -86,14 +86,6 @@ export async function activate(context: vscode.ExtensionContext) {
     };
     const debuggerNavigateDiagramCommand = vscode.commands.registerCommand('xstateDebugger.setNavigateDiagram', () => setNavigateTarget('diagram'));
     const debuggerNavigateCodeCommand = vscode.commands.registerCommand('xstateDebugger.setNavigateCode', () => setNavigateTarget('code'));
-    const debuggerFreezeIndicator = debuggerController.getStore().subscribe(() => {
-        const s = debuggerController.getStore().getState();
-        // Time travel is already conveyed by the selected/dimmed rows in the event
-        // log and the title-bar "Back to Live" action, so only surface replay here.
-        debuggerTreeView.message = s.replayMode
-            ? `● Replay${s.replayName ? ` — ${s.replayName}` : ''}`
-            : undefined;
-    });
     const debuggerContextTreeProvider = new DebuggerContextTreeProvider(debuggerController);
     const debuggerContextTreeView = vscode.window.createTreeView('xstateDebuggerContext', {
         treeDataProvider: debuggerContextTreeProvider,
@@ -208,8 +200,6 @@ export async function activate(context: vscode.ExtensionContext) {
     const debuggerConnectCommand = vscode.commands.registerCommand('xstateDebugger.connect', () => debuggerController.connect());
     const debuggerDisconnectCommand = vscode.commands.registerCommand('xstateDebugger.disconnect', () => debuggerController.disconnect());
     const debuggerToggleCommand = vscode.commands.registerCommand('xstateDebugger.toggle', () => debuggerController.toggle());
-    const debuggerExportSessionCommand = vscode.commands.registerCommand('xstateDebugger.exportSession', () => debuggerController.exportSession());
-    const debuggerImportSessionCommand = vscode.commands.registerCommand('xstateDebugger.importSession', () => debuggerController.importSession());
 
     // "Open invoked machine" on an invoke state → open that machine's diagram,
     // falling back to a running actor whose machine id matches the invoke src.
@@ -239,7 +229,6 @@ export async function activate(context: vscode.ExtensionContext) {
         debuggerFocusLogSub,
         debuggerTreeView,
         debuggerTreeSelectionListener,
-        { dispose: () => debuggerFreezeIndicator() },
         debuggerContextTreeView,
         debuggerRevealActorSub,
         debuggerEventTreeView,
@@ -267,8 +256,6 @@ export async function activate(context: vscode.ExtensionContext) {
         debuggerConnectCommand,
         debuggerDisconnectCommand,
         debuggerToggleCommand,
-        debuggerExportSessionCommand,
-        debuggerImportSessionCommand,
         debuggerController,
     );
 }

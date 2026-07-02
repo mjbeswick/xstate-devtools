@@ -50,7 +50,6 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
                 case 'dispatchCustom': this.controller.dispatchCustom(String(msg.type ?? ''), String(msg.payload ?? '')); return;
                 case 'capture': this.controller.capturePersisted(); return;
                 case 'restore': void this.controller.restore(); return;
-                case 'exitReplay': this.controller.exitReplay(); return;
                 case 'jserror': this.controller.logLine(`webview(${this.role}) JS error: ${msg.error}`); return;
                 case 'ready': this.post(this.controller.getLastModel()); return;
             }
@@ -109,10 +108,6 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
   table.events td.ev { width: 99%; overflow: hidden; text-overflow: ellipsis; }
   .muted { color: var(--vscode-descriptionForeground); }
   .empty { color: var(--vscode-descriptionForeground); padding: 16px 10px; text-align: center; font-size: 12px; }
-  .banner { display: flex; align-items: center; gap: 8px; padding: 4px 10px; font-size: 12px; }
-  .banner.tt { background: var(--vscode-inputValidation-warningBackground, rgba(255,200,0,.15)); color: var(--vscode-foreground); }
-  .banner.replay { background: var(--vscode-inputValidation-infoBackground, rgba(100,100,255,.15)); }
-  .banner .grow { flex: 1; }
   .tx { display: flex; align-items: center; gap: 6px; padding: 2px 4px; }
   .tx button { padding: 1px 8px; }
   .tx .ev { font-family: var(--vscode-editor-font-family); }

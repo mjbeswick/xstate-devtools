@@ -47,15 +47,6 @@ function render(m: any): void {
     const live = m.status === 'open';
     const body = $('body');
 
-    // Replay / time-travel banner — shared global state, shown in both views.
-    let banner = '';
-    if (m.replayMode) {
-        banner = '<div class="banner replay"><span class="grow">● Replay' + (m.replayName ? (' · ' + esc(m.replayName)) : '') +
-            '</span><button class="secondary" id="exit-replay">Exit replay</button></div>';
-    }
-    // Time-travel is shown by the selected/dimmed rows here, the Instances tree
-    // message, and the title-bar "Back to Live" action — no in-panel banner needed.
-
     if (ROLE === 'events') {
         // Scroll-lock: pin the selected row at the same spot in the viewport across
         // the rebuild. Anchor to the row that is *becoming* selected (matched by
@@ -70,7 +61,7 @@ function render(m: any): void {
             ? rowBefore.getBoundingClientRect().top - listBefore.getBoundingClientRect().top
             : null;
 
-        body.innerHTML = banner + renderEvents(m);
+        body.innerHTML = renderEvents(m);
 
         if (anchor !== null) {
             const listAfter = document.getElementById('loglist');
@@ -88,9 +79,9 @@ function render(m: any): void {
             : (m.actors.length
                 ? 'Select an instance in the Instances view.'
                 : 'No running machine instances yet. Make sure the app calls createServerAdapter().');
-        body.innerHTML = banner + '<div class="empty">' + hint + '</div>';
+        body.innerHTML = '<div class="empty">' + hint + '</div>';
     } else {
-        body.innerHTML = banner + renderInspector(m);
+        body.innerHTML = renderInspector(m);
     }
 
     // Wire listeners — each guarded; only the relevant elements exist per role.
@@ -100,7 +91,6 @@ function render(m: any): void {
     body.querySelectorAll('tr.evrow').forEach((el) => {
         el.addEventListener('click', () => vscode.postMessage({ command: 'timeTravel', seq: Number((el as HTMLElement).dataset.seq) }));
     });
-    document.getElementById('exit-replay')?.addEventListener('click', () => vscode.postMessage({ command: 'exitReplay' }));
     document.getElementById('capture')?.addEventListener('click', () => vscode.postMessage({ command: 'capture' }));
     document.getElementById('restore')?.addEventListener('click', () => vscode.postMessage({ command: 'restore' }));
     document.getElementById('cev-send')?.addEventListener('click', () => vscode.postMessage({
@@ -124,7 +114,7 @@ function renderInspector(m: any): string {
 
     html += '<div class="section"><h3>Send event</h3>';
     if (!m.canInteract) {
-        html += '<div class="muted">' + (m.timeTravelSeq !== null || m.replayMode
+        html += '<div class="muted">' + (m.timeTravelSeq !== null
             ? 'Return to live to send events.' : 'Connect to send events.') + '</div>';
     } else {
         if (s.transitions.length) {
