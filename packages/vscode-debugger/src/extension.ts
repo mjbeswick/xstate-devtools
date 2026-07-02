@@ -88,11 +88,11 @@ export async function activate(context: vscode.ExtensionContext) {
     const debuggerNavigateCodeCommand = vscode.commands.registerCommand('xstateDebugger.setNavigateCode', () => setNavigateTarget('code'));
     const debuggerFreezeIndicator = debuggerController.getStore().subscribe(() => {
         const s = debuggerController.getStore().getState();
-        debuggerTreeView.message = s.timeTravelSeq !== null
-            ? `⏱ Time travel — seq ${s.timeTravelSeq}`
-            : s.replayMode
-                ? `● Replay${s.replayName ? ` — ${s.replayName}` : ''}`
-                : undefined;
+        // Time travel is already conveyed by the selected/dimmed rows in the event
+        // log and the title-bar "Back to Live" action, so only surface replay here.
+        debuggerTreeView.message = s.replayMode
+            ? `● Replay${s.replayName ? ` — ${s.replayName}` : ''}`
+            : undefined;
     });
     const debuggerContextTreeProvider = new DebuggerContextTreeProvider(debuggerController);
     const debuggerContextTreeView = vscode.window.createTreeView('xstateDebuggerContext', {
