@@ -159,7 +159,7 @@ export async function activate(context: vscode.ExtensionContext) {
         openDiagramForActor(target);
     });
     const debuggerItemCommands = registerDebuggerCommands(debuggerController, graphViewProvider, workspaceScanner);
-    const debuggerDecorationProvider = new DebuggerActiveDecorationProvider(debuggerController);
+    const debuggerDecorationProvider = new DebuggerActiveDecorationProvider();
     const debuggerDecorationRegistration = vscode.window.registerFileDecorationProvider(debuggerDecorationProvider);
     const debuggerSetupDetector = new DebuggerSetupDetector(workspaceScanner);
     const debuggerRecheckCommand = vscode.commands.registerCommand('xstateDebugger.recheckSetup', async () => {
