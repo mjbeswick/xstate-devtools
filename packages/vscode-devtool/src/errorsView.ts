@@ -110,7 +110,7 @@ export class ErrorsTreeProvider implements vscode.TreeDataProvider<ErrorNode> {
         return this.filter === 'all' ? fd.diagnostics : fd.diagnostics.filter(d => this.severityVisible(d.severity));
     }
 
-    /** Total visible issues across all in-scope files — used for the view badge. */
+    /** Total visible issues across all in-scope files (drives the empty-state view). */
     totalCount(): number {
         let n = 0;
         for (const fd of this.results.values()) { n += this.visible(fd).length; }
