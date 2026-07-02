@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.3.0] - 2026-07-02
+
+### Removed
+- The session **import/export replay** feature (Import/Export Session, the replay banner and `● Replay` indicator). Live debugging, time-travel, and capture/restore snapshot are unaffected.
+
+### Fixed
+- Clicking an event in the log no longer scrolls the list — the clicked row stays where it is.
+
+### Changed
+- Dropped the `⏱ Time travel — seq N` message above the Instances tree (time travel is already shown by the selected/dimmed rows and the title-bar **Back to Live** action).
+
 ## [1.2.0] - 2026-07-02
 
 ### Added
