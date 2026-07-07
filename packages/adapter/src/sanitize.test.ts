@@ -15,6 +15,34 @@ describe('sanitize', () => {
     expect(sanitize(() => {})).toBe('[Function: (anonymous)]')
   })
 
+  it('drills into closure stores via getState', () => {
+    let state = { count: 5, user: 'ada' }
+    const store = { getState: () => state, assign: () => {}, reset: () => { state = { count: 0, user: '' } } }
+    const out = sanitize({ store }) as any
+    expect(out.store['[state]']).toEqual({ count: 5, user: 'ada' })
+    expect(out.store.getState).toBe('[Function: getState]')
+  })
+
+  it('drills into closure stores via getSnapshot', () => {
+    const store = { getSnapshot: () => ({ ready: true }), subscribe: () => {} }
+    expect((sanitize(store) as any)['[state]']).toEqual({ ready: true })
+  })
+
+  it('does not invoke getState on objects that also carry data', () => {
+    let called = false
+    const notAStore = { data: 1, getState: () => { called = true; return {} } }
+    const out = sanitize(notAStore) as any
+    expect(called).toBe(false)
+    expect(out['[state]']).toBeUndefined()
+  })
+
+  it('skips [state] when the store reader throws', () => {
+    const store = { getState: () => { throw new Error('boom') }, reset: () => {} }
+    const out = sanitize(store) as any
+    expect(out['[state]']).toBeUndefined()
+    expect(out.reset).toBe('[Function: reset]')
+  })
+
   it('truncates long strings', () => {
     const long = 'x'.repeat(600)
     const result = sanitize(long) as string

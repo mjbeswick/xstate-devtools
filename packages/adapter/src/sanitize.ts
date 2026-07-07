@@ -96,6 +96,18 @@ function sanitizeInner(value: unknown, ctx: Ctx): unknown {
       const kctx = perKey ? { ...child, budget: { n: 0, max: perKey } } : child
       result[k] = sanitizeInner(v, kctx)
     }
+    // Closure stores (zustand / xstate-store style) keep their state where
+    // Object.entries can't see it — every enumerable prop is a function. When
+    // such an object exposes a conventional zero-arg reader, call it and show
+    // the live state alongside the function markers. Only for all-function
+    // objects, so a data object that happens to have a getState isn't invoked.
+    if (entries.length > 0 && entries.every(([, v]) => typeof v === 'function')) {
+      const get = (value as { getState?: unknown; getSnapshot?: unknown })
+      const reader = typeof get.getState === 'function' ? get.getState : get.getSnapshot
+      if (typeof reader === 'function') {
+        try { result['[state]'] = sanitizeInner(reader.call(value), child) } catch { /* reader threw — skip */ }
+      }
+    }
     return result
   }
   return String(value)
