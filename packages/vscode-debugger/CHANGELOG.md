@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0] - 2026-07-07
+
+### Added
+- **Find in the events log** — a VS Code-style find widget (⌘F / Ctrl+F with the panel focused, or the search icon in the panel title), floating over the log like the terminal search. Case / whole-word / regex toggles, a match count, and **↑/↓** (Enter / Shift+Enter) step the selection through matches. Space-separated terms are AND-ed, a `-` prefix excludes (`fetch -TICK`), and matching covers event type, actor name, and the full event payload.
+
+### Fixed
+- The events log now follows new events when live and stays pinned on the selected event while events stream in (the scroll-lock previously adjusted a container that never scrolled).
+- **Collapse All** in the Instances view now sticks — the tree starts fully collapsed and no longer re-expands rows as events stream in. Event-click reveal still expands the path to the hit actor.
+- Clicking a node in the Instances tree no longer moves focus to the opened editor/diagram; explicit **Go to Source** / **Reveal in Diagram** still do.
+
+### Changed
+- Event history cap raised from 500 to 5000 (single cap in the shared store; the view no longer re-trims to 200 rows).
+
 ## [1.3.0] - 2026-07-02
 
 ### Removed
