@@ -120,6 +120,9 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
   table.events tr.evrow:hover td { background: var(--vscode-list-hoverBackground); }
   table.events tr.tt td { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
   table.events tr.future td { opacity: .5; }
+  .filterbar { position: sticky; top: 0; z-index: 1; padding: 6px 10px; background: var(--vscode-panel-background, var(--vscode-editor-background)); border-bottom: 1px solid var(--vscode-panel-border); }
+  .filterbar input { width: 100%; box-sizing: border-box; font-family: inherit; font-size: 12px; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); border-radius: 2px; padding: 3px 6px; outline: none; }
+  .filterbar input:focus { border-color: var(--vscode-focusBorder); }
   .loglist { overflow: auto; outline: none; }
   .loglist:focus-visible { box-shadow: inset 0 0 0 1px var(--vscode-focusBorder); }
   .tree { font-size: 12px; }

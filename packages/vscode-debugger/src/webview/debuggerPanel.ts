@@ -48,28 +48,11 @@ function render(m: any): void {
     const body = $('body');
 
     if (ROLE === 'events') {
-        // .loglist has no fixed height, so the document — not #loglist — is the
-        // real scroll container. Anchor to the row that is *becoming* selected
-        // (matched by seq in the current DOM — i.e. exactly where the user
-        // clicked it), NOT the previously-selected tr.tt, so clicking a new
-        // event doesn't scroll. Also covers streaming and ←/→ stepping.
-        const scroller = document.scrollingElement as HTMLElement;
-        const rowBefore = m.timeTravelSeq !== null
-            ? body.querySelector('tr[data-seq="' + m.timeTravelSeq + '"]') as HTMLElement | null
-            : null;
-        const anchor = rowBefore ? rowBefore.getBoundingClientRect().top : null;
+        renderEventsPanel(m);
+        return; // events role wires its own row listeners below
+    }
 
-        body.innerHTML = renderEvents(m);
-
-        if (anchor !== null) {
-            // Selected: pin the selected row at the same viewport offset.
-            const rowAfter = body.querySelector('tr.tt') as HTMLElement | null;
-            if (rowAfter) { scroller.scrollTop += rowAfter.getBoundingClientRect().top - anchor; }
-        } else {
-            // Live: newest-first list → top shows the latest events.
-            scroller.scrollTop = 0;
-        }
-    } else if (!m.selected) {
+    if (!m.selected) {
         // Instances now live in the native "Instances" tree; this webview is the
         // inspector for whatever is selected there.
         const hint = !live
@@ -86,9 +69,6 @@ function render(m: any): void {
     body.querySelectorAll('.dispatch').forEach((el) => {
         el.addEventListener('click', () => vscode.postMessage({ command: 'dispatch', eventType: (el as HTMLElement).dataset.ev }));
     });
-    body.querySelectorAll('tr.evrow').forEach((el) => {
-        el.addEventListener('click', () => vscode.postMessage({ command: 'timeTravel', seq: Number((el as HTMLElement).dataset.seq) }));
-    });
     document.getElementById('capture')?.addEventListener('click', () => vscode.postMessage({ command: 'capture' }));
     document.getElementById('restore')?.addEventListener('click', () => vscode.postMessage({ command: 'restore' }));
     document.getElementById('cev-send')?.addEventListener('click', () => vscode.postMessage({
@@ -96,6 +76,54 @@ function render(m: any): void {
         type: (document.getElementById('cev-type') as HTMLInputElement | null)?.value || '',
         payload: (document.getElementById('cev-payload') as HTMLTextAreaElement | null)?.value || '',
     }));
+}
+
+// Events panel: a persistent filter input above the rebuilt list, so typing
+// survives streaming re-renders (only #evbody is replaced, never the input).
+let evModel: any = null;
+let evFilter = '';
+
+function renderEventsPanel(m: any): void {
+    evModel = m;
+    const body = $('body');
+    if (!document.getElementById('evfilter')) {
+        body.innerHTML = '<div class="filterbar">' +
+            '<input id="evfilter" type="text" placeholder="Filter by event type or actor" /></div>' +
+            '<div id="evbody"></div>';
+        const inp = document.getElementById('evfilter') as HTMLInputElement;
+        inp.addEventListener('input', () => { evFilter = inp.value; renderEventList(); });
+    }
+    renderEventList();
+}
+
+function renderEventList(): void {
+    const m = evModel;
+    const evbody = document.getElementById('evbody') as HTMLElement;
+    // .loglist has no fixed height, so the document — not #loglist — is the
+    // real scroll container. Anchor to the row that is *becoming* selected
+    // (matched by seq in the current DOM — i.e. exactly where the user
+    // clicked it), NOT the previously-selected tr.tt, so clicking a new
+    // event doesn't scroll. Also covers streaming and ←/→ stepping.
+    const scroller = document.scrollingElement as HTMLElement;
+    const rowBefore = m.timeTravelSeq !== null
+        ? evbody.querySelector('tr[data-seq="' + m.timeTravelSeq + '"]') as HTMLElement | null
+        : null;
+    const anchor = rowBefore ? rowBefore.getBoundingClientRect().top : null;
+
+    evbody.innerHTML = renderEvents(m);
+
+    if (anchor !== null) {
+        // Selected: pin the selected row at the same viewport offset.
+        const rowAfter = evbody.querySelector('tr.tt') as HTMLElement | null;
+        if (rowAfter) { scroller.scrollTop += rowAfter.getBoundingClientRect().top - anchor; }
+    } else {
+        // Live: newest-first list → top shows the latest events.
+        scroller.scrollTop = 0;
+    }
+
+    evbody.querySelectorAll('tr.evrow').forEach((el) => {
+        el.addEventListener('click', () => vscode.postMessage({ command: 'timeTravel', seq: Number((el as HTMLElement).dataset.seq) }));
+    });
 }
 
 // Selected actor inspector: state summary, context, dispatch, persisted.
@@ -157,9 +185,17 @@ function renderEvents(m: any): string {
             ? 'No events captured yet.' : 'Connect from the Debugger view to capture events.') + '</div>';
         return html + '</div>';
     }
+    const q = evFilter.trim().toLowerCase();
+    const shown = q
+        ? m.events.filter((ev: any) =>
+            String(ev.type).toLowerCase().includes(q) || (labelBy[ev.sessionId] || '').toLowerCase().includes(q))
+        : m.events;
+    if (!shown.length) {
+        return html + '<div class="muted">No events match the filter.</div></div>';
+    }
     html += '<div class="loglist" id="loglist" tabindex="0"><table class="events">';
-    for (let i = m.events.length - 1; i >= 0; i--) {
-        const ev = m.events[i];
+    for (let i = shown.length - 1; i >= 0; i--) {
+        const ev = shown[i];
         const isCur = m.timeTravelSeq !== null && ev.seq === m.timeTravelSeq;
         const isFuture = m.timeTravelSeq !== null && ev.seq > m.timeTravelSeq;
         html += '<tr class="evrow' + (isCur ? ' tt' : '') + (isFuture ? ' future' : '') + '" data-seq="' + ev.seq + '">' +
