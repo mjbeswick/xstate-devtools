@@ -1,0 +1,1153 @@
+{
+  "name": "xstate-devtools",
+  "displayName": "xState Devtools",
+  "description": "XState developer tools: interactive outline, search, and navigation",
+  "version": "1.25.0",
+  "publisher": "MichaelBeswick",
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "homepage": "https://github.com/mjbeswick/xstate-devtools/tree/main/packages/vscode-devtool#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mjbeswick/xstate-devtools.git",
+    "directory": "packages/vscode-devtool"
+  },
+  "bugs": {
+    "url": "https://github.com/mjbeswick/xstate-devtools/issues"
+  },
+  "keywords": [
+    "xstate",
+    "state machine",
+    "statechart",
+    "outline",
+    "typescript"
+  ],
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Visualization",
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:xstateMachineOutline",
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact",
+    "onLanguage:javascript",
+    "onLanguage:javascriptreact"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languageModelTools": [
+      {
+        "name": "xstate_list_machines",
+        "displayName": "List XState machines",
+        "modelDescription": "List every XState machine found in the workspace, with its id, source file, line, and state count. Use this first to discover which machines exist.",
+        "toolReferenceName": "xstateMachines",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(list-tree)",
+        "tags": [
+          "xstate"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "xstate_describe_machine",
+        "displayName": "Describe XState machine",
+        "modelDescription": "Return the structure of one XState machine as compact JSON: its states (with hierarchy, initial/final/parallel flags, entry/exit actions, invoked services) and transitions (source, target, event). Identify the machine by its id.",
+        "toolReferenceName": "xstateDescribe",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(symbol-structure)",
+        "tags": [
+          "xstate"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "machine": {
+              "type": "string",
+              "description": "The machine's id (as reported by xstate_list_machines)."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to disambiguate machines that share an id."
+            }
+          },
+          "required": [
+            "machine"
+          ]
+        }
+      },
+      {
+        "name": "xstate_machine_diagram",
+        "displayName": "XState machine diagram (Mermaid)",
+        "modelDescription": "Return a Mermaid `stateDiagram-v2` for one XState machine, identified by its id. Useful for visualising or documenting the machine.",
+        "toolReferenceName": "xstateDiagram",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(git-merge)",
+        "tags": [
+          "xstate"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "machine": {
+              "type": "string",
+              "description": "The machine's id."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to disambiguate."
+            }
+          },
+          "required": [
+            "machine"
+          ]
+        }
+      },
+      {
+        "name": "xstate_test_paths",
+        "displayName": "XState test paths",
+        "modelDescription": "Return the shortest event sequence to reach each state of one XState machine (structural — guards assumed takeable), flag unreachable states, and include copy-paste test skeletons. Identify the machine by its id.",
+        "toolReferenceName": "xstateTestPaths",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(beaker)",
+        "tags": [
+          "xstate"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "machine": {
+              "type": "string",
+              "description": "The machine's id."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to disambiguate."
+            }
+          },
+          "required": [
+            "machine"
+          ]
+        }
+      },
+      {
+        "name": "xstate_validate",
+        "displayName": "Validate XState machines",
+        "modelDescription": "Run XState diagnostics over the workspace (or one file): invalid config properties, unknown transition targets, unreachable states, etc. Returns the problems found with file, line, severity, and message.",
+        "toolReferenceName": "xstateValidate",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(checklist)",
+        "tags": [
+          "xstate"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string",
+              "description": "Optional source file path. Omit to validate every XState file in the workspace."
+            }
+          }
+        }
+      },
+      {
+        "name": "xstate_find_implementation",
+        "displayName": "Find XState implementation",
+        "modelDescription": "Locate where an XState action, guard, service/actor, or delay is defined in the source. Give the bare name (as it appears in the machine config); returns the file, line, and a short code snippet of the definition.",
+        "toolReferenceName": "xstateFindImpl",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(go-to-file)",
+        "tags": [
+          "xstate"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The action/guard/service/delay name to locate (as referenced in the machine config)."
+            },
+            "machine": {
+              "type": "string",
+              "description": "Optional machine id whose file to search from first."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to start the search from."
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      },
+      {
+        "name": "xstate_find_references",
+        "displayName": "Find XState references",
+        "modelDescription": "Find every place a name is USED across the workspace as an XState action, guard, invoked actor (service), or event — the inverse of xstate_find_implementation. Returns each usage with its machine, enclosing state, file and line.",
+        "toolReferenceName": "xstateFindRefs",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(references)",
+        "tags": [
+          "xstate"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The action/guard/actor/event name to find usages of."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to restrict the search to."
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      },
+      {
+        "name": "xstate_setup_coverage",
+        "displayName": "XState setup() coverage",
+        "modelDescription": "For one XState v5 machine, list every action, guard, and actor referenced in its config and which are MISSING an implementation in setup() (also which declared ones are unused). Use to check a machine's setup() is complete before running it.",
+        "toolReferenceName": "xstateSetupCoverage",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(checklist)",
+        "tags": [
+          "xstate"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "machine": {
+              "type": "string",
+              "description": "The machine's id."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to disambiguate."
+            }
+          },
+          "required": [
+            "machine"
+          ]
+        }
+      },
+      {
+        "name": "xstate_list_events",
+        "displayName": "List XState events",
+        "modelDescription": "List the events an XState machine handles — its send() API. For each event, the states that handle it and any guard/target. Includes eventless (always) and delayed (after) transitions, flagged as automatic (not sendable).",
+        "toolReferenceName": "xstateEvents",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(symbol-event)",
+        "tags": [
+          "xstate"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "machine": {
+              "type": "string",
+              "description": "The machine's id."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to disambiguate."
+            }
+          },
+          "required": [
+            "machine"
+          ]
+        }
+      },
+      {
+        "name": "xstate_state_detail",
+        "displayName": "XState state detail",
+        "modelDescription": "Focused detail for one state of an XState machine, by label or id: its entry/exit actions, invoked services, and outgoing transitions (event, target, guard, actions). Cheaper than describing the whole machine.",
+        "toolReferenceName": "xstateStateDetail",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(symbol-field)",
+        "tags": [
+          "xstate"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "machine": {
+              "type": "string",
+              "description": "The machine's id."
+            },
+            "state": {
+              "type": "string",
+              "description": "The state's label or id."
+            },
+            "file": {
+              "type": "string",
+              "description": "Optional source file path to disambiguate."
+            }
+          },
+          "required": [
+            "machine",
+            "state"
+          ]
+        }
+      }
+    ],
+    "views": {
+      "xstate-outline": [
+        {
+          "type": "webview",
+          "id": "xstateMachineOutlineSearch",
+          "name": "Search",
+          "when": "true"
+        },
+        {
+          "id": "xstateMachineOutline",
+          "name": "Outline"
+        },
+        {
+          "id": "xstateMachineNavigator",
+          "name": "Transitions"
+        },
+        {
+          "id": "xstateMachineErrors",
+          "name": "Errors"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "xstateMachineOutline",
+        "contents": "All machines in this file are state configs, which are hidden.\n[Show State Configs](command:xstateMachineOutline.setStateConfigsShow)",
+        "when": "xstateOutline.emptyReason == stateConfigsHidden"
+      },
+      {
+        "view": "xstateMachineOutline",
+        "contents": "No XState machines found in this file.\n[Search the Whole Workspace](command:xstateMachineOutline.setScopeWorkspace)",
+        "when": "xstateOutline.emptyReason == noMachinesInFile"
+      },
+      {
+        "view": "xstateMachineOutline",
+        "contents": "Open a JavaScript or TypeScript file to see its XState machines, or search the whole workspace.\n[Search the Whole Workspace](command:xstateMachineOutline.setScopeWorkspace)",
+        "when": "xstateOutline.emptyReason == noEditor"
+      },
+      {
+        "view": "xstateMachineOutline",
+        "contents": "No XState machines found in the workspace.\n[Rescan Workspace](command:xstateMachineOutline.refresh)\n[Search the Current File Only](command:xstateMachineOutline.setScopeFile)",
+        "when": "xstateOutline.emptyReason == noMachinesInWorkspace && workbenchState != empty"
+      },
+      {
+        "view": "xstateMachineOutline",
+        "contents": "Open a folder to scan it for XState machines.\n[Open Folder](command:vscode.openFolder)",
+        "when": "xstateOutline.emptyReason == noMachinesInWorkspace && workbenchState == empty"
+      }
+    ],
+    "commands": [
+      {
+        "command": "xstateMachineOutline.refresh",
+        "title": "Refresh XState Outline",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "xstateMachineOutline.setScopeFile",
+        "title": "Scope: file",
+        "icon": "$(file)"
+      },
+      {
+        "command": "xstateMachineOutline.setScopeFileActive",
+        "title": "Scope: file",
+        "icon": "$(file)"
+      },
+      {
+        "command": "xstateMachineOutline.setScopeWorkspace",
+        "title": "Scope: workspace",
+        "icon": "$(folder)"
+      },
+      {
+        "command": "xstateMachineOutline.setScopeWorkspaceActive",
+        "title": "Scope: workspace",
+        "icon": "$(folder)"
+      },
+      {
+        "command": "xstateMachineOutline.setViewGrouped",
+        "title": "View: grouped",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "xstateMachineOutline.setViewGroupedActive",
+        "title": "View: grouped",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "xstateMachineOutline.setViewFlat",
+        "title": "View: flat",
+        "icon": "$(list-flat)"
+      },
+      {
+        "command": "xstateMachineOutline.setViewFlatActive",
+        "title": "View: flat",
+        "icon": "$(list-flat)"
+      },
+      {
+        "command": "xstateMachineOutline.setStateConfigsShow",
+        "title": "State configs: show",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "xstateMachineOutline.setStateConfigsShowActive",
+        "title": "State configs: show",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "xstateMachineOutline.setStateConfigsHide",
+        "title": "State configs: hide",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "xstateMachineOutline.setStateConfigsHideActive",
+        "title": "State configs: hide",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "xstateMachineOutline.toggleFollowCursor",
+        "title": "Cursor: follow",
+        "icon": "$(pin)"
+      },
+      {
+        "command": "xstateMachineOutline.toggleFollowCursorActive",
+        "title": "Cursor: do not follow",
+        "icon": "$(pinned)"
+      },
+      {
+        "command": "xstateMachineOutline.setNavDiagram",
+        "title": "Navigate: diagram",
+        "icon": "$(git-merge)"
+      },
+      {
+        "command": "xstateMachineOutline.setNavCode",
+        "title": "Navigate: code",
+        "icon": "$(code)"
+      },
+      {
+        "command": "xstateMachineOutline.toggleGraphSyncExpansion",
+        "title": "Graph: reflect tree expansion",
+        "icon": "$(list-filter)"
+      },
+      {
+        "command": "xstateMachineOutline.toggleGraphSyncExpansionActive",
+        "title": "Graph: render full tree",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "xstateMachineOutline.setChildGroupingByType",
+        "title": "Group children: by type",
+        "icon": "$(group-by-ref-type)"
+      },
+      {
+        "command": "xstateMachineOutline.setChildGroupingFlat",
+        "title": "Group children: flat",
+        "icon": "$(ungroup-by-ref-type)"
+      },
+      {
+        "command": "xstateMachineOutlineSearch.setSortRelevance",
+        "title": "Sort results by: Relevance"
+      },
+      {
+        "command": "xstateMachineOutlineSearch.setSortRelevanceActive",
+        "title": "Sort results by: $(check) Relevance"
+      },
+      {
+        "command": "xstateMachineOutlineSearch.setSortName",
+        "title": "Sort results by: Name"
+      },
+      {
+        "command": "xstateMachineOutlineSearch.setSortNameActive",
+        "title": "Sort results by: $(check) Name"
+      },
+      {
+        "command": "xstateMachineOutlineSearch.setSortType",
+        "title": "Sort results by: Type"
+      },
+      {
+        "command": "xstateMachineOutlineSearch.setSortTypeActive",
+        "title": "Sort results by: $(check) Type"
+      },
+      {
+        "command": "xstateMachineOutlineSearch.setFuzzyOn",
+        "title": "Fuzzy match"
+      },
+      {
+        "command": "xstateMachineOutlineSearch.setFuzzyOff",
+        "title": "$(check) Fuzzy match"
+      },
+      {
+        "command": "xstateMachineOutline.setErrorsGroupingFile",
+        "title": "Group: by file",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "xstateMachineOutline.setErrorsGroupingSeverity",
+        "title": "Group: by severity",
+        "icon": "$(warning)"
+      },
+      {
+        "command": "xstateMachineOutline.setErrorsGroupingFlat",
+        "title": "Group: flat",
+        "icon": "$(list-flat)"
+      },
+      {
+        "command": "xstateErrors.open",
+        "title": "Go to Problem"
+      },
+      {
+        "command": "xstateErrors.copy",
+        "title": "Copy",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "xstateMachineOutline.setErrorsFilterAll",
+        "title": "Show: all",
+        "icon": "$(list-filter)"
+      },
+      {
+        "command": "xstateMachineOutline.setErrorsFilterWarnings",
+        "title": "Show: warnings & errors",
+        "icon": "$(warning)"
+      },
+      {
+        "command": "xstateMachineOutline.setErrorsFilterErrors",
+        "title": "Show: errors only",
+        "icon": "$(error)"
+      },
+      {
+        "command": "xstateMachineOutline.navigateToNode",
+        "title": "Go to Source"
+      },
+      {
+        "command": "xstateMachineOutline.goToSource",
+        "title": "Go to Source",
+        "category": "XState",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "xstateMachineOutline.goToImplementation",
+        "title": "Go to Implementation",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "xstateMachineOutline.showTransitions",
+        "title": "Show Transitions",
+        "icon": "$(arrow-both)"
+      },
+      {
+        "command": "xstateNavigator.openTransition",
+        "title": "Go to State"
+      },
+      {
+        "command": "xstateMachineOutline.filter",
+        "title": "Filter",
+        "icon": "$(search)"
+      },
+      {
+        "command": "xstateMachineOutline.clearFilter",
+        "title": "Clear Filter",
+        "icon": "$(search-stop)"
+      },
+      {
+        "command": "xstateMachineOutline.goToImplementationSelected",
+        "title": "Go to Implementation",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "xstateMachineOutline.editNode",
+        "title": "Edit"
+      },
+      {
+        "command": "xstateMachineOutline.addChildState",
+        "title": "Add Child State"
+      },
+      {
+        "command": "xstateMachineOutline.addTransition",
+        "title": "Add Transition"
+      },
+      {
+        "command": "xstateMachineOutline.addReference",
+        "title": "Add Action / Guard / Invoke"
+      },
+      {
+        "command": "xstateMachineOutline.deleteNode",
+        "title": "Delete"
+      },
+      {
+        "command": "xstateMachineOutline.setDescription",
+        "title": "Set Description"
+      },
+      {
+        "command": "xstateMachineOutline.copyNode",
+        "title": "Copy"
+      },
+      {
+        "command": "xstateMachineOutline.cutNode",
+        "title": "Cut"
+      },
+      {
+        "command": "xstateMachineOutline.pasteNode",
+        "title": "Paste"
+      },
+      {
+        "command": "xstateMachineOutline.openGraphView",
+        "title": "View State Diagram",
+        "icon": "$(git-merge)"
+      },
+      {
+        "command": "xstateMachineOutline.openGraphViewAtCursor",
+        "title": "View State Diagram",
+        "category": "XState",
+        "icon": "$(git-merge)"
+      },
+      {
+        "command": "xstateMachineOutline.openGraphViewForNode",
+        "title": "View State Diagram",
+        "category": "XState"
+      },
+      {
+        "command": "xstateMachineOutline.exportMermaid",
+        "title": "Export as Mermaid",
+        "category": "XState",
+        "icon": "$(markdown)"
+      },
+      {
+        "command": "xstateMachineOutline.generateSetupStubs",
+        "title": "Generate Setup Stubs",
+        "category": "XState",
+        "icon": "$(symbol-method)"
+      },
+      {
+        "command": "xstateMachineOutline.generateTestPaths",
+        "title": "Generate Test Paths",
+        "category": "XState",
+        "icon": "$(beaker)"
+      }
+    ],
+    "configuration": {
+      "title": "XState Outline",
+      "properties": {
+        "xstateOutline.defaultScope": {
+          "type": "string",
+          "enum": [
+            "file",
+            "workspace"
+          ],
+          "default": "workspace",
+          "description": "Default scope for XState Outline view (file or workspace)"
+        },
+        "xstateOutline.defaultViewMode": {
+          "type": "string",
+          "enum": [
+            "grouped",
+            "flat"
+          ],
+          "default": "flat",
+          "description": "Default view mode (grouped by file or flat list of machines)"
+        },
+        "xstateOutline.showStateConfigs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show createStateConfig/stateConfig patterns in the outline"
+        },
+        "xstateOutline.followCursor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically reveal the tree item corresponding to the cursor position"
+        },
+        "xstateOutline.navTarget": {
+          "type": "string",
+          "enum": [
+            "code",
+            "diagram"
+          ],
+          "enumDescriptions": [
+            "Clicking a state/machine in the outline jumps to its source",
+            "Clicking a state/machine focuses it in the diagram (opening the diagram if needed)"
+          ],
+          "default": "code",
+          "description": "Where clicking a tree node navigates: source code or the statechart diagram"
+        },
+        "xstateOutline.graphReflectsTreeExpansion": {
+          "type": "boolean",
+          "default": true,
+          "description": "Make the visual graph selectively render only states that are expanded in the tree outline"
+        },
+        "xstateOutline.codeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a CodeLens above each machine with state/transition counts and a 'View Diagram' action"
+        },
+        "xstateOutline.showInternalTransitions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show internal (action-only) transitions inside state boxes in the diagram (toggle live from the diagram toolbar)"
+        },
+        "xstateOutline.childGrouping": {
+          "type": "string",
+          "enum": [
+            "flat",
+            "by-type"
+          ],
+          "enumDescriptions": [
+            "Show a node's children as a flat list",
+            "Nest children under collapsible category nodes (States, Events, Actions, Guards, Invoked, Context…)"
+          ],
+          "default": "flat",
+          "description": "How a state/machine's children are arranged in the outline"
+        },
+        "xstateOutline.searchSort": {
+          "type": "string",
+          "enum": [
+            "relevance",
+            "name",
+            "type"
+          ],
+          "enumDescriptions": [
+            "Source order (as found)",
+            "Alphabetical by name",
+            "Grouped by type, then alphabetical by name"
+          ],
+          "default": "relevance",
+          "description": "Default ordering for search results"
+        },
+        "xstateOutline.searchFuzzy": {
+          "type": "boolean",
+          "default": false,
+          "description": "Match search by fuzzy subsequence (e.g. \"kp\" matches \"keep\") instead of substring, ranking the best matches first"
+        },
+        "xstateOutline.errorsGrouping": {
+          "type": "string",
+          "enum": [
+            "file",
+            "severity",
+            "flat"
+          ],
+          "default": "file",
+          "description": "How the Errors pane groups problems: by file, by severity, or a flat list"
+        },
+        "xstateOutline.errorsFilter": {
+          "type": "string",
+          "enum": [
+            "all",
+            "warning",
+            "error"
+          ],
+          "enumDescriptions": [
+            "Show everything, including deprecations and unused-setup hints",
+            "Show errors and warnings (hide informational hints)",
+            "Show only errors — problems that fail at runtime"
+          ],
+          "default": "warning",
+          "description": "Minimum severity shown in the Errors pane"
+        }
+      }
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "xstateMachineOutlineSearch.setSortRelevance",
+          "when": "view == xstateMachineOutlineSearch && xstateOutline.searchSortMode != relevance",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "xstateMachineOutlineSearch.setSortRelevanceActive",
+          "when": "view == xstateMachineOutlineSearch && xstateOutline.searchSortMode == relevance",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "xstateMachineOutlineSearch.setSortName",
+          "when": "view == xstateMachineOutlineSearch && xstateOutline.searchSortMode != name",
+          "group": "1_sort@2"
+        },
+        {
+          "command": "xstateMachineOutlineSearch.setSortNameActive",
+          "when": "view == xstateMachineOutlineSearch && xstateOutline.searchSortMode == name",
+          "group": "1_sort@2"
+        },
+        {
+          "command": "xstateMachineOutlineSearch.setSortType",
+          "when": "view == xstateMachineOutlineSearch && xstateOutline.searchSortMode != type",
+          "group": "1_sort@3"
+        },
+        {
+          "command": "xstateMachineOutlineSearch.setSortTypeActive",
+          "when": "view == xstateMachineOutlineSearch && xstateOutline.searchSortMode == type",
+          "group": "1_sort@3"
+        },
+        {
+          "command": "xstateMachineOutlineSearch.setFuzzyOn",
+          "when": "view == xstateMachineOutlineSearch && !xstateOutline.searchFuzzy",
+          "group": "2_match@1"
+        },
+        {
+          "command": "xstateMachineOutlineSearch.setFuzzyOff",
+          "when": "view == xstateMachineOutlineSearch && xstateOutline.searchFuzzy",
+          "group": "2_match@1"
+        },
+        {
+          "command": "xstateMachineOutline.refresh",
+          "when": "view == xstateMachineOutline",
+          "group": "navigation@0"
+        },
+        {
+          "command": "xstateMachineOutline.toggleGraphSyncExpansion",
+          "when": "view == xstateMachineOutline && !xstateOutline.graphReflectsTreeExpansion",
+          "group": "1_visibility@1"
+        },
+        {
+          "command": "xstateMachineOutline.toggleGraphSyncExpansionActive",
+          "when": "view == xstateMachineOutline && xstateOutline.graphReflectsTreeExpansion",
+          "group": "1_visibility@1"
+        },
+        {
+          "command": "xstateMachineOutline.toggleFollowCursor",
+          "when": "view == xstateMachineOutline && !xstateOutline.followCursor",
+          "group": "0_cursor@1"
+        },
+        {
+          "command": "xstateMachineOutline.toggleFollowCursorActive",
+          "when": "view == xstateMachineOutline && xstateOutline.followCursor",
+          "group": "0_cursor@1"
+        },
+        {
+          "command": "xstateMachineOutline.setNavDiagram",
+          "when": "view == xstateMachineOutline && !xstateOutline.navIsDiagram",
+          "group": "0_nav@1"
+        },
+        {
+          "command": "xstateMachineOutline.setNavCode",
+          "when": "view == xstateMachineOutline && xstateOutline.navIsDiagram",
+          "group": "0_nav@1"
+        },
+        {
+          "command": "xstateMachineOutline.setScopeFile",
+          "when": "view == xstateMachineOutline && xstateOutline.scopeIsWorkspace",
+          "group": "1_scope@1"
+        },
+        {
+          "command": "xstateMachineOutline.setScopeWorkspace",
+          "when": "view == xstateMachineOutline && !xstateOutline.scopeIsWorkspace",
+          "group": "1_scope@1"
+        },
+        {
+          "command": "xstateMachineOutline.setViewGrouped",
+          "when": "view == xstateMachineOutline && xstateOutline.viewModeIsFlat",
+          "group": "2_view@1"
+        },
+        {
+          "command": "xstateMachineOutline.setViewFlat",
+          "when": "view == xstateMachineOutline && !xstateOutline.viewModeIsFlat",
+          "group": "2_view@1"
+        },
+        {
+          "command": "xstateMachineOutline.setStateConfigsShow",
+          "when": "view == xstateMachineOutline && !xstateOutline.showStateConfigs",
+          "group": "3_configs@1"
+        },
+        {
+          "command": "xstateMachineOutline.setStateConfigsHide",
+          "when": "view == xstateMachineOutline && xstateOutline.showStateConfigs",
+          "group": "3_configs@1"
+        },
+        {
+          "command": "xstateMachineOutline.setChildGroupingByType",
+          "when": "view == xstateMachineOutline && xstateOutline.childGroupingMode == flat",
+          "group": "4_grouping@1"
+        },
+        {
+          "command": "xstateMachineOutline.setChildGroupingFlat",
+          "when": "view == xstateMachineOutline && xstateOutline.childGroupingMode == by-type",
+          "group": "4_grouping@1"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsFilterAll",
+          "when": "view == xstateMachineErrors && xstateErrors.filter != all",
+          "group": "navigation@0"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsFilterWarnings",
+          "when": "view == xstateMachineErrors && xstateErrors.filter != warning",
+          "group": "navigation@1"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsFilterErrors",
+          "when": "view == xstateMachineErrors && xstateErrors.filter != error",
+          "group": "navigation@2"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsGroupingFile",
+          "when": "view == xstateMachineErrors && xstateErrors.grouping != file",
+          "group": "navigation@3"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsGroupingSeverity",
+          "when": "view == xstateMachineErrors && xstateErrors.grouping != severity",
+          "group": "navigation@4"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsGroupingFlat",
+          "when": "view == xstateMachineErrors && xstateErrors.grouping != flat",
+          "group": "navigation@5"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "xstateMachineOutline.goToSource",
+          "when": "view == xstateMachineOutline && xstateOutline.navIsDiagram && (viewItem == machine || viewItem == state)",
+          "group": "navigation@0"
+        },
+        {
+          "command": "xstateMachineOutline.openGraphView",
+          "when": "view == xstateMachineOutline && (viewItem == machine || viewItem == state)",
+          "group": "navigation@1"
+        },
+        {
+          "command": "xstateMachineOutline.exportMermaid",
+          "when": "view == xstateMachineOutline && (viewItem == machine || viewItem == state)",
+          "group": "navigation@3"
+        },
+        {
+          "command": "xstateMachineOutline.generateTestPaths",
+          "when": "view == xstateMachineOutline && viewItem == machine",
+          "group": "navigation@5"
+        },
+        {
+          "command": "xstateMachineOutline.generateSetupStubs",
+          "when": "view == xstateMachineOutline && viewItem == machine",
+          "group": "navigation@6"
+        },
+        {
+          "command": "xstateMachineOutline.goToImplementation",
+          "when": "view == xstateMachineOutline && (viewItem == action || viewItem == guard || viewItem == entry || viewItem == exit || viewItem == invoke || viewItem == target)",
+          "group": "navigation@1"
+        },
+        {
+          "command": "xstateMachineOutline.showTransitions",
+          "when": "view == xstateMachineOutline && viewItem == state",
+          "group": "navigation@2"
+        },
+        {
+          "command": "xstateMachineOutline.editNode",
+          "when": "view == xstateMachineOutline && (viewItem == state || viewItem == transition || viewItem == target || viewItem == action || viewItem == guard || viewItem == invoke || viewItem == contextProperty || viewItem == actor || viewItem == delay || viewItem == invalid)",
+          "group": "edit@1"
+        },
+        {
+          "command": "xstateMachineOutline.addChildState",
+          "when": "view == xstateMachineOutline && (viewItem == machine || viewItem == state)",
+          "group": "edit@2"
+        },
+        {
+          "command": "xstateMachineOutline.addTransition",
+          "when": "view == xstateMachineOutline && viewItem == state",
+          "group": "edit@3"
+        },
+        {
+          "command": "xstateMachineOutline.addReference",
+          "when": "view == xstateMachineOutline && (viewItem == machine || viewItem == state || viewItem == transition || viewItem == setup || viewItem == action || viewItem == guard || viewItem == actor || viewItem == delay || viewItem == invoke)",
+          "group": "edit@4"
+        },
+        {
+          "command": "xstateMachineOutline.deleteNode",
+          "when": "view == xstateMachineOutline && (viewItem == state || viewItem == transition || viewItem == target || viewItem == action || viewItem == guard || viewItem == invoke || viewItem == contextProperty || viewItem == actor || viewItem == delay || viewItem == invalid)",
+          "group": "edit@5"
+        },
+        {
+          "command": "xstateMachineOutline.setDescription",
+          "when": "view == xstateMachineOutline && (viewItem == machine || viewItem == state)",
+          "group": "edit@6"
+        },
+        {
+          "command": "xstateMachineOutline.copyNode",
+          "when": "view == xstateMachineOutline && (viewItem == state || viewItem == transition || viewItem == action || viewItem == guard || viewItem == invoke || viewItem == contextProperty || viewItem == actor || viewItem == delay)",
+          "group": "9_cutcopypaste@1"
+        },
+        {
+          "command": "xstateMachineOutline.cutNode",
+          "when": "view == xstateMachineOutline && (viewItem == state || viewItem == transition || viewItem == action || viewItem == guard || viewItem == invoke || viewItem == contextProperty || viewItem == actor || viewItem == delay)",
+          "group": "9_cutcopypaste@2"
+        },
+        {
+          "command": "xstateMachineOutline.pasteNode",
+          "when": "view == xstateMachineOutline && xstateOutline.hasClipboard && (viewItem == machine || viewItem == state)",
+          "group": "9_cutcopypaste@3"
+        },
+        {
+          "command": "xstateErrors.copy",
+          "when": "view == xstateMachineErrors && (viewItem == errorIssue || viewItem == errorFileGroup || viewItem == errorSeverityGroup)",
+          "group": "9_copy@1"
+        }
+      ],
+      "view/item/inline": [
+        {
+          "command": "xstateMachineOutline.openGraphView",
+          "when": "view == xstateMachineOutline && (viewItem == machine || viewItem == state)",
+          "group": "inline@1"
+        },
+        {
+          "command": "xstateMachineOutline.goToImplementation",
+          "when": "view == xstateMachineOutline && (viewItem == action || viewItem == guard || viewItem == entry || viewItem == exit || viewItem == invoke || viewItem == target)",
+          "group": "inline"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "xstateMachineOutline.openGraphViewAtCursor",
+          "when": "xstateOutline.editorHasMachine",
+          "group": "navigation@9"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "xstateMachineOutline.goToSource",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.openGraphView",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.openGraphViewForNode",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.exportMermaid",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.generateTestPaths",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.generateSetupStubs",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.showTransitions",
+          "when": "false"
+        },
+        {
+          "command": "xstateNavigator.openTransition",
+          "when": "false"
+        },
+        {
+          "command": "xstateErrors.open",
+          "when": "false"
+        },
+        {
+          "command": "xstateErrors.copy",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsGroupingFile",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsGroupingSeverity",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsGroupingFlat",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsFilterAll",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsFilterWarnings",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.setErrorsFilterErrors",
+          "when": "false"
+        },
+        {
+          "command": "xstateMachineOutline.openGraphViewAtCursor",
+          "when": "xstateOutline.editorHasMachine"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "xstate-outline",
+          "title": "xState Devtools",
+          "icon": "resources/xstate.svg"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "xstateMachineOutline.goToImplementationSelected",
+        "key": "f12",
+        "mac": "f12",
+        "when": "focusedView == xstateMachineOutline"
+      },
+      {
+        "command": "xstateErrors.copy",
+        "key": "ctrl+c",
+        "mac": "cmd+c",
+        "when": "focusedView == xstateMachineErrors"
+      },
+      {
+        "command": "xstateMachineOutline.copyNode",
+        "key": "ctrl+c",
+        "mac": "cmd+c",
+        "when": "focusedView == xstateMachineOutline"
+      },
+      {
+        "command": "xstateMachineOutline.cutNode",
+        "key": "ctrl+x",
+        "mac": "cmd+x",
+        "when": "focusedView == xstateMachineOutline"
+      },
+      {
+        "command": "xstateMachineOutline.pasteNode",
+        "key": "ctrl+v",
+        "mac": "cmd+v",
+        "when": "focusedView == xstateMachineOutline && xstateOutline.hasClipboard"
+      }
+    ]
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "vscode:prepublish": "npm run copy-codicons && npm run bundle",
+    "copy-codicons": "node -e \"const fs=require('fs'),p=require('path');const dist=p.dirname(require.resolve('@vscode/codicons/package.json'))+'/dist';const out='resources/codicons';fs.mkdirSync(out,{recursive:true});for(const f of ['codicon.css','codicon.ttf'])fs.copyFileSync(p.join(dist,f),p.join(out,f));\"",
+    "bundle": "node esbuild.js",
+    "compile": "npm run copy-codicons && npm run bundle",
+    "build": "npm run copy-codicons && npm run bundle",
+    "watch": "npm run copy-codicons && node esbuild.js --watch",
+    "dev": "npm run copy-codicons && node esbuild.js --watch",
+    "check": "tsc -p ./ --noEmit",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.95.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vscode/codicons": "^0.0.45",
+    "esbuild": "^0.17.6",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@xstate-devtools/diagram-core": "*",
+    "elkjs": "^0.11.1"
+  }
+}
