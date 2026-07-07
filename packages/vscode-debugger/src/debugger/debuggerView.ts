@@ -125,8 +125,8 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
   table.events tr.evrow:hover td { background: var(--vscode-list-hoverBackground); }
   table.events tr.tt td { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
   table.events tr.future td { opacity: .5; }
-  .findw { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: var(--vscode-editorWidget-background, var(--vscode-editor-background)); border-bottom: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border)); }
-  .finput { display: flex; align-items: center; gap: 1px; flex: 0 1 420px; min-width: 120px; padding: 1px 3px; background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); border-radius: 4px; }
+  .findw { position: fixed; top: 4px; right: 14px; z-index: 10; display: flex; align-items: center; gap: 4px; padding: 3px 5px; background: var(--vscode-editorWidget-background, var(--vscode-editor-background)); border: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border)); border-radius: 4px; box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, .3)); }
+  .finput { display: flex; align-items: center; gap: 1px; width: 200px; padding: 1px 3px; background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); border-radius: 4px; }
   .finput:focus-within { border-color: var(--vscode-focusBorder); box-shadow: 0 0 0 1px var(--vscode-focusBorder) inset; }
   .finput input { flex: 1; min-width: 40px; border: none; outline: none; background: transparent; color: var(--vscode-input-foreground); font-family: inherit; font-size: 12px; padding: 2px 4px; }
   .fbtn { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 3px; border: 1px solid transparent; border-radius: 3px; background: transparent; color: var(--vscode-icon-foreground, var(--vscode-foreground)); cursor: pointer; font-size: 11px; flex: none; }
@@ -134,8 +134,7 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
   .fbtn:disabled { opacity: .4; cursor: default; }
   .fbtn:disabled:hover { background: transparent; }
   .fbtn.on { background: var(--vscode-inputOption-activeBackground); border-color: var(--vscode-inputOption-activeBorder); color: var(--vscode-inputOption-activeForeground); }
-  .fcount { color: var(--vscode-descriptionForeground); font-size: 12px; white-space: nowrap; }
-  .fspace { flex: 1; }
+  .fcount { color: var(--vscode-descriptionForeground); font-size: 12px; white-space: nowrap; min-width: 60px; text-align: center; }
   .loglist { overflow: auto; outline: none; }
   .loglist:focus-visible { box-shadow: inset 0 0 0 1px var(--vscode-focusBorder); }
   .tree { font-size: 12px; }

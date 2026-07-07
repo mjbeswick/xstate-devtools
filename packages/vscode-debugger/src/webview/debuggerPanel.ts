@@ -106,7 +106,6 @@ function renderEventsPanel(m: any): void {
                     '<button id="f-regex" class="fbtn ftog" title="Use Regular Expression">.*</button>' +
                 '</div>' +
                 '<span id="f-count" class="fcount"></span>' +
-                '<span class="fspace"></span>' +
                 '<button id="f-prev" class="fbtn" title="Previous Match (Shift+Enter)">↑</button>' +
                 '<button id="f-next" class="fbtn" title="Next Match (Enter)">↓</button>' +
                 '<button id="f-close" class="fbtn" title="Close (Escape)">✕</button>' +
