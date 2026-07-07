@@ -318,8 +318,12 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
             new vscode.ThemeColor(stopped ? 'disabledForeground' : 'charts.green'),
         );
         const hasChildren = !!actor.machine || [...state.actors.values()].some((a) => a.parentSessionId === sessionId);
+        // Collapsed, never Expanded: the tree refreshes on every event, and VS
+        // Code re-applies a provider's Expanded on each refresh — re-expanding
+        // rows the user (or Collapse All) just collapsed. User expansions are
+        // remembered by the stable item id instead.
         item.collapsibleState = hasChildren
-            ? vscode.TreeItemCollapsibleState.Expanded
+            ? vscode.TreeItemCollapsibleState.Collapsed
             : vscode.TreeItemCollapsibleState.None;
         item.tooltip = `${item.label} · ${actor.status}\n${sessionId}`;
         return item;
@@ -349,9 +353,11 @@ export class DebuggerTreeProvider implements vscode.TreeDataProvider<DebuggerTre
         };
         // Expandable if it has child states, or a live invoked actor nested
         // under it (invoked actors only exist while the state is active).
+        // Collapsed even when active — Expanded gets re-applied on every
+        // event-driven refresh, fighting Collapse All (see actorItem).
         const hasChildren = Object.keys(node.states).length > 0 || this.invokedActorsOf(sessionId, node).length > 0;
         item.collapsibleState = hasChildren
-            ? (active ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed)
+            ? vscode.TreeItemCollapsibleState.Collapsed
             : vscode.TreeItemCollapsibleState.None;
         return item;
     }
