@@ -100,7 +100,8 @@ function renderEventsPanel(m: any): void {
         body.innerHTML =
             '<div id="findw" class="findw" style="display:none">' +
                 '<div class="finput">' +
-                    '<input id="evfilter" type="text" placeholder="Find" />' +
+                    '<input id="evfilter" type="text" placeholder="Find" ' +
+                        'title="Searches event type, actor, and payload. Space-separated terms are AND-ed; -term excludes." />' +
                     '<button id="f-case" class="fbtn ftog" title="Match Case">Aa</button>' +
                     '<button id="f-word" class="fbtn ftog" title="Match Whole Word"><u>ab</u></button>' +
                     '<button id="f-regex" class="fbtn ftog" title="Use Regular Expression">.*</button>' +
@@ -197,19 +198,28 @@ function renderEventList(): void {
     }
 }
 
-// Build the row predicate from the find state; null = no filtering. An invalid
-// regex matches nothing (the count then reads "No results", like VS Code).
+// Build the row predicate from the find state; null = no filtering. Grammar:
+// space-separated terms are AND-ed, a '-' prefix negates a term ("FETCH -TICK").
+// In regex mode the whole query is one pattern (a leading '-' still negates;
+// use \- to match a literal dash). An invalid regex matches nothing (the count
+// then reads "No results", like VS Code).
 function eventMatcher(): ((hay: string) => boolean) | null {
     const q = evFilter.trim();
     if (!evFindOpen || !q) { return null; }
-    const src = evRegex ? q : q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = evWord ? '\\b(?:' + src + ')\\b' : src;
-    try {
-        const re = new RegExp(pattern, evCase ? '' : 'i');
-        return (hay) => re.test(hay);
-    } catch {
-        return () => false;
+    const compile = (term: string): RegExp | null => {
+        const src = evRegex ? term : term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        try { return new RegExp(evWord ? '\\b(?:' + src + ')\\b' : src, evCase ? '' : 'i'); }
+        catch { return null; }
+    };
+    const pos: RegExp[] = [];
+    const neg: RegExp[] = [];
+    for (const t of evRegex ? [q] : q.split(/\s+/)) {
+        const isNeg = t.length > 1 && t.startsWith('-');
+        const re = compile(isNeg ? t.slice(1) : t);
+        if (!re) { return () => false; }
+        (isNeg ? neg : pos).push(re);
     }
+    return (hay) => pos.every((re) => re.test(hay)) && !neg.some((re) => re.test(hay));
 }
 
 // Selected actor inspector: state summary, context, dispatch, persisted.
@@ -274,7 +284,8 @@ function renderEvents(m: any): string {
     }
     const match = eventMatcher();
     const shown = match
-        ? m.events.filter((ev: any) => match(String(ev.type)) || match(labelBy[ev.sessionId] || ''))
+        ? m.events.filter((ev: any) =>
+            match(String(ev.type) + ' ' + (labelBy[ev.sessionId] || '') + ' ' + (ev.data || '')))
         : m.events;
     evShownSeqs = shown.map((ev: any) => ev.seq);
     if (!shown.length) {

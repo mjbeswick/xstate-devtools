@@ -34,6 +34,8 @@ export interface EventVM {
     type: string;
     seq: number;
     time: number;
+    /** Full event payload as JSON, so the find widget can search event bodies. */
+    data: string;
 }
 
 /** An event the selected actor could be sent from its current state. */
@@ -77,6 +79,7 @@ export class DebuggerController implements vscode.Disposable {
     private lastTimeTravelling = false;
     private lastOverlaySummary = '';
     private flushTimer: ReturnType<typeof setTimeout> | null = null;
+    private eventDataCache = new Map<number, string>();
     private announceConnectFailure = false;
     private readonly _onDidChangeStatus = new vscode.EventEmitter<ConnectionStatus>();
     /** Fires on every connection-status change (for surfaces that key off it). */
@@ -431,8 +434,18 @@ export class DebuggerController implements vscode.Disposable {
             }
         }
 
-        const events: EventVM[] = state.events
-            .map((e) => ({ sessionId: e.sessionId, type: e.event.type, seq: e.globalSeq, time: e.timestamp }));
+        // Stringify each event body once per seq (events are immutable); the cache
+        // is rebuilt per flush so it never outgrows the capped event buffer.
+        // ponytail: full payloads ride every model push — at a full 5000-event
+        // buffer under heavy streaming that's ~1MB per flush; switch to delta
+        // pushes if the log ever janks.
+        const nextCache = new Map<number, string>();
+        const events: EventVM[] = state.events.map((e) => {
+            const data = this.eventDataCache.get(e.globalSeq) ?? JSON.stringify(e.event);
+            nextCache.set(e.globalSeq, data);
+            return { sessionId: e.sessionId, type: e.event.type, seq: e.globalSeq, time: e.timestamp, data };
+        });
+        this.eventDataCache = nextCache;
 
         return {
             status: this.status,
