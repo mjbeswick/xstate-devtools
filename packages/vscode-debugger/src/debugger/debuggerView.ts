@@ -67,6 +67,11 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
         this.post(model);
     }
 
+    /** Events role: toggle the find widget in the webview (title-bar icon / ⌘F). */
+    toggleFind(): void {
+        void this.view?.webview.postMessage({ command: 'toggleFind' });
+    }
+
     private post(model: DebuggerViewModel): void {
         void this.view?.webview.postMessage({ command: 'model', model });
     }
@@ -120,9 +125,17 @@ export class DebuggerViewProvider implements vscode.WebviewViewProvider, Debugge
   table.events tr.evrow:hover td { background: var(--vscode-list-hoverBackground); }
   table.events tr.tt td { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
   table.events tr.future td { opacity: .5; }
-  .filterbar { position: sticky; top: 0; z-index: 1; padding: 6px 10px; background: var(--vscode-panel-background, var(--vscode-editor-background)); border-bottom: 1px solid var(--vscode-panel-border); }
-  .filterbar input { width: 100%; box-sizing: border-box; font-family: inherit; font-size: 12px; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); border-radius: 2px; padding: 3px 6px; outline: none; }
-  .filterbar input:focus { border-color: var(--vscode-focusBorder); }
+  .findw { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: var(--vscode-editorWidget-background, var(--vscode-editor-background)); border-bottom: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border)); }
+  .finput { display: flex; align-items: center; gap: 1px; flex: 0 1 420px; min-width: 120px; padding: 1px 3px; background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); border-radius: 4px; }
+  .finput:focus-within { border-color: var(--vscode-focusBorder); box-shadow: 0 0 0 1px var(--vscode-focusBorder) inset; }
+  .finput input { flex: 1; min-width: 40px; border: none; outline: none; background: transparent; color: var(--vscode-input-foreground); font-family: inherit; font-size: 12px; padding: 2px 4px; }
+  .fbtn { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 3px; border: 1px solid transparent; border-radius: 3px; background: transparent; color: var(--vscode-icon-foreground, var(--vscode-foreground)); cursor: pointer; font-size: 11px; flex: none; }
+  .fbtn:hover { background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground)); }
+  .fbtn:disabled { opacity: .4; cursor: default; }
+  .fbtn:disabled:hover { background: transparent; }
+  .fbtn.on { background: var(--vscode-inputOption-activeBackground); border-color: var(--vscode-inputOption-activeBorder); color: var(--vscode-inputOption-activeForeground); }
+  .fcount { color: var(--vscode-descriptionForeground); font-size: 12px; white-space: nowrap; }
+  .fspace { flex: 1; }
   .loglist { overflow: auto; outline: none; }
   .loglist:focus-visible { box-shadow: inset 0 0 0 1px var(--vscode-focusBorder); }
   .tree { font-size: 12px; }

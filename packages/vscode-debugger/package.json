@@ -157,6 +157,12 @@
         "icon": "$(clear-all)"
       },
       {
+        "command": "xstateDebugger.findEvents",
+        "title": "Find in Event Log",
+        "category": "XState Debugger",
+        "icon": "$(search)"
+      },
+      {
         "command": "xstateDebugger.recheckSetup",
         "title": "Check Setup",
         "category": "XState Debugger",
@@ -308,9 +314,14 @@
           "group": "navigation@2"
         },
         {
-          "command": "xstateDebugger.clearEvents",
+          "command": "xstateDebugger.findEvents",
           "when": "view == xstateEventsLog",
           "group": "navigation@3"
+        },
+        {
+          "command": "xstateDebugger.clearEvents",
+          "when": "view == xstateEventsLog",
+          "group": "navigation@4"
         },
         {
           "command": "xstateDebugger.copyEvent",

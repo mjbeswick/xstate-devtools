@@ -26,12 +26,16 @@ const ROLE: string = (window as { __ROLE__?: string }).__ROLE__ || 'debugger';
 window.addEventListener('message', (e: MessageEvent) => {
     const msg = e.data;
     if (msg && msg.command === 'model') { render(msg.model); }
+    if (msg && msg.command === 'toggleFind' && ROLE === 'events') { toggleFind(); }
 });
 
-// Events panel keyboard nav (only when this webview is focused): ← previous,
-// → next, Esc back to live. Reuses the controller's step/back-to-live logic.
+// Events panel keyboard nav (only when this webview is focused): ⌘/Ctrl+F find,
+// ← previous, → next, Esc closes find or goes back to live. VS Code does not
+// forward workbench keybindings into a focused webview, so ⌘F lives here.
 if (ROLE === 'events') {
     window.addEventListener('keydown', (e: KeyboardEvent) => {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') { e.preventDefault(); toggleFind(true); return; }
+        if (e.key === 'Escape' && evFindOpen) { e.preventDefault(); toggleFind(false); return; }
         const t = e.target as HTMLElement | null;
         if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) { return; }
         const command = e.key === 'ArrowLeft' ? 'stepBack'
@@ -78,22 +82,79 @@ function render(m: any): void {
     }));
 }
 
-// Events panel: a persistent filter input above the rebuilt list, so typing
-// survives streaming re-renders (only #evbody is replaced, never the input).
+// Events panel: a VS Code-style find widget (hidden until ⌘/Ctrl+F or the
+// title-bar icon) above the rebuilt list; only #evbody is replaced per model
+// push, so the input, its text, and focus survive streaming re-renders.
 let evModel: any = null;
 let evFilter = '';
+let evFindOpen = false;
+let evCase = false;
+let evWord = false;
+let evRegex = false;
+let evShownSeqs: number[] = []; // ascending seqs of visible rows — count + ↑/↓ nav
 
 function renderEventsPanel(m: any): void {
     evModel = m;
     const body = $('body');
-    if (!document.getElementById('evfilter')) {
-        body.innerHTML = '<div class="filterbar">' +
-            '<input id="evfilter" type="text" placeholder="Filter by event type or actor" /></div>' +
-            '<div id="evbody"></div>';
+    if (!document.getElementById('findw')) {
+        body.innerHTML =
+            '<div id="findw" class="findw" style="display:none">' +
+                '<div class="finput">' +
+                    '<input id="evfilter" type="text" placeholder="Find" />' +
+                    '<button id="f-case" class="fbtn ftog" title="Match Case">Aa</button>' +
+                    '<button id="f-word" class="fbtn ftog" title="Match Whole Word"><u>ab</u></button>' +
+                    '<button id="f-regex" class="fbtn ftog" title="Use Regular Expression">.*</button>' +
+                '</div>' +
+                '<span id="f-count" class="fcount"></span>' +
+                '<span class="fspace"></span>' +
+                '<button id="f-prev" class="fbtn" title="Previous Match (Shift+Enter)">↑</button>' +
+                '<button id="f-next" class="fbtn" title="Next Match (Enter)">↓</button>' +
+                '<button id="f-close" class="fbtn" title="Close (Escape)">✕</button>' +
+            '</div><div id="evbody"></div>';
         const inp = document.getElementById('evfilter') as HTMLInputElement;
         inp.addEventListener('input', () => { evFilter = inp.value; renderEventList(); });
+        inp.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key === 'Enter') { e.preventDefault(); stepMatch(e.shiftKey ? 'up' : 'down'); }
+        });
+        wireToggle('f-case', () => { evCase = !evCase; });
+        wireToggle('f-word', () => { evWord = !evWord; });
+        wireToggle('f-regex', () => { evRegex = !evRegex; });
+        document.getElementById('f-prev')?.addEventListener('click', () => stepMatch('up'));
+        document.getElementById('f-next')?.addEventListener('click', () => stepMatch('down'));
+        document.getElementById('f-close')?.addEventListener('click', () => toggleFind(false));
     }
     renderEventList();
+}
+
+function wireToggle(id: string, flip: () => void): void {
+    const el = document.getElementById(id) as HTMLElement;
+    el.addEventListener('click', () => { flip(); el.classList.toggle('on'); renderEventList(); });
+}
+
+function toggleFind(open?: boolean): void {
+    const w = document.getElementById('findw');
+    if (!w) { return; }
+    evFindOpen = open === undefined ? !evFindOpen : open;
+    w.style.display = evFindOpen ? '' : 'none';
+    if (evFindOpen) {
+        const inp = document.getElementById('evfilter') as HTMLInputElement;
+        inp.focus();
+        inp.select();
+    }
+    renderEventList();
+}
+
+// ↑/↓ move the selection through visible rows. The list is newest-first, so
+// "down" = older = smaller seq; with nothing selected both start at the top row.
+function stepMatch(dir: 'up' | 'down'): void {
+    if (!evShownSeqs.length) { return; }
+    const cur: number | null = evModel?.timeTravelSeq ?? null;
+    const target = cur === null
+        ? evShownSeqs[evShownSeqs.length - 1]
+        : dir === 'down'
+            ? [...evShownSeqs].reverse().find((s) => s < cur)
+            : evShownSeqs.find((s) => s > cur);
+    if (target !== undefined) { vscode.postMessage({ command: 'timeTravel', seq: target }); }
 }
 
 function renderEventList(): void {
@@ -124,6 +185,32 @@ function renderEventList(): void {
     evbody.querySelectorAll('tr.evrow').forEach((el) => {
         el.addEventListener('click', () => vscode.postMessage({ command: 'timeTravel', seq: Number((el as HTMLElement).dataset.seq) }));
     });
+
+    const count = document.getElementById('f-count');
+    if (count) {
+        const q = evFilter.trim();
+        count.textContent = evFindOpen && q
+            ? (evShownSeqs.length ? String(evShownSeqs.length) + ' results' : 'No results')
+            : '';
+        const none = !evShownSeqs.length;
+        (document.getElementById('f-prev') as HTMLButtonElement).disabled = none;
+        (document.getElementById('f-next') as HTMLButtonElement).disabled = none;
+    }
+}
+
+// Build the row predicate from the find state; null = no filtering. An invalid
+// regex matches nothing (the count then reads "No results", like VS Code).
+function eventMatcher(): ((hay: string) => boolean) | null {
+    const q = evFilter.trim();
+    if (!evFindOpen || !q) { return null; }
+    const src = evRegex ? q : q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = evWord ? '\\b(?:' + src + ')\\b' : src;
+    try {
+        const re = new RegExp(pattern, evCase ? '' : 'i');
+        return (hay) => re.test(hay);
+    } catch {
+        return () => false;
+    }
 }
 
 // Selected actor inspector: state summary, context, dispatch, persisted.
@@ -181,15 +268,16 @@ function renderEvents(m: any): string {
     for (const a of m.actors) { labelBy[a.sessionId] = a.label; }
     let html = '<div class="section">';
     if (!m.events.length) {
+        evShownSeqs = [];
         html += '<div class="muted">' + (m.status === 'open'
             ? 'No events captured yet.' : 'Connect from the Debugger view to capture events.') + '</div>';
         return html + '</div>';
     }
-    const q = evFilter.trim().toLowerCase();
-    const shown = q
-        ? m.events.filter((ev: any) =>
-            String(ev.type).toLowerCase().includes(q) || (labelBy[ev.sessionId] || '').toLowerCase().includes(q))
+    const match = eventMatcher();
+    const shown = match
+        ? m.events.filter((ev: any) => match(String(ev.type)) || match(labelBy[ev.sessionId] || ''))
         : m.events;
+    evShownSeqs = shown.map((ev: any) => ev.seq);
     if (!shown.length) {
         return html + '<div class="muted">No events match the filter.</div></div>';
     }

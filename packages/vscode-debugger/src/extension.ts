@@ -33,10 +33,13 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // ── Live debugger ──────────────────────────────────────────────────────────
     const debuggerController = new DebuggerController(graphViewProvider);
+    const eventsViewProvider = new DebuggerViewProvider(context.extensionUri, debuggerController, 'events');
     const eventsViewRegistration = vscode.window.registerWebviewViewProvider(
         DebuggerViewProvider.eventsViewType,
-        new DebuggerViewProvider(context.extensionUri, debuggerController, 'events'),
+        eventsViewProvider,
     );
+    const debuggerFindEventsCommand = vscode.commands.registerCommand(
+        'xstateDebugger.findEvents', () => eventsViewProvider.toggleFind());
     // Bring the XState event log to the front when the debugger attaches (only on
     // the transition into 'open', so reconnect flaps don't keep stealing focus).
     let debuggerWasOpen = false;
@@ -226,6 +229,7 @@ export async function activate(context: vscode.ExtensionContext) {
         outputChannel,
         workspaceScanner,
         eventsViewRegistration,
+        debuggerFindEventsCommand,
         debuggerFocusLogSub,
         debuggerTreeView,
         debuggerTreeSelectionListener,
