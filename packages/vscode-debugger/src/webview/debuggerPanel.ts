@@ -48,28 +48,26 @@ function render(m: any): void {
     const body = $('body');
 
     if (ROLE === 'events') {
-        // Scroll-lock: pin the selected row at the same spot in the viewport across
-        // the rebuild. Anchor to the row that is *becoming* selected (matched by
-        // seq in the current DOM — i.e. exactly where the user clicked it), NOT the
-        // previously-selected tr.tt, so clicking a new event doesn't scroll. This
-        // also covers streaming (seq unchanged → same row) and ←/→ stepping.
-        const listBefore = document.getElementById('loglist');
+        // .loglist has no fixed height, so the document — not #loglist — is the
+        // real scroll container. Anchor to the row that is *becoming* selected
+        // (matched by seq in the current DOM — i.e. exactly where the user
+        // clicked it), NOT the previously-selected tr.tt, so clicking a new
+        // event doesn't scroll. Also covers streaming and ←/→ stepping.
+        const scroller = document.scrollingElement as HTMLElement;
         const rowBefore = m.timeTravelSeq !== null
             ? body.querySelector('tr[data-seq="' + m.timeTravelSeq + '"]') as HTMLElement | null
             : null;
-        const anchor = (listBefore && rowBefore)
-            ? rowBefore.getBoundingClientRect().top - listBefore.getBoundingClientRect().top
-            : null;
+        const anchor = rowBefore ? rowBefore.getBoundingClientRect().top : null;
 
         body.innerHTML = renderEvents(m);
 
         if (anchor !== null) {
-            const listAfter = document.getElementById('loglist');
+            // Selected: pin the selected row at the same viewport offset.
             const rowAfter = body.querySelector('tr.tt') as HTMLElement | null;
-            if (rowAfter && listAfter) {
-                // Shift scroll so the row returns to the exact viewport offset it had.
-                listAfter.scrollTop += (rowAfter.getBoundingClientRect().top - listAfter.getBoundingClientRect().top) - anchor;
-            }
+            if (rowAfter) { scroller.scrollTop += rowAfter.getBoundingClientRect().top - anchor; }
+        } else {
+            // Live: newest-first list → top shows the latest events.
+            scroller.scrollTop = 0;
         }
     } else if (!m.selected) {
         // Instances now live in the native "Instances" tree; this webview is the
