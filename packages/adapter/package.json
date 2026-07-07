@@ -1,6 +1,6 @@
 {
   "name": "@xstate-devtools/adapter",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Inspect XState v5 actors from a running app (browser, Node/SSR, or React) and stream them to the XState DevTools / VS Code live debugger.",
   "license": "MIT",
   "repository": {
