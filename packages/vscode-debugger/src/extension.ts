@@ -67,9 +67,12 @@ export async function activate(context: vscode.ExtensionContext) {
     const navigateToSelected = (item: DebuggerTreeItem): void => {
         // Only navigate for items backed by a machine (skip placeholders/machineless actors).
         if (!debuggerController.getStore().getState().actors.get(item.sessionId)?.machine) { return; }
+        // preserveFocus: navigation triggered by clicking the tree must not
+        // steal focus from it (explicit context-menu commands still focus).
         void vscode.commands.executeCommand(
             navigateTarget === 'diagram' ? 'xstateDebugger.revealInDiagram' : 'xstateDebugger.goToSource',
             item,
+            { preserveFocus: true },
         );
     };
     // Set while an event-log click programmatically reveals+selects an actor, so

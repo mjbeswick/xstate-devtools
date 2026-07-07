@@ -119,11 +119,11 @@ export class XStateGraphViewProvider {
     }
 
 
-    public show(machineNode: MachineNode, title: string, selectName?: string, liveOverlay?: { label: string; path: string[] }) {
+    public show(machineNode: MachineNode, title: string, selectName?: string, liveOverlay?: { label: string; path: string[] }, preserveFocus = false) {
         const key = machineKey(machineNode);
         const existing = this.panels.get(key);
         if (existing) {
-            existing.panel.reveal();
+            existing.panel.reveal(undefined, preserveFocus);
             this.activeKey = key;
             // Already rendered — select the requested node via a live message.
             if (selectName) { this.highlightState(selectName); }
@@ -133,7 +133,7 @@ export class XStateGraphViewProvider {
         const panel = vscode.window.createWebviewPanel(
             XStateGraphViewProvider.viewType,
             `XState Graph: ${title}`,
-            { viewColumn: vscode.ViewColumn.Active },
+            { viewColumn: vscode.ViewColumn.Active, preserveFocus },
             {
                 enableScripts: true,
                 localResourceRoots: [this.extensionUri],

@@ -34,9 +34,12 @@ function walkStatic(machine: MachineNode, path: string[]): MachineNode | undefin
     return cur;
 }
 
-async function reveal(uri: vscode.Uri, range: vscode.Range): Promise<void> {
-    await vscode.window.showTextDocument(uri, { selection: range, preview: false });
+async function reveal(uri: vscode.Uri, range: vscode.Range, preserveFocus = false): Promise<void> {
+    await vscode.window.showTextDocument(uri, { selection: range, preview: false, preserveFocus });
 }
+
+/** Extra options the tree's navigate-on-select passes so focus stays in the tree. */
+export interface NavigateOptions { preserveFocus?: boolean }
 
 /** Outgoing event types from the actor's current active configuration. */
 function enabledEvents(controller: DebuggerController, sessionId: string): string[] {
@@ -63,8 +66,9 @@ export function registerDebuggerCommands(
 ): vscode.Disposable[] {
     const goToSource = vscode.commands.registerCommand(
         'xstateDebugger.goToSource',
-        async (item?: DebuggerTreeItem) => {
+        async (item?: DebuggerTreeItem, opts?: NavigateOptions) => {
             if (!item) { return; }
+            const preserveFocus = opts?.preserveFocus ?? false;
             const state = controller.getStore().getState();
             const actor = state.actors.get(item.sessionId);
             if (!actor?.machine) { return; }
@@ -73,17 +77,17 @@ export function registerDebuggerCommands(
             if (item.kind === 'state' && item.node && machine) {
                 const path = pathToNode(actor.machine.root, item.node.id);
                 const target = path ? walkStatic(machine, path) : undefined;
-                if (target?.uri && target.range) { await reveal(target.uri, target.range); return; }
+                if (target?.uri && target.range) { await reveal(target.uri, target.range, preserveFocus); return; }
             }
             // Actor (or state fallback) → the machine's location.
-            if (machine?.uri && machine.range) { await reveal(machine.uri, machine.range); return; }
+            if (machine?.uri && machine.range) { await reveal(machine.uri, machine.range, preserveFocus); return; }
             // Last resort: the runtime's best-effort source location.
             const loc = actor.machine.sourceLocation;
             const m = loc ? /^(.*?):(\d+)(?::\d+)?$/.exec(loc) : null;
             if (m) {
                 try {
                     const line = Math.max(0, parseInt(m[2], 10) - 1);
-                    await reveal(vscode.Uri.file(m[1]), new vscode.Range(line, 0, line, 0));
+                    await reveal(vscode.Uri.file(m[1]), new vscode.Range(line, 0, line, 0), preserveFocus);
                     return;
                 } catch { /* fall through */ }
             }
@@ -95,7 +99,7 @@ export function registerDebuggerCommands(
 
     const revealInDiagram = vscode.commands.registerCommand(
         'xstateDebugger.revealInDiagram',
-        (item?: DebuggerTreeItem) => {
+        (item?: DebuggerTreeItem, opts?: NavigateOptions) => {
             if (!item) { return; }
             const actor = controller.getStore().getState().actors.get(item.sessionId);
             if (!actor?.machine) { return; }
@@ -109,7 +113,7 @@ export function registerDebuggerCommands(
             }
             controller.selectActor(item.sessionId);
             const selectName = item.kind === 'state' && item.node ? item.node.key : undefined;
-            graphView.show(machine, machine.label, selectName);
+            graphView.show(machine, machine.label, selectName, undefined, opts?.preserveFocus);
         },
     );
 
