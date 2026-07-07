@@ -11,7 +11,9 @@ import type {
   PageToExtensionMessage, SerializedSnapshot, SessionExport,
 } from '@xstate-devtools/protocol'
 
-export const MAX_EVENTS = 500
+// ponytail: fixed cap, no virtualization — each event carries a full snapshot,
+// so unbounded history is unbounded memory; 5000 covers realistic sessions.
+export const MAX_EVENTS = 5000
 
 /**
  * Build a minimal actor record from a bare snapshot, for an actor we never saw

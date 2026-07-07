@@ -66,8 +66,6 @@ export interface DebuggerView {
     postModel(model: DebuggerViewModel): void;
 }
 
-const MAX_EVENT_ROWS = 200;
-
 export class DebuggerController implements vscode.Disposable {
     private readonly store: StoreApi<InspectorStore> = createInspectorStore();
     private client: DebuggerWsClient | null = null;
@@ -434,7 +432,6 @@ export class DebuggerController implements vscode.Disposable {
         }
 
         const events: EventVM[] = state.events
-            .slice(-MAX_EVENT_ROWS)
             .map((e) => ({ sessionId: e.sessionId, type: e.event.type, seq: e.globalSeq, time: e.timestamp }));
 
         return {

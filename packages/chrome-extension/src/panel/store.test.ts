@@ -1,6 +1,7 @@
 // packages/chrome-extension/src/panel/store.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useStore, getDisplaySnapshot } from './store.js'
+import { MAX_EVENTS } from '@xstate-devtools/panel-core'
 import type { SerializedMachine, SerializedSnapshot } from '../shared/types.js'
 
 const mockMachine: SerializedMachine = {
@@ -68,7 +69,7 @@ describe('handleMessage', () => {
     expect(useStore.getState().events).toHaveLength(1)
   })
 
-  it('caps events at MAX_EVENTS (500)', () => {
+  it('caps events at MAX_EVENTS', () => {
     useStore.getState().handleMessage({
       type: 'XSTATE_ACTOR_REGISTERED',
       sessionId: 'a1',
@@ -77,7 +78,7 @@ describe('handleMessage', () => {
       globalSeq: 1,
       timestamp: 1000,
     })
-    for (let i = 0; i < 510; i++) {
+    for (let i = 0; i < MAX_EVENTS + 10; i++) {
       useStore.getState().handleMessage({
         type: 'XSTATE_EVENT',
         sessionId: 'a1',
@@ -87,7 +88,7 @@ describe('handleMessage', () => {
         globalSeq: i + 2,
       })
     }
-    expect(useStore.getState().events.length).toBe(500)
+    expect(useStore.getState().events.length).toBe(MAX_EVENTS)
   })
 
   it('records a persisted snapshot response', () => {
