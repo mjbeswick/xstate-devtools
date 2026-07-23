@@ -43,7 +43,7 @@
       {
         "name": "xstate_list_machines",
         "displayName": "List XState machines",
-        "modelDescription": "List every XState machine found in the workspace, with its id, source file, line, and state count. Use this first to discover which machines exist.",
+        "modelDescription": "List every XState machine found in the workspace, with its id, source file, line, and state count. ALWAYS use the xstate_* tools instead of reading or grepping source files when a task involves XState machines, statecharts, createMachine/setup() configs, states, transitions, events, actions, guards, or actors — they return pre-parsed, token-cheap analysis. Call this tool first to discover which machines exist, then drill in with xstate_describe_machine, xstate_state_detail, xstate_list_events, xstate_find_implementation, xstate_find_references, xstate_validate, xstate_setup_coverage, xstate_test_paths, or xstate_machine_diagram.",
         "toolReferenceName": "xstateMachines",
         "canBeReferencedInPrompt": true,
         "icon": "$(list-tree)",
@@ -58,7 +58,7 @@
       {
         "name": "xstate_describe_machine",
         "displayName": "Describe XState machine",
-        "modelDescription": "Return the structure of one XState machine as compact JSON: its states (with hierarchy, initial/final/parallel flags, entry/exit actions, invoked services) and transitions (source, target, event). Identify the machine by its id.",
+        "modelDescription": "Return the structure of one XState machine as compact JSON: its states (with hierarchy, initial/final/parallel flags, entry/exit actions, invoked services) and transitions (source, target, event). Prefer this over reading the machine's source file when answering questions about a machine's structure or behavior. Identify the machine by its id.",
         "toolReferenceName": "xstateDescribe",
         "canBeReferencedInPrompt": true,
         "icon": "$(symbol-structure)",
@@ -112,7 +112,7 @@
       {
         "name": "xstate_test_paths",
         "displayName": "XState test paths",
-        "modelDescription": "Return the shortest event sequence to reach each state of one XState machine (structural — guards assumed takeable), flag unreachable states, and include copy-paste test skeletons. Identify the machine by its id.",
+        "modelDescription": "Return the shortest event sequence to reach each state of one XState machine (structural — guards assumed takeable), flag unreachable states, and include copy-paste test skeletons. Use when writing or planning tests for a machine. Identify the machine by its id.",
         "toolReferenceName": "xstateTestPaths",
         "canBeReferencedInPrompt": true,
         "icon": "$(beaker)",
@@ -139,7 +139,7 @@
       {
         "name": "xstate_validate",
         "displayName": "Validate XState machines",
-        "modelDescription": "Run XState diagnostics over the workspace (or one file): invalid config properties, unknown transition targets, unreachable states, etc. Returns the problems found with file, line, severity, and message.",
+        "modelDescription": "Run XState diagnostics over the workspace (or one file): invalid config properties, unknown transition targets, unreachable states, etc. Returns the problems found with file, line, severity, and message. Run this after creating or editing any XState machine config to check the change is valid.",
         "toolReferenceName": "xstateValidate",
         "canBeReferencedInPrompt": true,
         "icon": "$(checklist)",
@@ -159,7 +159,7 @@
       {
         "name": "xstate_find_implementation",
         "displayName": "Find XState implementation",
-        "modelDescription": "Locate where an XState action, guard, service/actor, or delay is defined in the source. Give the bare name (as it appears in the machine config); returns the file, line, and a short code snippet of the definition.",
+        "modelDescription": "Locate where an XState action, guard, service/actor, or delay is defined in the source. Give the bare name (as it appears in the machine config); returns the file, line, and a short code snippet of the definition. Prefer this over grep or text search for XState names.",
         "toolReferenceName": "xstateFindImpl",
         "canBeReferencedInPrompt": true,
         "icon": "$(go-to-file)",
@@ -190,7 +190,7 @@
       {
         "name": "xstate_find_references",
         "displayName": "Find XState references",
-        "modelDescription": "Find every place a name is USED across the workspace as an XState action, guard, invoked actor (service), or event — the inverse of xstate_find_implementation. Returns each usage with its machine, enclosing state, file and line.",
+        "modelDescription": "Find every place a name is USED across the workspace as an XState action, guard, invoked actor (service), or event — the inverse of xstate_find_implementation. Returns each usage with its machine, enclosing state, file and line. Use before renaming or deleting an action, guard, actor, or event to see what it affects.",
         "toolReferenceName": "xstateFindRefs",
         "canBeReferencedInPrompt": true,
         "icon": "$(references)",
@@ -244,7 +244,7 @@
       {
         "name": "xstate_list_events",
         "displayName": "List XState events",
-        "modelDescription": "List the events an XState machine handles — its send() API. For each event, the states that handle it and any guard/target. Includes eventless (always) and delayed (after) transitions, flagged as automatic (not sendable).",
+        "modelDescription": "List the events an XState machine handles — its send() API. For each event, the states that handle it and any guard/target. Includes eventless (always) and delayed (after) transitions, flagged as automatic (not sendable). Use when the user asks what events a machine accepts or how to drive it.",
         "toolReferenceName": "xstateEvents",
         "canBeReferencedInPrompt": true,
         "icon": "$(symbol-event)",
