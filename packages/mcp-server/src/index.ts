@@ -14,6 +14,7 @@ import {
     setupCoverageSource,
 } from '@xstate-devtools/diagram-core';
 import { candidateFiles, discover, findMachine, type MachineRef } from './scan';
+import { findImplementation } from './implementationFinder';
 
 // stdout is the JSON-RPC channel — the shared parser does an unconditional
 // console.log, so redirect it (and anything else) to stderr to avoid corrupting
@@ -81,6 +82,26 @@ function main() {
         if (!ref) { return notFound(refs, machine); }
         const resolve = (src: string) => findMachine(refs, src)?.machine;
         return text(renderTestPathsMarkdown(ref.machine, resolve));
+    });
+
+    server.registerTool('find_implementation', {
+        title: 'Find XState implementation',
+        description: 'Resolve an action/guard/actor name to its source definition: same file, then imported modules, then a workspace-wide text search. Returns file:line and a short snippet.',
+        inputSchema: {
+            name: z.string().describe('The action/guard/actor name to resolve.'),
+            machine: z.string().optional().describe("Optional machine id (from list_machines) to search from its file first."),
+            file: z.string().optional().describe('Optional source path substring to search from, if `machine` is not given.'),
+        },
+    }, async ({ name, machine, file }) => {
+        let startFile = file;
+        if (machine) {
+            const refs = discover(ROOT);
+            const ref = findMachine(refs, machine, file);
+            if (ref) { startFile = ref.file; }
+        }
+        const hit = findImplementation(ROOT, name, startFile);
+        if (!hit) { return text(`No implementation found for "${name}" under ${ROOT}.`); }
+        return text(`${hit.file}:${hit.line}\n\n${hit.snippet}`);
     });
 
     server.registerTool('validate', {
