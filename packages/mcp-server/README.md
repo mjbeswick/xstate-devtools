@@ -9,7 +9,7 @@ It reuses the same analysis engine as the [XState Devtools](../vscode-devtool/RE
 | Tool | Description |
 | --- | --- |
 | `list_machines` | Every machine in the workspace: id, file, line, state count. |
-| `describe_machine` | One machine as JSON: states (hierarchy, initial/final/parallel, entry/exit actions, invokes) plus transitions. |
+| `describe_machine` | One machine as JSON: states (hierarchy, initial/final/parallel, entry/exit actions, invokes) plus transitions. Optionally scoped to a subtree via `parent`/`depth`. |
 | `machine_diagram` | Mermaid `stateDiagram-v2` for a machine. |
 | `test_paths` | Shortest event sequence to reach each state, unreachable states flagged, plus test skeletons. |
 | `validate` | XState diagnostics (invalid properties, unknown transition targets, unreachable states, etc). |

@@ -50,14 +50,18 @@ function main() {
 
     server.registerTool('describe_machine', {
         title: 'Describe XState machine',
-        description: 'Return one machine as JSON: states (hierarchy, initial/final/parallel flags, entry/exit actions, invoked services) and transitions (source, target, event).',
-        inputSchema: machineInput,
-    }, async ({ machine, file }) => {
+        description: 'Return one machine as JSON: states (hierarchy, initial/final/parallel flags, entry/exit actions, invoked services) and transitions (source, target, event). For large machines, pass `parent` (and optionally `depth`) to scope the result to one subtree instead of the whole machine.',
+        inputSchema: {
+            ...machineInput,
+            parent: z.string().optional().describe('Optional state label or id — scope the result to this state\'s descendants instead of the whole machine.'),
+            depth: z.number().int().positive().optional().describe('Optional levels below `parent` to include (1 = direct children only). Requires `parent`. Omit for unlimited.'),
+        },
+    }, async ({ machine, file, parent, depth }) => {
         const refs = discover(ROOT);
         const ref = findMachine(refs, machine, file);
         if (!ref) { return notFound(refs, machine); }
         const resolve = (src: string) => findMachine(refs, src)?.machine;
-        return text(JSON.stringify(describeMachine(ref.machine, resolve), null, 2));
+        return text(JSON.stringify(describeMachine(ref.machine, resolve, { parent, depth }), null, 2));
     });
 
     server.registerTool('machine_diagram', {

@@ -45,12 +45,45 @@ export interface MachineDescription {
     transitions: Array<{ source: string; target: string; event: string }>;
 }
 
-/** Structured states + transitions for a machine (derived from the graph payload). */
-export function describeMachine(machine: MachineNode, resolveInvoke?: ResolveInvoke): MachineDescription {
+export interface DescribeScope {
+    /** State label or id to scope the result to (its descendants only). */
+    parent?: string;
+    /** Levels below `parent` to include (1 = direct children only). Omit for unlimited. */
+    depth?: number;
+}
+
+/** Structured states + transitions for a machine (derived from the graph payload).
+ *  Pass `scope.parent` to return only a subtree instead of the whole machine —
+ *  useful for large machines where the full JSON is too big to be useful. */
+export function describeMachine(machine: MachineNode, resolveInvoke?: ResolveInvoke, scope?: DescribeScope): MachineDescription {
     const payload = buildGraphPayload(machine, { resolveInvoke });
+    let nodes = payload.nodes;
+
+    if (scope?.parent) {
+        const root = nodes.find((n) => n.data.label === scope.parent || n.data.id === scope.parent);
+        if (!root) { return { id: machine.label, states: [], transitions: [] }; }
+        const byParent = new Map<string, typeof nodes>();
+        for (const n of nodes) {
+            if (!n.data.parent) { continue; }
+            const list = byParent.get(n.data.parent) ?? [];
+            list.push(n);
+            byParent.set(n.data.parent, list);
+        }
+        nodes = [];
+        const walk = (parentId: string, level: number) => {
+            if (scope.depth !== undefined && level > scope.depth) { return; }
+            for (const n of byParent.get(parentId) ?? []) {
+                nodes.push(n);
+                walk(n.data.id, level + 1);
+            }
+        };
+        walk(root.data.id, 1);
+    }
+
+    const ids = new Set(nodes.map((n) => n.data.id));
     return {
         id: machine.label,
-        states: payload.nodes.map((n) => ({
+        states: nodes.map((n) => ({
             id: n.data.id,
             label: n.data.label,
             parent: n.data.parent,
@@ -62,7 +95,9 @@ export function describeMachine(machine: MachineNode, resolveInvoke?: ResolveInv
             exitActions: n.data.exitActions?.length ? n.data.exitActions : undefined,
             invokes: n.data.invokes?.length ? n.data.invokes : undefined,
         })),
-        transitions: payload.edges.map((e) => ({ source: e.data.source, target: e.data.target, event: e.data.label })),
+        transitions: payload.edges
+            .filter((e) => !scope?.parent || ids.has(e.data.source))
+            .map((e) => ({ source: e.data.source, target: e.data.target, event: e.data.label })),
     };
 }
 
