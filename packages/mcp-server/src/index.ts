@@ -36,7 +36,7 @@ const machineInput = {
 };
 
 function main() {
-    const server = new McpServer({ name: 'xstate-mcp', version: '0.2.0' });
+    const server = new McpServer({ name: 'xstate-mcp', version: '0.3.0' });
 
     server.registerTool('list_machines', {
         title: 'List XState machines',
