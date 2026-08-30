@@ -33,6 +33,7 @@
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.122.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@types/node": "^18",
     "@types/vscode": "^1.95.0",
