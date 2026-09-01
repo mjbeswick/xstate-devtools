@@ -66,3 +66,18 @@ Without the server, the agent had no structural view of the machine. It read the
 - **Lower cost** — 90% fewer total tokens, since the agent no longer had to re-read large spans of source into context.
 - **Faster** — under two minutes end to end, versus over five without.
 - **Correct by construction** — state and transition data comes from the parsed AST, not text pattern-matching, so nesting depth and sibling counts can't be misread the way raw indentation was.
+
+## Verifying `describe_machine` scoping with Claude's tokenizer
+
+`describe_machine`'s `parent`/`depth` options (see [Tools](#tools)) scope the result to one subtree instead of dumping the whole machine. `test/tokenSavings.test.ts` checks that this scoping actually saves tokens, using real counts from Claude's own tokenizer via `client.messages.countTokens` (the [Anthropic TypeScript SDK](https://github.com/anthropics/anthropic-sdk-typescript)) rather than an estimate.
+
+**Method.** The test builds a synthetic machine with several independent sibling branches (a shape that mirrors a real multi-domain workflow machine), asks `describe_machine` to scope to a single branch via `parent`, and compares the token count of that scoped JSON against the token count of the raw source file. It requires `ANTHROPIC_API_KEY` (plus `ANTHROPIC_WORKSPACE_ID` for identity-linked keys) and is skipped automatically when no key is set, so it never breaks CI without credentials.
+
+**Results**, measured against `claude-sonnet-5`:
+
+| Machine size | Raw file | Full `describe_machine` | Scoped to 1 branch | Savings vs. raw file | Savings vs. full `describe_machine` |
+| --- | --- | --- | --- | --- | --- |
+| 6 branches | 1,063 tokens | — | 535 tokens | −50% | — |
+| 40 branches | 6,194 tokens | 22,667 tokens | 538 tokens | −91% | −98% |
+
+Scoping stays roughly constant in size (one branch's worth of JSON) while both the raw file and the unscoped `describe_machine` output grow with the machine — and past a certain size, the full JSON dump is *more* expensive than just reading the file, which is exactly the case `parent`/`depth` exists for.
