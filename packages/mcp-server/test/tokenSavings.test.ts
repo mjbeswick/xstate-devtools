@@ -57,7 +57,12 @@ describe('token savings (Claude tokenizer)', () => {
         expect(ref).toBeDefined();
         const scoped = JSON.stringify(describeMachine(ref!.machine, () => undefined, { parent: 'billing' }), null, 2);
 
-        const client = new Anthropic({ apiKey });
+        const client = new Anthropic({
+            apiKey,
+            defaultHeaders: process.env.ANTHROPIC_WORKSPACE_ID
+                ? { 'anthropic-workspace-id': process.env.ANTHROPIC_WORKSPACE_ID }
+                : undefined,
+        });
         const [rawCount, scopedCount] = await Promise.all([
             client.messages.countTokens({ model, messages: [{ role: 'user', content: SRC }] }),
             client.messages.countTokens({ model, messages: [{ role: 'user', content: scoped }] }),
